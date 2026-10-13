@@ -1,0 +1,22 @@
+{
+  "godot": {
+    "repository": "https://github.com/godotengine/godot.git",
+    "version": "4.7.2-stable",
+    "role": "runtime-and-editor",
+    "windows_archive": "Godot_v4.7.2-stable_win64.exe.zip",
+    "sha256": "731980f9608d61333e5baf54a2ef17210acc7a538446c0cb9969f002aca1e953",
+    "license": "MIT"
+  },
+  "studio_reference": {
+    "repository": "https://github.com/Donchitos/Claude-Code-Game-Studios.git",
+    "role": "optional-development-reference",
+    "revision": "be8993bbc5a1f016bc770b2846ce06272d284526",
+    "install_hooks": false
+  },
+  "excluded": {
+    "pixijs/pixijs": "2D renderer; no need for a second renderer in the 3D base.",
+    "BabylonJS/Babylon.js": "Alternative web engine; reconsider only for a browser-first target.",
+    "libgdx/libgdx": "Alternative Java stack; duplicates the chosen engine.",
+    "JuliusBrussee/caveman": "Agent token tooling; does not contribute to the game runtime."
+  }
+}

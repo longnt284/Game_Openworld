@@ -1,0 +1,21 @@
+name: Validate game base
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Godot (checksum verified)
+        shell: pwsh
+        run: ./tools/setup.ps1
+      - name: Import assets and run integration tests
+        shell: pwsh
+        run: ./tools/run.ps1 -Mode test
