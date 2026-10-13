@@ -1,0 +1,32 @@
+; Open with the Godot version pinned in dependencies.json.
+config_version=5
+
+[application]
+config/name="Game Openworld — Nguyễn Thành Long"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/icon.svg"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.62, 0.73, 0.76, 1)
+
+[input]
+move_forward={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":87)]}
+move_back={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":83)]}
+move_left={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":65)]}
+move_right={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":68)]}
+jump={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":32)]}
+sprint={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194325)]}
+interact={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":69)]}
+save_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194336)]}
+load_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194340)]}
+respawn={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":82)]}
+pause_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194305)]}

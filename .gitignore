@@ -1,0 +1,9 @@
+.godot/
+.tools/
+.cache/
+build/
+*.blend1
+*.blend2
+*.tmp
+*.log
+.DS_Store

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GameSettings" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/game_settings.gd" id="1"]
+[resource]
+script = ExtResource("1")
+world_seed = 284
+chunk_size = 32
+subdivisions = 16
+view_radius = 2
+trees_per_chunk = 10
