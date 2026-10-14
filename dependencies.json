@@ -17,6 +17,14 @@
     "pixijs/pixijs": "2D renderer; no need for a second renderer in the 3D base.",
     "BabylonJS/Babylon.js": "Alternative web engine; reconsider only for a browser-first target.",
     "libgdx/libgdx": "Alternative Java stack; duplicates the chosen engine.",
-    "JuliusBrussee/caveman": "Agent token tooling; does not contribute to the game runtime."
+    "Kavex/GameDev-Resources": "Link list, no code or assets to vendor; use as a bookmark when searching for free assets or tools. Check each linked license before use.",
+    "ppy/osu": "C# rhythm game on its own framework; no shared code with the Godot 3D open-world base. Assets are CC BY-NC, not safe to reuse."
+  },
+  "caveman": {
+    "repository": "https://github.com/JuliusBrussee/caveman.git",
+    "role": "agent-tooling-reference-submodule",
+    "path": "external/caveman",
+    "revision": "2e08b9177c07bb7249a8a2d1a6758e5db281d002",
+    "license": "see repository"
   }
 }

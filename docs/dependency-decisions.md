@@ -9,7 +9,9 @@
 | [PixiJS](https://github.com/pixijs/pixijs) | Không thêm | Thư viện render 2D; HUD hiện dùng Control của Godot |
 | [Babylon.js](https://github.com/BabylonJS/Babylon.js) | Không thêm | Engine 3D web thay thế; đánh giá lại nếu yêu cầu browser-first |
 | [libGDX](https://github.com/libgdx/libgdx) | Không thêm | Framework Java thay thế, không cần thêm JVM/toolchain cho base Godot |
-| [Caveman](https://github.com/JuliusBrussee/caveman) | Không thêm | Công cụ/skill cho coding agent; không bổ sung tính năng chạy game |
+| [Caveman](https://github.com/JuliusBrussee/caveman) | **Submodule tham khảo** | Công cụ/skill cho coding agent, không phải mã runtime; gắn tại `external/caveman` (commit cố định), Godot bỏ qua nhờ `external/.gdignore` |
+| [GameDev-Resources](https://github.com/Kavex/GameDev-Resources) | Không thêm | Danh sách liên kết, không có mã hay tài nguyên để đưa vào; dùng như trang đánh dấu khi tìm asset/công cụ miễn phí, luôn kiểm tra license từng liên kết |
+| [osu!](https://github.com/ppy/osu) | Không thêm | Game nhịp điệu C# trên framework riêng, không dùng chung mã với base Godot 3D; tài nguyên theo CC BY-NC nên không an toàn để tái sử dụng |
 
 `dependencies.json` ghi nguồn, vai trò và phiên bản. `tools/setup.ps1 -WithStudioReference` lấy đúng hai thành phần đã chọn. Bản clone tham khảo và engine được gitignore; clone mới vẫn tự dựng được qua script. Không sao chép hoặc kích hoạt hooks, agent, proxy hay cấu hình tài khoản từ repo tham khảo.
 
