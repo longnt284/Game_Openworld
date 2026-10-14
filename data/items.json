@@ -1,0 +1,12 @@
+{
+	"banh_ngai": {"name": "Bánh ngải", "kind": "heal", "description": "Bánh lá ngải hấp nóng. Hồi 40% khí huyết.", "icon": "bamboo"},
+	"tra_sen": {"name": "Trà sen", "kind": "heal", "description": "Trà ướp sen hồ Vân Khê. Hồi 65% khí huyết.", "icon": "jade"},
+	"da_gio": {"name": "Đá gió", "kind": "material", "description": "Đá xanh rỗng ruột, gió lùa qua kêu vi vu. Thợ rèn dùng để tôi kiếm.", "icon": "stone"},
+	"manh_gio": {"name": "Mảnh gió", "kind": "material", "description": "Mảnh tinh thể đọng lại khi ký ức tan vào gió.", "icon": "spirit"},
+	"thu_tieu_mac": {"name": "Thư gửi bà Lục", "kind": "quest", "description": "Thư Tiểu Mạc nhờ chuyển cho bà Lục. Dấu niêm phong đã nhòe.", "icon": "paper"},
+	"chuong_gio": {"name": "Chuông gió của bé Tý", "kind": "quest", "description": "Chuông gió tre treo tua đỏ. Khắc chữ \"Tý\" nguệch ngoạc.", "icon": "bamboo"},
+	"nhat_ky": {"name": "Nhật ký người giữ đền", "kind": "quest", "description": "Những trang chữ nhòe của Tịch Phong, người giữ đền trên núi.", "icon": "paper"},
+	"long_vu_gio": {"name": "Lông vũ gió", "kind": "key", "description": "Lông chim trắng không bao giờ rơi xuống đất. Giúp lĩnh hội khinh công.", "icon": "white"},
+	"to_ky_uc": {"name": "Tơ ký ức", "kind": "key", "description": "Sợi tơ sáng kết từ ký ức người làng nhớ lại. Có thể dùng để hóa giải phong ấn.", "icon": "spirit"},
+	"ngoc_phong_an": {"name": "Ngọc phong ấn", "kind": "key", "description": "Viên ngọc nứt rơi ra từ Trúc Tướng. Bên trong vọng tiếng chuông xa.", "icon": "seal"}
+}

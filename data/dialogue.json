@@ -1,0 +1,105 @@
+{
+	"tm_wait": {"lines": [["Tiểu Mạc", "Cứu… cứu tôi với! Bọn mặt nạ đòi lục túi thư!"]]},
+	"tm_rescue": {
+		"lines": [
+			["Tiểu Mạc", "Hú hồn… Cảm ơn huynh! Bọn mặt nạ lục túi thư của tôi như tìm vàng."],
+			["Lâm An", "Chúng tìm gì?"],
+			["Tiểu Mạc", "Tôi cũng chịu. Từ khi chuông trên núi đổ mỗi chiều, chúng mới kéo xuống thung lũng."],
+			["Tiểu Mạc", "Huynh lên làng thì đưa giúp thư này cho bà Lục nhé. Bà là người duy nhất còn nhớ đủ tên cả làng."]
+		],
+		"do": ["give:thu_tieu_mac:1", "event:talk:tieu_mac"]
+	},
+	"tm_village": {
+		"lines": [
+			["Tiểu Mạc", "Tôi ngồi đây nghỉ chân một lát. Đường lên Trúc Hải giờ chẳng ai dám đưa thư."],
+			["Tiểu Mạc", "À, nghe nói Miếu Gió mà sáng lên thì người đi đường đỡ lạc. Huynh thử xem."]
+		]
+	},
+	"tm_after": {
+		"lines": [["Tiểu Mạc", "Chiều nay chuông không đổ! Cả làng ra quảng trường nhìn lên núi, ai cũng hồi hộp."]]
+	},
+	"bl_early": {
+		"lines": [["Bà Lục", "Cháu là người lạ? Nếu gặp thằng Mạc đưa thư thì bảo nó về sớm, đường dạo này không yên."]]
+	},
+	"bl_letter": {
+		"lines": [
+			["Bà Lục", "Thư của thằng Mạc à… để bà xem."],
+			["Bà Lục", "Nó viết con gái nhà họ Đỗ không còn nhận ra mẹ. Người thứ bảy trong tháng rồi."],
+			["Lâm An", "Vì tiếng chuông trên núi?"],
+			["Bà Lục", "Mỗi hồi chuông vang, làng mất đi một mảnh ký ức. Trước hết, cháu thắp lại Miếu Gió giúp bà. Gió còn giữ được những gì người ta quên."],
+			["Bà Lục", "Rồi hỏi thử chú Bảy thợ rèn và bà Hạnh xem họ còn nhớ gì về tiếng chuông."]
+		],
+		"do": ["take:thu_tieu_mac:1", "event:talk:ba_luc"]
+	},
+	"bl_waiting": {"lines": [["Bà Lục", "Miếu Gió ở góc quảng trường, gần đường xuống bến. Còn chú Bảy ở lò rèn phía đông, bà Hạnh ở dãy nhà phía tây."]]},
+	"bl_report": {
+		"lines": [
+			["Bà Lục", "Cháu nghe đủ rồi chứ? Chuông ấy là chuông Đền Tịch Phong."],
+			["Bà Lục", "Người giữ đền tên Tịch Phong. Năm xưa ông dựng phong ấn trấn tai họa dưới chân núi, cứu cả thung lũng này."],
+			["Lâm An", "Vậy sao giờ ông ấy lại lấy ký ức của làng?"],
+			["Bà Lục", "Bà không biết. Nhưng gió biết. Cháu nghe được ký ức trong gió, phải không? Hãy lần theo nó qua Trúc Hải."],
+			["", "Một làn gió lướt qua lưỡi kiếm cũ. Lâm An chợt nhớ lại thế kiếm năm nào: Phong Trảm."]
+		],
+		"do": ["unlock:gust", "flag:map_unlocked", "event:talk:ba_luc"]
+	},
+	"bl_trail": {"lines": [["Bà Lục", "Đi đường cẩn thận, cháu. Trên Đồi Gió có bọn tàn binh lảng vảng. Mỏi thì ghé Miếu Gió mà nghỉ."]]},
+	"bl_after": {
+		"lines": [
+			["Bà Lục", "Cháu về rồi… Chiều nay bà nhớ ra tên ông nhà. Ba mươi năm rồi mà như hôm qua."],
+			["Bà Lục", "Phong ấn chưa giải, nhưng gió đã đổi chiều. Bà tin cháu sẽ tìm ra cách thứ ba."]
+		]
+	},
+	"bh_idle": {"lines": [["Bà Hạnh", "Hiên nhà trống trơn… hình như trước đây tôi treo thứ gì ở đó."]]},
+	"bh_bell": {
+		"lines": [
+			["Bà Hạnh", "Tiếng chuông à? Mỗi lần nó vang, tôi thấy như có ai gọi mình, rồi lại quên mất là ai."],
+			["Bà Hạnh", "Nhà tôi có cái chuông gió tre, chẳng nhớ của ai treo… Mất rồi, chắc bị heo rừng ở bãi phía đông tha đi."],
+			["Lâm An", "Để cháu tìm thử."]
+		],
+		"do": ["event:ask:bell", "flag:asked_ba_hanh", "quest:sq01_chuong_gio"]
+	},
+	"bh_wait": {"lines": [["Bà Hạnh", "Bãi heo rừng ở phía đông làng, theo con đường qua lò rèn. Cháu cẩn thận, bọn heo dạo này hung lắm."]]},
+	"bh_return": {
+		"lines": [
+			["Bà Hạnh", "Cái chuông này… Tý. Thằng Tý nhà tôi!"],
+			["Bà Hạnh", "Sao tôi lại quên được nó… Nó theo lên núi phụ việc cho người giữ đền từ mùa trước."],
+			["Bà Hạnh", "Cháu ơi, nếu gặp nó, bảo nó về ăn cơm. Mẹ nó đã nhớ ra rồi."],
+			["", "Một sợi tơ sáng mảnh như tóc tách ra từ chiếc chuông, quấn nhẹ quanh cổ tay Lâm An."]
+		],
+		"do": ["take:chuong_gio:1", "event:talk:ba_hanh"]
+	},
+	"bh_after": {"lines": [["Bà Hạnh", "Tôi treo chuông lại hiên rồi. Gió thổi là tôi nhớ thằng bé."]]},
+	"cb_idle": {"lines": [["Chú Bảy", "Lửa lò cứ tắt ngóm. Cậu cần rèn gì thì đợi tôi nhớ lại cách nhóm đã."]]},
+	"cb_bell": {
+		"lines": [
+			["Chú Bảy", "Chuông với chiếc gì! Lò của tôi tắt ba hôm rồi, tôi chẳng nhớ nổi cách nhóm cho lửa cháy đều."],
+			["Chú Bảy", "Cha tôi bảo đá gió trên Trúc Hải giữ lửa tốt nhất. Mà bọn tàn binh vơ hết vào trại của chúng rồi."],
+			["Chú Bảy", "Kiếm ba viên về đây, tôi rèn lại thanh kiếm cũ của cậu cho ra hồn."]
+		],
+		"do": ["event:ask:bell", "flag:asked_chu_bay", "quest:sq02_lo_ren"]
+	},
+	"cb_wait": {"lines": [["Chú Bảy", "Ba viên Đá gió. Trại tàn binh nằm phía tây con đường trong Trúc Hải."]]},
+	"cb_forge": {
+		"lines": [
+			["Chú Bảy", "Đủ rồi! Lửa này… ừ, tôi nhớ rồi. Phải để than hồng mới thả đá vào."],
+			["", "Tiếng búa vang đều. Lò rèn đỏ rực trở lại sau ba ngày nguội lạnh."],
+			["Chú Bảy", "Cầm lấy. Thanh Trúc Kiếm — nhẹ như lá, bén như gió."]
+		],
+		"do": ["take:da_gio:3", "sword:sword_bamboo", "event:talk:chu_bay"]
+	},
+	"cb_after": {
+		"lines": [["Chú Bảy", "Kiếm tốt thì phải dùng vào việc tốt. Nếu tìm được thứ ngọc lạ trên núi, mang về đây."]],
+		"choices": [["Rèn Phong Ngân Kiếm (1 Ngọc phong ấn, 4 Mảnh gió, 120 đồng)", "cb_wind", ["has:ngoc_phong_an:1", "has:manh_gio:4", "has:coins:120", "!flag:sword_wind"]], ["Để sau", ""]]
+	},
+	"cb_wind": {
+		"lines": [
+			["Chú Bảy", "Ngọc này… nó đang hát! Được, để tôi thử."],
+			["Chú Bảy", "Phong Ngân Kiếm. Lưỡi bạc như mặt nước, chạm vào là nghe tiếng gió."]
+		],
+		"do": ["take:ngoc_phong_an:1", "take:manh_gio:4", "take:coins:120", "sword:sword_wind", "flag:sword_wind"]
+	},
+	"villager_1": {"lines": [["Dân làng", "Sáng nay tôi ra chợ mà quên mất định mua gì. Chắc tại tiếng chuông…"]]},
+	"villager_2": {"lines": [["Dân làng", "Cậu là lữ khách à? Đừng ở lại qua đêm, nghe chuông nhiều quên cả đường về."]]},
+	"villager_3": {"lines": [["Người bán trà", "Trà sen đây! Uống một chén cho tỉnh, nhớ được thêm chút nào hay chút ấy."]]},
+	"villager_after": {"lines": [["Dân làng", "Chiều nay chuông không đổ! Tôi vừa nhớ ra tên con mèo nhà mình."]]}
+}

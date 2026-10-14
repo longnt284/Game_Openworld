@@ -1,25 +1,41 @@
 # Blender → Godot
 
-Model mẫu được tạo riêng cho dự án: cây thông, đá và trạm ánh sáng. Nguồn chỉnh sửa ở `art/*.blend`, script tái tạo ở `tools/blender/build_assets.py`, file runtime ở `assets/models/*.glb`. `art/.gdignore` ngăn Godot tự nhập `.blend`, giúp máy khác không cần cài Blender để chạy game.
+Mọi model, rig và animation trong game được dựng bằng **script Python chạy Blender 5.2.2 ở chế độ nền**. Phiên làm việc này không có Blender MCP (không kết nối được Blender đang mở), nên không có thao tác tay trong giao diện Blender: chạy lại script là tạo lại y hệt `.blend` và `.glb`.
 
-## Tạo lại bộ mẫu
+| Script | Tạo ra |
+|---|---|
+| `tools/blender/build_characters.py` | 8 nhân vật người: Lâm An, Tiểu Mạc, bà Lục, chú Bảy, bà Hạnh, Tịch Phong, Tàn binh, Trúc Tướng — mesh, xương 20 khớp, animation |
+| `tools/blender/build_creatures.py` | Heo gió (4 chân, 12 khớp) |
+| `tools/blender/build_weapons.py` | Kiếm Cũ, Thanh Trúc Kiếm, Phong Ngân Kiếm, đao tàn binh, kích Trúc Tướng |
+| `tools/blender/build_props.py` | Cây, trúc, cỏ, đá, nhà, cổng, miếu, cầu, bến, thuyền, đèn, rương, trại, chuông gió, cổng phong ấn… (36 asset) |
+| `tools/blender/humanoid.py`, `anim_humanoid.py`, `vk_lib.py` | Thư viện chung: dựng mesh bằng bmesh, tóc/áo/mặt nạ, rig, tư thế, keyframe, bảng màu, export |
+| `tools/blender/contact_sheet.py` | Ghép ảnh xem trước (Python hệ thống + Pillow) |
+| `tools/blender/build_assets.py` | Bộ mẫu của bản nền (cây/đá/trạm đèn) — giữ lại, game không còn dùng |
 
-Từ thư mục repo, dùng Blender 5.2.2 LTS (phiên bản đã kiểm tra):
+## Chạy lại
 
-```powershell
-blender --background --factory-startup --python tools/blender/build_assets.py
-./tools/run.ps1 -Mode test
+```sh
+blender --background --factory-startup --python tools/blender/build_characters.py -- lam_an --preview
+blender --background --factory-startup --python tools/blender/build_props.py -- house_small dock
+blender --background --factory-startup --python tools/blender/build_weapons.py
+blender --background --factory-startup --python tools/blender/build_creatures.py
+python3 tools/blender/contact_sheet.py lam_an 4      # ghép ảnh .cache/blender_previews/lam_an_*.png
+python3 tools/asset_manifest.py                      # cập nhật docs/assets.md
+./tools/run.ps1 -Mode test                           # import lại và kiểm tra
 ```
 
-Script chỉ chạy ở chế độ background và ghi đè ba model mẫu của chính nó. Khi đã chỉnh `.blend` thủ công, hãy export model đó trực tiếp; không chạy generator nếu muốn giữ sửa đổi riêng.
+Không truyền tên thì script dựng tất cả. `--preview` render ảnh Workbench vào `.cache/blender_previews/` (không commit); cần OpenGL — trên Linux không màn hình hãy chạy qua `xvfb-run -a`, nếu không Blender dừng ở bước preview (GLB và `.blend` đã ghi xong trước đó). Script ghi đè file của chính nó: nếu chỉnh `.blend` bằng tay, hãy export file đó trực tiếp thay vì chạy lại generator.
 
-## Quy ước model mới
+## Quy ước
 
-- Đơn vị mét, origin ở chân vật thể; apply rotation/scale trước khi export.
-- Dùng Principled BSDF, texture PBR phổ thông; bake các node procedural không được glTF hỗ trợ.
-- Export glTF 2.0 định dạng **GLB**, +Y Up; bỏ camera/lights không cần dùng.
-- Giữ material và mesh ít, dùng texture theo ngân sách thực tế. Không đưa collider chi tiết cao cho từng cây.
-- Thêm đường dẫn trong `AssetLibrary.PATHS`, import trong Godot và chạy test. Scene riêng nên bọc model để thêm gameplay/collision mà không sửa scene import.
-- Runtime hiện tạo collider terrain và thân cây bằng code. Model đá là trang trí; beacon kích hoạt bằng khoảng cách.
+- Mét, Z-up trong Blender; exporter glTF chuyển sang Y-up. Nhân vật nhìn về −Y Blender (= +Z Godot), gốc ở chân.
+- Không dùng texture ảnh: màu là vật liệu Principled phẳng theo bảng màu trong `vk_lib.py` (ngọc, trúc, kem, đỏ son, vàng); shader toon của Godot thay vật liệu khi nạp, giữ tên vật liệu.
+- Va chạm: object tên `*-convcolonly` (hộp lồi) hoặc `*-colonly` thành `StaticBody3D` khi import; không xuất hiện khi render.
+- Xương được đặt roll để trục X cục bộ là trục ngang, giúp xoay tay/chân nhất quán. Socket vũ khí (`SwordSocket` ở tay phải, `SheathSocket` ở hông) là empty gắn vào xương; glTF importer của Godot biến chúng thành `BoneAttachment3D`, game gắn kiếm vào đó và đổi qua lại khi rút/tra kiếm.
+- Vũ khí: tâm chuôi ở gốc, lưỡi theo +Z Blender (= +Y cục bộ trong Godot).
+- Animation export dạng action riêng (`export_animation_mode="ACTIONS"`), 30 fps. Độ dài, khung gây sát thương, khung nối đòn, khung bất tử của mọi đòn đánh đọc từ `data/anim_timings.json` — cùng file mà game dùng để xử lý va chạm, nên hình và luật luôn khớp.
+- GLB vào `assets/models/{characters,weapons,env}/`, nguồn `.blend` vào `art/{characters,weapons,env}/`. `art/.gdignore` ngăn Godot import `.blend`.
 
-Tài liệu: [Godot 3D import](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_3d_scenes/index.html), [Blender glTF](https://docs.blender.org/manual/en/latest/addons/import_export/scene_gltf2.html).
+## Giới hạn hiện tại
+
+Model low-poly dựng bằng thủ tục (1–6 nghìn tam giác mỗi nhân vật), không có texture vẽ tay, không có blend shape biểu cảm. Animation là keyframe tư thế tay (không motion capture). Đủ cho vertical slice; bản phát hành nên có họa sĩ chỉnh mesh mặt/tóc và animator làm lại các đòn chính.

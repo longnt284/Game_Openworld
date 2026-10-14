@@ -1,0 +1,94 @@
+{
+	"mq01_ben_song": {
+		"kind": "main", "order": 1, "title": "Bến sông sương sớm",
+		"cause": "Vừa cập bến Vân Khê, Lâm An nghe hồi chuông vọng từ núi và tiếng kêu cứu trên đường lên làng.",
+		"result": "Tiểu Mạc thoát nạn và nhờ Lâm An mang thư cho bà Lục — người làng đang quên dần người thân.",
+		"objectives": [
+			{"text": "Theo con đường đất lên làng", "event": "reach:rescue_site", "marker": [-5, 46]},
+			{"text": "Đánh đuổi bọn tàn binh đang vây người đưa thư", "event": "camp_clear:rescue", "marker": [-5, 46]},
+			{"text": "Hỏi chuyện người đưa thư", "event": "talk:tieu_mac", "marker": [-6, 48]}
+		],
+		"rewards": {"xp": 60, "items": [["banh_ngai", 2], ["coins", 15]]},
+		"next": ["mq02_lang_quen"]
+	},
+	"mq02_lang_quen": {
+		"kind": "main", "order": 2, "title": "Làng quên tên",
+		"cause": "Bức thư của Tiểu Mạc kể về những người làng không còn nhận ra người thân.",
+		"result": "Tiếng chuông phát ra từ Đền Tịch Phong. Bà Lục nhờ Lâm An lần theo dấu ký ức qua Trúc Hải; Lâm An nhớ lại chiêu Phong Trảm.",
+		"objectives": [
+			{"text": "Mang thư đến cho bà Lục ở nhà lớn phía bắc quảng trường", "event": "talk:ba_luc", "marker": [-16, 4]},
+			{"text": "Thắp lại Miếu Gió của làng", "event": "interact:shrine_village", "marker": [8, 30]},
+			{"text": "Hỏi dân làng về tiếng chuông", "event": "ask:bell", "count": 2, "marker": [21, 14], "markers": [[21, 14], [-21, 24]]},
+			{"text": "Kể lại cho bà Lục", "event": "talk:ba_luc", "marker": [-16, 4]}
+		],
+		"rewards": {"xp": 110, "items": [["tra_sen", 1], ["banh_ngai", 1]]},
+		"next": ["mq03_dau_ky_uc"]
+	},
+	"mq03_dau_ky_uc": {
+		"kind": "main", "order": 3, "title": "Dấu ký ức trong rừng trúc",
+		"cause": "Bà Lục tin rằng gió còn giữ những gì người ta đã quên, và chỉ Lâm An nghe được.",
+		"result": "Nhật ký cho thấy Tịch Phong lấy ký ức để giữ phong ấn trấn một cơn bão cổ. Lông vũ gió giúp Lâm An lĩnh hội khinh công.",
+		"objectives": [
+			{"text": "Lên Đồi Gió, đến bìa rừng Trúc Hải", "event": "reach:bamboo_gate", "marker": [4, -113]},
+			{"text": "Lần theo tiếng vọng ký ức", "event": "echo", "count": 3, "marker": [6, -173], "markers": [[6, -173], [-24, -191], [41, -211]]},
+			{"text": "Tìm nhật ký trong trạm gác bỏ hoang", "event": "interact:diary_tower", "marker": [43, -212]}
+		],
+		"rewards": {"xp": 160, "items": [["manh_gio", 2]]},
+		"next": ["mq04_vuot_khe"]
+	},
+	"mq04_vuot_khe": {
+		"kind": "main", "order": 4, "title": "Vượt Khe Gió",
+		"cause": "Nhật ký chỉ đường lên đền: qua Khe Gió, gõ chuông theo lời ru cũ, vượt qua kẻ gác rừng.",
+		"result": "Trúc Tướng gục ngã. Ký ức cuối của Tịch Phong hé lộ: ông cầu xin một cách thứ ba, không để bão thoát cũng không để làng quên mãi.",
+		"objectives": [
+			{"text": "Dùng khinh công vượt Khe Gió (Space trên không, giữ Space để lướt)", "event": "reach:gorge_north", "marker": [0, -272]},
+			{"text": "Gõ chuông gió theo lời ru: trúc xanh, đá cũ, nước trong", "event": "flag:chimes_solved", "marker": [-6, -288]},
+			{"text": "Đánh bại Trúc Tướng", "event": "kill:truc_tuong", "marker": [0, -334]},
+			{"text": "Chạm vào ký ức trong lõi phong ấn", "event": "interact:memory_core", "marker": [0, -347]}
+		],
+		"rewards": {"xp": 300, "items": [["banh_ngai", 2]]},
+		"next": []
+	},
+	"sq01_chuong_gio": {
+		"kind": "side", "order": 10, "title": "Chuông gió của bé Tý",
+		"cause": "Bà Hạnh mất chiếc chuông gió tre mà bà không còn nhớ của ai.",
+		"result": "Bà Hạnh nhớ lại con trai mình, Tý, người theo lên núi giúp việc ở đền. Một sợi Tơ ký ức kết lại.",
+		"objectives": [
+			{"text": "Tìm chuông gió ở bãi heo rừng phía đông làng", "have": "chuong_gio", "count": 1, "marker": [74, 6]},
+			{"text": "Trả chuông gió cho bà Hạnh", "event": "talk:ba_hanh", "marker": [-21, 24]}
+		],
+		"rewards": {"xp": 80, "items": [["coins", 30], ["to_ky_uc", 1]]},
+		"next": []
+	},
+	"sq02_lo_ren": {
+		"kind": "side", "order": 11, "title": "Lò rèn nguội lửa",
+		"cause": "Chú Bảy quên cách giữ lửa lò. Đá gió trên Trúc Hải có thể giúp lò cháy đều.",
+		"result": "Lò rèn đỏ lửa trở lại. Chú Bảy rèn thanh kiếm cũ thành Thanh Trúc Kiếm và nhớ ra công thức của cha mình.",
+		"objectives": [
+			{"text": "Gom 3 Đá gió (trại tàn binh trong Trúc Hải)", "have": "da_gio", "count": 3, "marker": [-45, -200]},
+			{"text": "Mang Đá gió về cho chú Bảy", "event": "talk:chu_bay", "marker": [21, 14]}
+		],
+		"rewards": {"xp": 90, "items": [["to_ky_uc", 1]]},
+		"next": []
+	},
+	"ev01_chan_duong": {
+		"kind": "event", "order": 20, "title": "Tàn binh chặn đường",
+		"cause": "Bọn tàn binh chặn lối lên Đồi Gió, cướp của người qua lại.",
+		"result": "Con đường lên Trúc Hải đã thông. Người buôn trà có thể qua lại.",
+		"objectives": [
+			{"text": "Đánh tan toán tàn binh trên Đồi Gió", "event": "camp_clear:hill_ambush", "marker": [9, -82]}
+		],
+		"rewards": {"xp": 60, "items": [["coins", 25], ["banh_ngai", 1]]},
+		"next": []
+	},
+	"ev02_tieng_sao": {
+		"kind": "event", "order": 21, "title": "Tiếng sáo bên suối",
+		"cause": "Tiếng sáo lẫn trong tiếng suối, như ai đó muốn dẫn đường.",
+		"result": "Tiếng sáo dẫn đến một rương bị vùi dưới rặng trúc đổ.",
+		"objectives": [
+			{"text": "Lần theo tiếng sáo dọc khe suối", "event": "interact:chest_stream", "marker": [-62, -148]}
+		],
+		"rewards": {"xp": 50, "items": [["manh_gio", 1]]},
+		"next": []
+	}
+}
