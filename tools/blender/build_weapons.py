@@ -41,7 +41,7 @@ def sword_old():
     grip(b, 0.2, 0.016, "wood_dark", "cloth_dark")
     b.sphere(0.022, (0, 0, -0.11), mat="bronze", segments=8, rings=6)
     b.box((0.1, 0.034, 0.022), (0, 0, 0.11), mat="bronze", bevel=0.006)
-    blade(b, 0.12, 0.78, 0.052, 0.01, "metal_dark")
+    blade(b, 0.12, 0.78, 0.058, 0.01, "metal", fuller="metal_dark")
     return b
 
 
@@ -108,7 +108,6 @@ def main(preview):
         info = vk.save_and_export(name)
         vk.MODELS = original
         vk.ART = original_art
-    vk.ART = original_art
         vk.write_manifest_entry(info, "weapons")
         if preview:
             size = 2.4 if name == "glaive" else 1.1

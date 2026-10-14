@@ -536,10 +536,12 @@ func _hit_targets(areas: Array[Area3D], data: Dictionary, bonus: float) -> void:
 # ------------------------------------------------------------------ damage
 
 func take_damage(damage: Combat.Damage) -> Dictionary:
-	if state in ["dead", "disabled", "loading"] or invulnerable > 0.0:
-		return {"hit": false, "dodged": state == "dodge"}
+	if state in ["dead", "disabled", "loading"]:
+		return {"hit": false}
 	var from_front: bool = facing.dot(-damage.direction) > 0.2
 	var parry_window: bool = current_action() == "parry" and float(action.get("t", 9.0)) <= float((action["data"] as Dictionary).get("hit_end", 0.2))
+	if invulnerable > 0.0 and not parry_window:
+		return {"hit": false, "dodged": state == "dodge"}
 	if parry_window and from_front and not damage.unblockable:
 		visual.hitstop(0.12)
 		camera_rig.add_trauma(0.25)

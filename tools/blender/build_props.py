@@ -1,7 +1,7 @@
 """Environment kit for Vân Khê: flora, building modules, composed buildings and props.
 
 blender --background --factory-startup --python tools/blender/build_props.py -- [names...] [--preview]
-Outputs art/env_<name>.blend and assets/models/env/<name>.glb. Objects named *-convcolonly
+Outputs art/env/<name>.blend and assets/models/env/<name>.glb. Objects named *-convcolonly
 become convex StaticBody3D colliders on Godot import. Fronts face -Y (Godot +Z).
 """
 import math

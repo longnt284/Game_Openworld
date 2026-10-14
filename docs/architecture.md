@@ -1,40 +1,45 @@
-# Kiến trúc bản nền
+# Kiến trúc
 
-Engine được cố định trong `dependencies.json`. Dự án dùng Godot + GDScript, GL Compatibility và đầu vào bàn phím/chuột; mục tiêu ban đầu là desktop Windows. Blender chỉ cần khi sửa hoặc tạo lại model. File GLB đã nằm trong repo nên người chơi và CI không cần Blender.
+Godot 4.7.2, GDScript có kiểu tĩnh, renderer GL Compatibility, bàn phím + chuột, mục tiêu Windows desktop. Không dùng autoload: `scenes/main.tscn` chỉ có node gốc `main.gd`, mọi hệ thống được tạo bằng code và nối với nhau ở đó. Nội dung (nhiệm vụ, hội thoại, vật phẩm, địch, bản đồ) nằm trong JSON dưới `data/`, code chỉ chứa luật.
 
-## Các phần chính
+## Thành phần
 
-| Thành phần | Trách nhiệm |
-|---|---|
-| `main.gd` | Khởi tạo, ánh sáng, checkpoint, pause, kết nối lưu/tải |
-| `game_settings.gd` / `default_settings.tres` | Seed, tốc độ, kích thước và số vùng địa hình |
-| `player_controller.gd` | CharacterBody3D, chạy/nhảy, SpringArm camera và trạng thái di chuyển |
-| `asset_library.gd` | Tải GLB bằng ResourceLoader trên luồng nền, kiểm tra thất bại |
-| `world_manager.gd` | Lịch tải vùng theo khoảng cách, giới hạn pool và tái sử dụng node |
-| `world_chunk.gd` | Mesh địa hình, collider, MultiMesh cây/đá, LOD cây theo khoảng cách |
-| `save_store.gd` | JSON có version, kiểm tra đầu vào, ghi tạm và phục hồi từ backup |
-| `game_hud.gd` | Thông tin khám phá, điều khiển và menu tạm dừng |
+| Nhóm | File | Trách nhiệm |
+|---|---|---|
+| Gốc | `scripts/main.gd` | Luồng màn hình chính → chơi; nối người chơi, thế giới, thực thể, nhiệm vụ, hội thoại, UI, âm thanh; phần thưởng, chết/hồi sinh, lưu/tải, thoát game |
+| Dữ liệu | `scripts/core/content_db.gd`, `game_state.gd`, `user_settings.gd` | Đọc JSON có cache; trạng thái người chơi (cờ, túi đồ, nhiệm vụ, cấp, kỹ năng, kiếm, checkpoint); thiết lập lưu riêng ở `user://settings.cfg` |
+| Người chơi | `scripts/player_controller.gd`, `scripts/player/camera_rig.gd` | Máy trạng thái loading/move/dodge/action/hit/dead/disabled, đệm phím, thể lực, khinh công, khóa mục tiêu; camera SpringArm có rung theo "trauma" |
+| Chiến đấu | `scripts/combat/combat.gd`, `projectile.gd`, `vfx.gd` | Bảng đòn đánh (gộp thời điểm từ `data/anim_timings.json`), quét cung bằng `PhysicsShapeQueryParameters3D`, gói sát thương, lớp va chạm, đạn gió, hiệu ứng |
+| Nhân vật | `scripts/characters/character_visual.gd` | Dựng `AnimationTree` (BlendSpace1D di chuyển, Transition trạng thái, OneShot đòn đánh), gắn vũ khí vào `BoneAttachment3D`, nháy trắng khi trúng đòn, hit-stop |
+| Địch | `scripts/enemies/enemy.gd`, `boar.gd`, `guardian.gd` | AI theo trạng thái, giới hạn số kẻ tấn công cùng lúc mỗi trại, NavigationAgent hoặc lái tránh vật cản, kéo về khi đi quá xa; heo húc; Trúc Tướng hai pha |
+| Thế giới | `scripts/world/world_layout.gd`, `scripts/world_manager.gd`, `scripts/world_chunk.gd` | Hàm độ cao/màu/vùng từ `layout.json`; stream vùng 32 m (5 × 5 quanh người chơi), tính mesh trên `WorkerThreadPool`, dựng node trên main thread |
+| Thực thể | `scripts/world/entity_spawner.gd`, `npc.gd`, `interactable.gd`, `arena.gd`, `prop_placer.gd`, `water_bodies.gd`, `backdrop.gd` | Sinh/hủy NPC, địch, vật tương tác theo khoảng cách và điều kiện; trigger, điểm khám phá, bake navmesh theo vùng giao tranh; đấu trường; đạo cụ; sông suối; núi nền |
+| Nhiệm vụ | `scripts/quests/quest_manager.gd` | Bắt đầu/tiến độ/hoàn thành theo sự kiện chuỗi (`talk:`, `reach:`, `kill:`, `interact:`, `camp_clear:`, `flag:`, `have:`…), điều kiện, điểm đánh dấu |
+| Giao diện | `scripts/game_hud.gd`, `scripts/ui/menus.gd`, `map_view.gd`, `ui_theme.gd` | HUD, hội thoại, thị kiến, la bàn mục tiêu; màn hình chính, tạm dừng, bản đồ, nhật ký, túi đồ, thiết lập, ghi công |
+| Âm thanh | `scripts/audio/audio_director.gd` | Bus Music/SFX/Ambience/UI, chuyển nhạc theo vùng và mức chiến đấu, âm nền, tiếng sông theo khoảng cách, pool phát 2D/3D có biến thể |
+| Hình ảnh | `scripts/render/toon.gd`, `atmosphere.gd`, `shaders/*.gdshader` | Shader toon (bậc sáng, viền rim, nhiễu nét vẽ, cây đung đưa), outline đảo mặt, nước, bầu trời, tường gió; sương/nắng theo vùng |
+| Lưu game | `scripts/save_store.gd` | JSON schema v2, kiểm tra kiểu, migrate v1, ghi qua `.tmp`, giữ `.bak` |
 
-## Quy ước thế giới
+## Quy ước
 
-- Một đơn vị là một mét, Godot dùng Y hướng lên. Blender export tự chuyển Z-up sang Y-up.
-- Vùng mặc định 32 × 32 m, lưới 16 × 16 ô; 25 vùng quanh người chơi.
-- Mọi đỉnh lấy độ cao từ tọa độ thế giới nên mép vùng khớp nhau. Seed tái tạo độ cao và vị trí cây trong phiên bản engine đã cố định.
-- Tạo sẵn pool 25 node vùng. Mỗi frame cấu hình tối đa một vùng; hàng chờ được cập nhật khi người chơi đổi vùng. Đây là sinh mesh theo ngân sách trên main thread, không phải terrain worker thread.
-- Người chơi dừng vật lý khi vùng dưới chân chưa sẵn sàng, tránh rơi khi dịch chuyển xa. Các vùng xa được trả lại pool.
-- Cây/đá chia sẻ mesh bằng MultiMesh. Cây ngoài khoảng cách cấu hình dùng silhouette ít đa giác; quyết định LOD theo vị trí node vùng. Thân cây và mặt đất có va chạm; đá mẫu chỉ trang trí.
-- Khi chơi có hình ảnh, GLB được tải bất đồng bộ; vật liệu và mesh chia sẻ cho mọi vùng. Trong headless, tải trên main thread để tránh lỗi RID khi dummy renderer của Godot khởi tạo mesh từ tài nguyên tải nền. Cả hai đường chạy đều được kiểm tra.
+- 1 đơn vị = 1 m, Y hướng lên. Model nhìn về +Z; `rotation.y = yaw`, hướng mặt `(sin yaw, 0, cos yaw)`.
+- Lớp va chạm: 1 thế giới, 2 người chơi, 4 địch, 8 NPC, 16 hurtbox người chơi, 32 hurtbox địch, 64 vật tương tác.
+- Mỗi thực thể có ID ổn định trong `data/world/entities.json`. `EntitySpawner` giữ tối đa một node mỗi ID; địch chết vĩnh viễn (`dead:<id>`), rương đã mở (`opened:<id>`), phần thưởng đã nhận (`reward:<quest>`) đều là cờ trong `GameState`, nên stream lại vùng hay tải save không nhân đôi NPC, hồi sinh boss hoặc trả thưởng lần hai.
+- Thời điểm đòn đánh (độ dài, khung gây sát thương, khung nối đòn, khung bất tử) chỉ định nghĩa một lần trong `data/anim_timings.json`; script Blender đọc nó để đặt keyframe, game đọc nó để xử lý va chạm.
+
+## Thế giới và streaming
+
+- Bản đồ hữu hạn, biên x ∈ [−132, 132], z ∈ [−462, 100]; ngoài biên là tường vô hình và núi nền.
+- Độ cao = đường cong theo z + nhiễu + nâng mép (bão hòa bằng `tanh`) + sống núi → làm phẳng khu đặt nhà/đấu trường → hạ đường đi → lòng sông → khe vực. Mép vùng khớp nhau vì mọi đỉnh lấy từ tọa độ thế giới.
+- `WorldChunk.compute()` là hàm tĩnh, không chạm scene tree, chạy trên `WorkerThreadPool` (tối đa 2 việc). `apply()` tạo mesh, collider, MultiMesh cây/cỏ/đá trên main thread. Người chơi đứng yên khi vùng dưới chân chưa sẵn sàng.
+- Navmesh không phủ toàn bản đồ: mỗi khu giao tranh (`navzone`) được parse collider đã stream và bake bất đồng bộ khi người chơi đến gần 80 m.
 
 ## Lưu game
 
-F5 ghi `user://world_save.json` với version, seed, vị trí, checkpoint và trạng thái trạm. F9 tải và tái lập thế giới. Ghi qua `.tmp`, giữ bản trước trong `.bak`; nếu bản chính lỗi, đọc bản backup hợp lệ. Test dùng tên file riêng, không ghi vào save người chơi. Thay đổi schema hoặc thuật toán terrain về sau cần migration rõ ràng.
+`user://world_save.json`, schema v2: seed, vị trí, hướng, checkpoint, toàn bộ `GameState`. Giới hạn 1 MiB (thay cho 16 KB của bản nền — dữ liệu cờ/nhiệm vụ lớn hơn nhiều). Save v1 của bản nền được migrate (trạm đèn → Miếu Gió làng, gắn cờ `migrated_from_v1`), bản cũ giữ trong `.bak`. Tải save sửa lỗi vị trí nằm trong nước/vực/ngoài biên về checkpoint.
 
-## Mở rộng tiếp
+## Mở rộng
 
-1. Thay capsule bằng nhân vật rig/animation trong scene riêng.
-2. Đưa biome, vật phẩm và nhiệm vụ vào Resource; tránh phụ thuộc trực tiếp giữa UI và luật game.
-3. Nếu đo được giật khi sinh vùng, chuyển tính vertex sang WorkerThreadPool; cập nhật scene/physics ở main thread.
-4. Thêm origin shifting trước khi mở thế giới vượt hàng chục km; tọa độ lưu hiện được giới hạn ±100.000 m để loại dữ liệu lỗi, không phải cam kết độ chính xác tại khoảng cách đó.
-5. Thêm input gamepad, rebinding, accessibility và export preset cho nền tảng thực sự cần.
-
-Bản nền chưa có multiplayer, combat, inventory, navigation AI, hệ thống nhiệm vụ hoàn chỉnh hoặc xuất bản thương mại. Chu kỳ ánh sáng hiện là thay đổi góc/cường độ mặt trời đơn giản, chưa mô phỏng đầy đủ trời đêm.
+1. Hồi 3: thêm vùng `den_tich_phong` vào `layout.json`, thực thể và nhiệm vụ vào JSON; địch bắn xa và địch khiên dùng lại `Enemy` với lớp con như `Boar`.
+2. Nếu bản đồ lớn hơn nhiều: origin shifting, navmesh theo vùng stream thay vì theo khu giao tranh.
+3. Gamepad: thêm sự kiện joypad vào `UserSettings.REBINDABLE` và camera stick phải.

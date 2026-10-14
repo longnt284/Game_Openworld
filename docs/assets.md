@@ -1,0 +1,181 @@
+# Danh mục asset
+
+Sinh tự động bằng `python3 tools/asset_manifest.py` từ các file thật trong `assets/`. Số tam giác đọc từ GLB (không tính mesh va chạm `-colonly`/`-convcolonly`, ghi riêng ở cột Va chạm). Không có texture ảnh nhúng: màu nằm ở vertex color/material, shader toon của game tô bóng.
+
+## Model 3D
+
+| File | Trạng thái | Nguồn tạo | File nguồn | Tris | Va chạm | Vật liệu | Texture | Xương | Animation |
+|---|---|---|---|---:|---:|---:|---:|---:|---|
+| `assets/models/beacon.glb` | Legacy (bản nền cũ, runtime không dùng) | `tools/blender/build_assets.py` | `art/beacon.blend` | 218 | 0 | 3 | 0 | — | — |
+| `assets/models/characters/ba_hanh.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/ba_hanh.blend` | 4,636 | 0 | 12 | 0 | 20 | idle, talk, walk, wave |
+| `assets/models/characters/ba_luc.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/ba_luc.blend` | 4,564 | 0 | 14 | 0 | 20 | idle, talk, walk, wave |
+| `assets/models/characters/chu_bay.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/chu_bay.blend` | 4,714 | 0 | 15 | 0 | 20 | idle, talk, walk, wave, work |
+| `assets/models/characters/heo_gio.glb` | Dùng trong slice | `tools/blender/build_creatures.py` | `art/characters/heo_gio.blend` | 1,346 | 0 | 6 | 0 | 12 | charge, death, hit, idle, run, stagger, walk, windup |
+| `assets/models/characters/lam_an.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/lam_an.blend` | 6,048 | 0 | 15 | 0 | 20 | air_leap, attack_1, attack_2, attack_3, block, death, dodge, fall, glide, heavy, hit, idle, interact, jump, land, parry, run, skill_cyclone, skill_gust, walk |
+| `assets/models/characters/tan_binh.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tan_binh.blend` | 5,268 | 0 | 14 | 0 | 20 | alert, attack, death, hit, idle, run, stagger, walk |
+| `assets/models/characters/tich_phong.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tich_phong.blend` | 4,668 | 0 | 12 | 0 | 20 | idle, talk, walk, wave |
+| `assets/models/characters/tieu_mac.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tieu_mac.blend` | 5,034 | 0 | 17 | 0 | 20 | idle, talk, walk, wave |
+| `assets/models/characters/truc_tuong.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/truc_tuong.blend` | 6,158 | 0 | 17 | 0 | 20 | attack, death, hit, idle, roar, slam, stagger, sweep, walk |
+| `assets/models/env/bamboo_cluster.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bamboo_cluster.blend` | 3,500 | 0 | 4 | 0 | — | — |
+| `assets/models/env/barrel.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/barrel.blend` | 232 | 28 | 3 | 0 | — | — |
+| `assets/models/env/bench.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bench.blend` | 68 | 12 | 2 | 0 | — | — |
+| `assets/models/env/boat.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/boat.blend` | 448 | 0 | 5 | 0 | — | — |
+| `assets/models/env/bridge_wood.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bridge_wood.blend` | 1,272 | 120 | 4 | 0 | — | — |
+| `assets/models/env/campfire.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/campfire.blend` | 378 | 0 | 3 | 0 | — | — |
+| `assets/models/env/chest.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/chest.blend` | 148 | 12 | 3 | 0 | — | — |
+| `assets/models/env/crate.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/crate.blend` | 96 | 12 | 3 | 0 | — | — |
+| `assets/models/env/dock.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/dock.blend` | 1,020 | 12 | 4 | 0 | — | — |
+| `assets/models/env/fence_bamboo.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/fence_bamboo.blend` | 224 | 12 | 3 | 0 | — | — |
+| `assets/models/env/gate_village.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/gate_village.blend` | 1,204 | 56 | 11 | 0 | — | — |
+| `assets/models/env/grass_tuft.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/grass_tuft.blend` | 216 | 0 | 4 | 0 | — | — |
+| `assets/models/env/house_long.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_long.blend` | 3,708 | 12 | 13 | 0 | — | — |
+| `assets/models/env/house_small.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_small.blend` | 3,200 | 12 | 12 | 0 | — | — |
+| `assets/models/env/house_teal.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_teal.blend` | 3,200 | 12 | 11 | 0 | — | — |
+| `assets/models/env/lantern_post.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/lantern_post.blend` | 334 | 28 | 5 | 0 | — | — |
+| `assets/models/env/lantern_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/lantern_stone.blend` | 214 | 12 | 3 | 0 | — | — |
+| `assets/models/env/market_stall.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/market_stall.blend` | 460 | 12 | 8 | 0 | — | — |
+| `assets/models/env/memory_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/memory_stone.blend` | 126 | 28 | 3 | 0 | — | — |
+| `assets/models/env/rock_cliff.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/rock_cliff.blend` | 282 | 12 | 3 | 0 | — | — |
+| `assets/models/env/rock_moss.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/rock_moss.blend` | 154 | 0 | 2 | 0 | — | — |
+| `assets/models/env/ruins_pillar.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/ruins_pillar.blend` | 176 | 28 | 3 | 0 | — | — |
+| `assets/models/env/ruins_wall.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/ruins_wall.blend` | 936 | 12 | 3 | 0 | — | — |
+| `assets/models/env/seal_gate.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/seal_gate.blend` | 780 | 24 | 8 | 0 | — | — |
+| `assets/models/env/shrine_wind.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/shrine_wind.blend` | 796 | 36 | 11 | 0 | — | — |
+| `assets/models/env/signboard.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/signboard.blend` | 176 | 12 | 5 | 0 | — | — |
+| `assets/models/env/smithy.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/smithy.blend` | 1,276 | 136 | 12 | 0 | — | — |
+| `assets/models/env/stele.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/stele.blend` | 280 | 12 | 3 | 0 | — | — |
+| `assets/models/env/steps_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/steps_stone.blend` | 264 | 12 | 2 | 0 | — | — |
+| `assets/models/env/table.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/table.blend` | 184 | 12 | 4 | 0 | — | — |
+| `assets/models/env/tent.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tent.blend` | 84 | 12 | 3 | 0 | — | — |
+| `assets/models/env/tree_maple.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_maple.blend` | 608 | 0 | 4 | 0 | — | — |
+| `assets/models/env/tree_pine.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_pine.blend` | 156 | 0 | 3 | 0 | — | — |
+| `assets/models/env/watchtower.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/watchtower.blend` | 776 | 12 | 6 | 0 | — | — |
+| `assets/models/env/well.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/well.blend` | 572 | 36 | 9 | 0 | — | — |
+| `assets/models/env/wind_chime_post.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/wind_chime_post.blend` | 228 | 28 | 6 | 0 | — | — |
+| `assets/models/rock.glb` | Legacy (bản nền cũ, runtime không dùng) | `tools/blender/build_assets.py` | `art/rock.blend` | 20 | 0 | 1 | 0 | — | — |
+| `assets/models/tree.glb` | Legacy (bản nền cũ, runtime không dùng) | `tools/blender/build_assets.py` | `art/tree.blend` | 60 | 0 | 4 | 0 | — | — |
+| `assets/models/weapons/glaive.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/glaive.blend` | 504 | 0 | 6 | 0 | — | — |
+| `assets/models/weapons/sabre.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sabre.blend` | 530 | 0 | 4 | 0 | — | — |
+| `assets/models/weapons/sword_bamboo.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_bamboo.blend` | 462 | 0 | 7 | 0 | — | — |
+| `assets/models/weapons/sword_old.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_old.blend` | 538 | 0 | 4 | 0 | — | — |
+| `assets/models/weapons/sword_wind.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_wind.blend` | 630 | 0 | 5 | 0 | — | — |
+
+Tổng: 53 model, 73,174 tam giác hiển thị. Mọi model của dự án được dựng bằng script Blender 5.2.2 chạy nền (`blender --background --factory-startup --python <script>`), giấy phép: Của dự án (chủ repo chọn giấy phép).
+
+## Âm thanh
+
+| File | Nhóm | Nguồn | Giấy phép |
+|---|---|---|---|
+| `assets/audio/ambience/forest.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/river.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/village.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/wind.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/music/bamboo.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/music/boss.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/music/combat.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/music/explore.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/music/temple.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/music/title.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/music/village.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/barrier.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/block_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/block_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/block_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/boar_charge.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/boar_grunt.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/boar_hit_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/boar_hit_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/boar_hit_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/book.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/chest_open.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/chime_1.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/chime_2.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/chime_3.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/chime_solved.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/cloth.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/coins.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/danger.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/death.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/discovery.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/dodge.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/echo_whisper.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/enemy_down.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/flute_call.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/glaive_slam.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/glaive_sweep.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/glint.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/ground_slam.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/heal.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/hit_flesh_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/hit_flesh_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/hit_flesh_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/hit_heavy_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/hit_heavy_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/hit_heavy_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/jump.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/land.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/leap.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/level_up.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/parry.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/parry_metal.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/pickup.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/plank.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/quest_complete.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/roar.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/sabre_swing.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/seal_hum.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/shrine_bell.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/splash.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/step_dirt_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_dirt_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_dirt_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_dirt_3.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_dirt_4.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_grass_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_grass_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_grass_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_grass_3.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_grass_4.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_leaves_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_leaves_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_leaves_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_leaves_3.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_leaves_4.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_stone_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_stone_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_stone_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_stone_3.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_stone_4.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_wood_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_wood_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_wood_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_wood_3.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/step_wood_4.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/swing_0.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/swing_1.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/swing_2.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/swing_heavy.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/sword_draw.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/temple_bell.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/ui_click.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/ui_close.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/ui_confirm.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/ui_error.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/ui_open.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/ui_select.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/victory.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/wind_cyclone.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/wind_slash.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/wood_knock.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+
+Tổng: 101 file OGG Vorbis. Nhạc được soạn bằng code (giai điệu ngũ cung Rê thứ) và render qua soundfont General MIDI; cần người nghe duyệt lại trước khi phát hành (xem `docs/progress.md`).
+
+## Font
+
+| File | Nguồn | Giấy phép |
+|---|---|---|
+| `assets/fonts/BeVietnamPro-Bold.ttf` | Be Vietnam Pro (Google Fonts) | SIL OFL 1.1 (`assets/fonts/OFL-BeVietnamPro.txt`) |
+| `assets/fonts/BeVietnamPro-Medium.ttf` | Be Vietnam Pro (Google Fonts) | SIL OFL 1.1 (`assets/fonts/OFL-BeVietnamPro.txt`) |
+| `assets/fonts/BeVietnamPro-Regular.ttf` | Be Vietnam Pro (Google Fonts) | SIL OFL 1.1 (`assets/fonts/OFL-BeVietnamPro.txt`) |
+| `assets/fonts/BeVietnamPro-SemiBold.ttf` | Be Vietnam Pro (Google Fonts) | SIL OFL 1.1 (`assets/fonts/OFL-BeVietnamPro.txt`) |
+| `assets/fonts/Lora-Variable.ttf` | Lora (Google Fonts) | SIL OFL 1.1 (`assets/fonts/OFL-Lora.txt`) |

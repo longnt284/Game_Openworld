@@ -6,10 +6,14 @@ extends Node3D
 signal fight_started
 signal fight_reset
 
+const BARRIER_SHADER: Shader = preload("res://shaders/barrier.gdshader")
+const IDLE_TINT: Color = Color(0.55, 0.95, 0.85)
+const FIGHT_TINT: Color = Color(1.0, 0.55, 0.4)
+
 var radius: float = 24.0
 var body: StaticBody3D
 var wall: MeshInstance3D
-var wall_material: StandardMaterial3D
+var wall_material: ShaderMaterial
 var closed: bool = false
 var fighting: bool = false
 
@@ -40,12 +44,10 @@ func setup(data: Dictionary, layout: WorldLayout) -> void:
 	wall = MeshInstance3D.new()
 	wall.mesh = cylinder
 	wall.position.y = 3.0
-	wall_material = StandardMaterial3D.new()
-	wall_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	wall_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	wall_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	wall_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	wall_material.albedo_color = Color(0.55, 0.95, 0.85, 0.18)
+	wall_material = ShaderMaterial.new()
+	wall_material.shader = BARRIER_SHADER
+	wall_material.set_shader_parameter("wall_height", cylinder.height)
+	_set_wall_tint(IDLE_TINT, 0.35)
 	wall.material_override = wall_material
 	wall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(wall)
@@ -68,15 +70,19 @@ func start_fight() -> void:
 		return
 	fighting = true
 	set_closed(true)
-	wall_material.albedo_color = Color(1.0, 0.55, 0.4, 0.22)
+	_set_wall_tint(FIGHT_TINT, 0.6)
 	emit_signal("fight_started")
 
 func end_fight(victory: bool) -> void:
 	fighting = false
-	wall_material.albedo_color = Color(0.55, 0.95, 0.85, 0.18)
+	_set_wall_tint(IDLE_TINT, 0.35)
 	set_closed(false)
 	if not victory:
 		emit_signal("fight_reset")
+
+func _set_wall_tint(tint: Color, strength: float) -> void:
+	wall_material.set_shader_parameter("tint", tint)
+	wall_material.set_shader_parameter("strength", strength)
 
 func _process(_delta: float) -> void:
 	if wall.visible:

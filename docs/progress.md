@@ -1,0 +1,47 @@
+# Tiến độ
+
+Cập nhật: 14/10/2026. Nhánh `claude/adoring-darwin-bwa9t8`. Đọc file này đầu mỗi phiên để biết đang ở đâu.
+
+## Tổng quan theo mốc
+
+| Mốc | Trạng thái |
+|---|---|
+| 1. Khảo sát bản nền, công cụ, kế hoạch | Xong |
+| 2. Đoạn chơi mẫu 20–30 phút (Bến Vân Khê → Trúc Hải) | Xong về nội dung và test tự động; **chưa có người chơi thử thật** và **chưa đo hiệu năng trên GPU thật** |
+| 3. Hoàn thiện chương (Hồi 3, đủ nhiệm vụ, boss cuối) | Chưa bắt đầu |
+| 4. Đóng gói Windows | Đã có export preset, script tải template có kiểm tra SHA-512, bản build tạo được; **chưa chạy thử trên máy Windows** |
+
+## Đã xong trong đoạn chơi mẫu
+
+- **Thế giới:** bản đồ hữu hạn 4 vùng (Bến Vân Khê, Đồi Gió, Trúc Hải, khu đền), sông, suối, Khe Gió sâu 30 m, sống núi, núi nền; 107 đạo cụ đặt cố định; 12 điểm khám phá; streaming vùng trên worker thread; navmesh theo khu giao tranh.
+- **Nhân vật:** Lâm An có rig 20 khớp và 20 animation (idle, đi, chạy, nhảy, rơi, tiếp đất, né, 3 đòn combo, trọng kích, 2 kỹ năng, đỡ, phản đòn, trúng đòn, chết, khinh công, lướt, tương tác). 5 NPC (Tiểu Mạc, bà Lục, chú Bảy, bà Hạnh, Tịch Phong) + dân làng đổi màu.
+- **Chiến đấu:** combo 3 đòn, trọng kích, né có khung bất tử, đỡ/phản đòn, Phong Trảm, Toàn Phong, thể lực, khóa mục tiêu, hit-stop, rung camera, báo trước đòn. Thời điểm gây sát thương dùng chung với animation (`data/anim_timings.json`).
+- **Địch:** Tàn binh (cận chiến, theo trại), Heo gió (lao tới), Trúc Tướng (miniboss 2 pha).
+- **Nhiệm vụ:** 4 chính, 2 phụ, 2 sự kiện; 25 nút hội thoại tiếng Việt; câu đố chuông gió; kết đoạn có thị kiến và mở ý Hồi 3.
+- **Tiến trình:** cấp, điểm tu luyện nâng kỹ năng, 3 thanh kiếm, thuốc hồi máu, túi đồ, Miếu Gió (checkpoint, hồi máu, đặt lại trại địch).
+- **UI:** màn hình chính, tạm dừng, bản đồ, nhật ký, túi đồ, thiết lập (đổi phím, chuột, âm lượng 3 bus, rung camera, chất lượng, toàn màn hình), ghi công/giấy phép, HUD gỡ lỗi F3.
+- **Âm thanh:** 7 bản nhạc theo vùng/chiến đấu/boss, 4 âm nền, 90 hiệu ứng (bước chân theo bề mặt, kiếm, phản đòn, quái, UI).
+- **Lưu game:** schema v2, migrate từ v1, backup, phục hồi file hỏng, tự lưu ở mốc an toàn.
+- **Kiểm thử:** smoke test (bản nền, giữ nguyên độ bao phủ) và gameplay test chơi trọn đoạn mẫu từ New Game đến kết. Xem [validation.md](validation.md).
+
+## Đang làm / làm tiếp ngay
+
+1. Người chơi thử thật đoạn mẫu trên Windows, ghi lại cảm giác điều khiển, độ khó, chỗ lạc đường.
+2. Đo hiệu năng 1080p Medium trên GPU thật bằng `./tools/run.ps1 -Mode preview` (làng đông, chuyển vùng, trận boss) và ghi vào `validation.md`.
+3. Chạy bản build `build/windows/VanKhe.exe` trên Windows sạch (không có Godot/Blender).
+
+## Lỗi và giới hạn đã biết
+
+- Nhạc soạn bằng code và render qua soundfont General MIDI: dùng được nhưng nên được người có chuyên môn nghe duyệt; coi là **bản tạm có thể thay**.
+- Chưa có lồng tiếng (đúng phạm vi chương đầu).
+- Model low-poly dựng bằng script, không texture vẽ tay; mặt/tóc còn đơn giản. Animation keyframe tay; các đòn chính nên được animator chỉnh lại.
+- Chỉ có 2 loại địch thường + 1 miniboss (mục tiêu chương: 6 mẫu thuộc 4 nhóm — thiếu nhóm đánh xa và hộ vệ nặng).
+- Điều khiển chỉ hỗ trợ bàn phím + chuột; chưa hỗ trợ gamepad.
+- Hiệu năng chỉ đo được trên renderer phần mềm (llvmpipe) trong môi trường phát triển, không có ý nghĩa cho mục tiêu 60 FPS.
+
+## Bước tiếp theo (Mốc 3)
+
+1. Hồi 3 — Đền Tịch Phong: đường núi sau cổng phong ấn, 2 nhiệm vụ chính, boss Tịch Phong 2 giai đoạn; nhiệm vụ phụ góp "Tơ ký ức" mở cách hóa giải thứ ba nhưng tuyến chính vẫn hoàn thành được khi bỏ qua.
+2. Thêm 2 nhiệm vụ phụ (đủ 4) và các mẫu địch: cung thủ tàn binh (đánh xa), hộ vệ khiên (heavy guard), biến thể heo/sói.
+3. Bổ sung đạo cụ cho khu đền, hang, VFX phong ấn; bản nhạc kết thúc chương.
+4. Playtest đo thời lượng 2–3 giờ, cân bằng độ khó; tối ưu theo số đo GPU thật.

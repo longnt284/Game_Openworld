@@ -108,6 +108,9 @@ func _update_spawn(data: Dictionary, rule: Dictionary, distance: float) -> void:
 		var moved: bool = data.has("positions") and node.has_meta("rule_pos") and node.get_meta("rule_pos") != rule["pos"]
 		var busy: bool = node is Enemy and (node as Enemy).state in ["chase", "attack", "stagger", "hit", "alert", "dead"]
 		if node is Enemy and (node as Enemy).state == "dead":
+			if distance > DESPAWN_RADIUS:
+				node.queue_free()
+				nodes.erase(id)
 			return
 		if (not wanted and not busy) or (distance > DESPAWN_RADIUS and not busy) or (moved and distance > 25.0):
 			node.queue_free()

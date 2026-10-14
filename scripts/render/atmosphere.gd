@@ -5,10 +5,10 @@ extends Node3D
 
 const SKY_SHADER: Shader = preload("res://shaders/sky.gdshader")
 const MOODS: Dictionary = {
-	"ben_van_khe": {"top": "5d9fc4", "horizon": "e6e2c8", "fog": "d7ddc6", "fog_density": 0.006, "sun": "ffe6b0", "sun_energy": 0.95, "ambient": "a9c4cc", "ambient_energy": 0.4, "pitch": -42.0},
-	"doi_gio": {"top": "5c98bd", "horizon": "e0e3cf", "fog": "d2dccd", "fog_density": 0.007, "sun": "ffe9ba", "sun_energy": 0.92, "ambient": "a8c2cc", "ambient_energy": 0.4, "pitch": -40.0},
-	"truc_hai": {"top": "5b95a6", "horizon": "cfe0cc", "fog": "bcd6c6", "fog_density": 0.013, "sun": "f4f1c8", "sun_energy": 0.92, "ambient": "98c4bc", "ambient_energy": 0.45, "pitch": -48.0},
-	"den_tich_phong": {"top": "6b88b0", "horizon": "e8d8c8", "fog": "d6cfd0", "fog_density": 0.009, "sun": "ffd9a8", "sun_energy": 0.98, "ambient": "b0b6cc", "ambient_energy": 0.4, "pitch": -30.0},
+	"ben_van_khe": {"top": "5d9fc4", "horizon": "e6e2c8", "fog": "d0dbc8", "fog_density": 0.0045, "sun": "ffe6b0", "sun_energy": 0.95, "ambient": "a9c4cc", "ambient_energy": 0.4, "pitch": -42.0},
+	"doi_gio": {"top": "5c98bd", "horizon": "e0e3cf", "fog": "c9d8cc", "fog_density": 0.0055, "sun": "ffe9ba", "sun_energy": 0.92, "ambient": "a8c2cc", "ambient_energy": 0.4, "pitch": -40.0},
+	"truc_hai": {"top": "5b95a6", "horizon": "cfe0cc", "fog": "a9c8bb", "fog_density": 0.0075, "sun": "f4f1c8", "sun_energy": 0.92, "ambient": "98c4bc", "ambient_energy": 0.45, "pitch": -48.0},
+	"den_tich_phong": {"top": "6b88b0", "horizon": "e8d8c8", "fog": "c4c2cc", "fog_density": 0.006, "sun": "ffd9a8", "sun_energy": 0.98, "ambient": "b0b6cc", "ambient_energy": 0.4, "pitch": -30.0},
 }
 
 var environment: Environment

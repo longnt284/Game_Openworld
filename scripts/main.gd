@@ -2,6 +2,8 @@ extends Node3D
 ## Game root: wires world streaming, player, entities, quests, dialogue, UI, audio
 ## and saving together. Gameplay rules live in their own classes.
 
+const ECHO_COUNT: int = 3
+
 @export var save_path: String = SaveStore.SAVE_PATH
 @export var skip_title: bool = false
 var settings: GameSettings = preload("res://config/default_settings.tres").duplicate() as GameSettings
@@ -35,6 +37,7 @@ var engaged: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().set_auto_accept_quit(false)
 	user_settings.load_file()
 	user_settings.apply_input()
 	audio = AudioDirector.new()
@@ -70,12 +73,24 @@ func _ready() -> void:
 			respawn())
 	menus.title_requested.connect(return_to_title)
 	menus.settings_changed.connect(apply_settings)
+	menus.quit_requested.connect(quit_game)
 	state.changed.connect(_on_state_changed)
 	hud.set_tracker("Vân Khê", "", "Đang tải thung lũng…")
 	assets.request_all()
 
 func _exit_tree() -> void:
 	MapView.shutdown()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		quit_game()
+
+func quit_game() -> void:
+	## Lets the audio server release its streams before the tree is torn down.
+	audio.stop_all()
+	for index: int in range(3):
+		await get_tree().process_frame
+	get_tree().quit()
 
 func _start_world() -> void:
 	player = PlayerController.new()
@@ -513,6 +528,19 @@ func unlock_skill(skill: String) -> void:
 	var key: String = UserSettings.event_label({"gust": "skill_1", "cyclone": "skill_2", "khinh_cong": "jump"}[skill])
 	hud.show_hint(String(hints[skill]) % ([key, key] if skill == "khinh_cong" else [key]), 10.0)
 
+func _check_echo_skill(announce: bool) -> void:
+	## Hearing all three memory echoes in Trúc Hải teaches Toàn Phong (also repairs older saves).
+	if state.skill_level("cyclone") > 0:
+		return
+	for index: int in range(1, ECHO_COUNT + 1):
+		if not state.has_flag("echo_seen:echo_%d" % index):
+			return
+	if announce:
+		hud.show_message("Ba tiếng vọng quyện lại, xoáy quanh lưỡi kiếm thành một luồng gió.")
+		unlock_skill("cyclone")
+	else:
+		state.unlock_skill("cyclone")
+
 func give_items(items: Array) -> void:
 	var parts: Array[String] = []
 	for entry: Array in items:
@@ -568,6 +596,8 @@ func discover(poi: Dictionary) -> void:
 		_add_xp(10)
 
 func on_interact(item: Interactable) -> void:
+	if not item.can_interact():
+		return
 	var data: Dictionary = item.entity
 	match item.kind:
 		"shrine":
@@ -588,6 +618,7 @@ func on_interact(item: Interactable) -> void:
 					quests.start(String(data["event_quest"]))
 				if not data.get("silent_count", false):
 					quests.notify("echo")
+					_check_echo_skill(true)
 				quests.notify("interact:" + item.entity_id)
 				if is_instance_valid(item):
 					item.refresh())
@@ -645,6 +676,8 @@ func _ring_chime(item: Interactable) -> void:
 	for index: int in range(chime_sequence.size()):
 		if chime_sequence[index] != expected[index]:
 			chime_sequence.clear()
+			if note == expected[0]:
+				chime_sequence.append(note)
 			Vfx.burst(self, item.global_position + Vector3.UP * 1.5, Vfx.WIND, 30, 6.0)
 			audio.play("dodge", item.global_position)
 			hud.show_message("Chuông lạc nhịp, gió cuốn đi âm thanh… Hãy nhớ lời ru: trúc xanh, đá cũ, nước trong.")
@@ -863,6 +896,7 @@ func load_game() -> bool:
 	if int(data["seed"]) != settings.world_seed:
 		world.reset_seed(int(data["seed"]))
 	state.from_dict(data["state"])
+	_check_echo_skill(false)
 	spawner.clear_all()
 	chime_sequence.clear()
 	if spawner.arena.fighting:

@@ -289,4 +289,8 @@ func ground_color(x: float, z: float, h: float, slope: float) -> Color:
 			base = base.lerp(Color("cdbf98") if water.get("kind", "") == "river" else Color("8f9a86"), 1.0 - smoothstep(half - 2.0, half + 3.0, hit.x))
 	if slope > 0.55:
 		base = base.lerp(Color("8e8a78"), smoothstep(0.55, 0.8, slope))
+	if in_chasm(x, z):
+		# Darken the gorge walls with depth so the drop reads clearly from the path.
+		var depth: float = _curve(elevation, z) - h
+		base = base.lerp(Color("2f3b37"), clampf((depth - 1.0) / 16.0, 0.0, 0.85))
 	return base

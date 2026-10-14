@@ -1,7 +1,7 @@
 """Build rigged, animated humanoids for Vân Khê: Dư Âm Gió.
 
 blender --background --factory-startup --python tools/blender/build_characters.py -- [names...] [--preview]
-Writes art/<name>.blend and assets/models/characters/<name>.glb. Background only.
+Writes art/characters/<name>.blend and assets/models/characters/<name>.glb. Background only.
 """
 import sys
 from pathlib import Path

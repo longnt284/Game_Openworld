@@ -5,7 +5,18 @@
     "role": "runtime-and-editor",
     "windows_archive": "Godot_v4.7.2-stable_win64.exe.zip",
     "sha256": "731980f9608d61333e5baf54a2ef17210acc7a538446c0cb9969f002aca1e953",
-    "license": "MIT"
+    "license": "MIT",
+    "export_templates": {
+      "archive": "Godot_v4.7.2-stable_export_templates.tpz",
+      "sha512": "ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079",
+      "used_files": [
+        "windows_release_x86_64.exe",
+        "windows_debug_x86_64.exe",
+        "windows_release_x86_64_console.exe",
+        "windows_debug_x86_64_console.exe",
+        "version.txt"
+      ]
+    }
   },
   "studio_reference": {
     "repository": "https://github.com/Donchitos/Claude-Code-Game-Studios.git",
@@ -18,5 +29,20 @@
     "BabylonJS/Babylon.js": "Alternative web engine; reconsider only for a browser-first target.",
     "libgdx/libgdx": "Alternative Java stack; duplicates the chosen engine.",
     "JuliusBrussee/caveman": "Agent token tooling; does not contribute to the game runtime."
+  },
+  "blender": {
+    "version": "5.2.2",
+    "role": "asset-authoring (background scripts)",
+    "required_to_play": false
+  },
+  "audio_tools": {
+    "fluidsynth": "2.3.x",
+    "soundfont": "FluidR3_GM.sf2 (MIT)",
+    "python": [
+      "numpy",
+      "scipy",
+      "mido"
+    ],
+    "required_to_play": false
   }
 }

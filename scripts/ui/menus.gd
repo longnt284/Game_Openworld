@@ -11,6 +11,7 @@ signal load_requested
 signal checkpoint_requested
 signal title_requested
 signal settings_changed
+signal quit_requested
 
 var main: Node
 var root: Control
@@ -69,7 +70,8 @@ func _build_title() -> void:
 	box.add_child(continue_button)
 	box.add_child(UiTheme.button("Hành trình mới", func() -> void: emit_signal("new_game_requested"), 300))
 	box.add_child(UiTheme.button("Thiết lập", func() -> void: open_panel("settings"), 300))
-	box.add_child(UiTheme.button("Thoát game", func() -> void: get_tree().quit(), 300))
+	box.add_child(UiTheme.button("Ghi công", func() -> void: open_panel("credits"), 300))
+	box.add_child(UiTheme.button("Thoát game", func() -> void: emit_signal("quit_requested"), 300))
 	var credit: Label = UiTheme.label("Chương I — đoạn chơi mẫu  •  Game của Nguyễn Thành Long", 13, UiTheme.MUTED)
 	credit.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	credit.offset_left = 90
@@ -107,7 +109,7 @@ func _build_pause() -> void:
 			["Nhật ký  (J)", func() -> void: open_panel("journal")], ["Túi đồ & tu luyện  (I)", func() -> void: open_panel("inventory")],
 			["Thiết lập", func() -> void: open_panel("settings")], ["Về Miếu Gió gần nhất", func() -> void: emit_signal("checkpoint_requested")],
 			["Lưu hành trình  (F5)", func() -> void: emit_signal("save_requested")], ["Tải lần lưu gần nhất  (F9)", func() -> void: emit_signal("load_requested")],
-			["Về màn hình chính", func() -> void: emit_signal("title_requested")], ["Thoát game", func() -> void: get_tree().quit()]]:
+			["Về màn hình chính", func() -> void: emit_signal("title_requested")], ["Thoát game", func() -> void: emit_signal("quit_requested")]]:
 		box.add_child(UiTheme.button(entry[0], entry[1], 320))
 	pause_panel.visible = false
 
@@ -164,6 +166,9 @@ func open_panel(name: String) -> void:
 		"settings":
 			panel_title.text = "Thiết lập"
 			panel_body.add_child(_settings_view())
+		"credits":
+			panel_title.text = "Ghi công & giấy phép"
+			panel_body.add_child(_credits_view())
 
 func close_panel() -> void:
 	rebinding = ""
@@ -178,6 +183,51 @@ func close_panel() -> void:
 func refresh_panel() -> void:
 	if panel_host.visible:
 		open_panel(current_panel)
+
+# ------------------------------------------------------------------ credits
+
+const CREDITS: Array[String] = [
+	"[b]Vân Khê — Dư Âm Gió[/b] (Chương I, đoạn chơi mẫu)",
+	"Thiết kế: Nguyễn Thành Long. Model, animation, nhạc và hiệu ứng âm thanh tạo riêng cho dự án.",
+	"",
+	"[b]Thành phần bên thứ ba[/b]",
+	"• Godot Engine — giấy phép MIT (toàn văn bên dưới).",
+	"• Phông Be Vietnam Pro và Lora — SIL Open Font License 1.1 (toàn văn bên dưới).",
+	"• Hiệu ứng âm thanh Kenney (kenney.nl): Impact Sounds, RPG Audio, Interface Sounds — CC0 1.0.",
+	"• Nhạc được render bằng soundfont FluidR3_GM (Frank Wen) — giấy phép MIT.",
+]
+const FONT_LICENCES: Array[String] = ["res://assets/fonts/OFL-BeVietnamPro.txt", "res://assets/fonts/OFL-Lora.txt"]
+
+func _credits_view() -> Control:
+	var text: RichTextLabel = RichTextLabel.new()
+	text.bbcode_enabled = true
+	text.selection_enabled = true
+	text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	text.add_theme_color_override("default_color", UiTheme.CREAM)
+	text.add_theme_font_size_override("normal_font_size", 15)
+	text.add_theme_font_size_override("bold_font_size", 17)
+	var parts: PackedStringArray = PackedStringArray(CREDITS)
+	parts.append("\n[b]Godot Engine[/b]")
+	parts.append(_escape(Engine.get_license_text()))
+	for path: String in FONT_LICENCES:
+		if FileAccess.file_exists(path):
+			parts.append("\n[b]%s[/b]" % path.get_file().get_basename())
+			parts.append(_escape(FileAccess.get_file_as_string(path)))
+	parts.append("\n[b]Thư viện tích hợp trong Godot[/b]")
+	for component: Dictionary in Engine.get_copyright_info():
+		var licences: PackedStringArray = PackedStringArray()
+		for part: Dictionary in component.get("parts", []):
+			licences.append(String(part.get("license", "")))
+		parts.append("• %s — %s" % [_escape(String(component.get("name", ""))), ", ".join(licences)])
+	var licence_info: Dictionary = Engine.get_license_info()
+	for licence: String in licence_info:
+		parts.append("\n[b]%s[/b]" % _escape(licence))
+		parts.append(_escape(String(licence_info[licence])))
+	text.text = "\n".join(parts)
+	return text
+
+func _escape(value: String) -> String:
+	return value.replace("[", "[lb]")
 
 # ------------------------------------------------------------------ map
 

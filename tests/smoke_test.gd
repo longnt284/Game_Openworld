@@ -138,6 +138,9 @@ func _run() -> void:
 		if FileAccess.file_exists(TEST_SAVE + suffix):
 			DirAccess.remove_absolute(TEST_SAVE + suffix)
 	print("SMOKE RESULT: ", failures, " failure(s). Last chunk apply: ", world.last_build_ms, " ms")
+	game.audio.stop_all()
+	for index: int in range(3):
+		await process_frame
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)

@@ -1,4 +1,4 @@
-param([ValidateSet('game', 'editor', 'test')][string]$Mode = 'game', [string]$GodotPath)
+param([ValidateSet('game', 'editor', 'test', 'preview', 'export')][string]$Mode = 'game', [string]$GodotPath)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $GodotPath) {
@@ -11,6 +11,15 @@ if ($Mode -eq 'test') {
     if ($LASTEXITCODE -ne 0) { throw 'Asset import failed.' }
     & $GodotPath --headless --render-thread safe --path $projectRoot --script res://tests/smoke_test.gd
     if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed.' }
+    & $GodotPath --headless --render-thread safe --path $projectRoot --script res://tests/gameplay_test.gd
+    if ($LASTEXITCODE -ne 0) { throw 'Gameplay tests failed.' }
+} elseif ($Mode -eq 'preview') {
+    & $GodotPath --path $projectRoot --resolution 1920x1080 --script res://tests/render_preview.gd
+} elseif ($Mode -eq 'export') {
+    $output = Join-Path $projectRoot 'build/windows'
+    New-Item -ItemType Directory -Force -Path $output | Out-Null
+    & $GodotPath --headless --path $projectRoot --export-release 'Windows Desktop' (Join-Path $output 'VanKhe.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Export failed. Run tools/setup.ps1 -WithExportTemplates first.' }
 } elseif ($Mode -eq 'editor') {
     & $GodotPath --path $projectRoot --editor
 } else {

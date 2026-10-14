@@ -112,6 +112,22 @@ func _process(delta: float) -> void:
 			combat_level = 0
 			set_music(area_music, 3.0)
 
+func _exit_tree() -> void:
+	stop_all()
+
+func stop_all() -> void:
+	## Stops every stream so the audio server releases its playbacks before shutdown.
+	var players: Array[Node] = [river_player]
+	players.append_array(music_players)
+	players.append_array(ambience_players)
+	players.append_array(pool_2d)
+	players.append_array(pool_3d)
+	for player: Node in players:
+		if player:
+			player.call("stop")
+	cache.clear()
+	variants.clear()
+
 # ------------------------------------------------------------------ ambience
 
 func set_ambience(name: String) -> void:

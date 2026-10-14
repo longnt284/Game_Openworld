@@ -214,10 +214,11 @@ def player_animations():
     steps = 6
     for i in range(steps + 1):
         u = i / steps
-        pose = merge(rest, legs=(-20, 14, 8), drop=0.06, spine=(6, 0, 0), chest=(2, 0, 0), head=(-4, 0, 0), hips=(0, -30 + 360 * u, 0),
-                     off=(0, 0, 0.06 * math.sin(u * math.pi)), ponytail=(30, 0, 25), scarf=(35, 0, 30))
-        pose["armR"] = ((-1, 0, 0.05), (-1, -0.12, 0.05), (-0.3, -0.95, 0.0))
-        pose["armL"] = ((0.9, 0.3, -0.2), (0.85, 0.5, -0.1))
+        # Low, forward-leaning spin: sword arm sweeps out front-right, off hand tucked to the chest.
+        pose = merge(rest, legs=(-32, 24, 10), drop=0.13, spine=(14, 0, 0), chest=(6, -12, 0), head=(-10, 12, 0), hips=(0, -30 + 360 * u, 0),
+                     off=(0, 0, 0.04 * math.sin(u * math.pi)), ponytail=(40, 0, 30), scarf=(45, 0, 35))
+        pose["armR"] = ((-0.82, -0.42, -0.25), (-0.72, -0.68, -0.08), (-0.45, -0.88, 0.05))
+        pose["armL"] = ((0.3, -0.45, -0.84), (-0.45, -0.82, 0.25))
         keys.append((spin_start + (he - spin_start) * u, pose))
     finish = merge(rest, legs=(-36, 24, 8), drop=0.15, spine=(16, 6, 0), chest=(8, 20, 0), head=(-10, -16, 0))
     finish["armR"] = ((-0.9, -0.3, -0.25), (-0.85, -0.45, -0.1), (-0.5, -0.85, -0.15))
