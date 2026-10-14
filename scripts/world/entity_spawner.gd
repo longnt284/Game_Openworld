@@ -171,11 +171,20 @@ func _create(data: Dictionary) -> Node3D:
 func _update_trigger(data: Dictionary, distance: float) -> void:
 	var id: String = data["id"]
 	var inside: bool = distance < float(data.get("radius", 8.0)) and main.quests.check(data.get("if", []))
-	if inside and not inside_triggers.get(id, false):
-		if data.has("start_quest"):
-			main.quests.start(String(data["start_quest"]))
+	var entered: bool = inside and not inside_triggers.get(id, false)
+	if entered and data.has("start_quest"):
+		main.quests.start(String(data["start_quest"]))
+	# Also fire while standing inside if a quest only now asks for this place.
+	if entered or (inside and main.quests.wants(String(data["event"]))):
 		main.quests.notify(String(data["event"]))
 	inside_triggers[id] = inside
+
+func reset_navzones() -> void:
+	## Terrain changed (seed reset): drop baked encounter navmeshes so they rebake from new colliders.
+	for region: Node in navzones.values():
+		if is_instance_valid(region):
+			region.queue_free()
+	navzones.clear()
 
 func _bake_navzone(data: Dictionary) -> void:
 	## Parses the colliders already streamed in around the encounter and bakes off-thread.

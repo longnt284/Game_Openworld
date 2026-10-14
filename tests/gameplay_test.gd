@@ -277,6 +277,8 @@ func _run() -> void:
 	check(not migrated.is_empty() and int(migrated["version"]) == 2 and migrated["state"]["checkpoint_id"] == "shrine_village", "Version 1 saves migrate to schema 2")
 	check(game.load_game() and state.has_flag("migrated_from_v1"), "Migrated save loads into the game")
 
+	_check_sequence_breaks()
+
 	for suffix: String in ["", ".tmp", ".bak"]:
 		if FileAccess.file_exists(TEST_SAVE + suffix):
 			DirAccess.remove_absolute(TEST_SAVE + suffix)
@@ -286,3 +288,23 @@ func _run() -> void:
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)
+
+func _check_sequence_breaks() -> void:
+	## Exploring ahead must never lock a quest: world facts done early count when the quest asks.
+	var early: GameState = GameState.new()
+	var manager: QuestManager = QuestManager.new()
+	manager.setup(early, Callable())
+	early.set_flag("camp_clear:rescue")
+	manager.start("mq01_ben_song")
+	manager.notify("reach:rescue_site")
+	check(manager.stage("mq01_ben_song") == 2, "Rescue camp cleared before the quest asks still counts")
+	for index: int in range(1, 4):
+		early.set_flag("echo_seen:echo_%d" % index)
+	early.set_flag("read:diary_tower")
+	manager.start("mq03_dau_ky_uc")
+	check(manager.stage("mq03_dau_ky_uc") == 0, "Early echoes do not skip reaching the bamboo gate")
+	manager.notify("reach:bamboo_gate")
+	check(manager.is_done("mq03_dau_ky_uc"), "Echoes and diary found early complete Dấu ký ức when reached")
+	check(manager.wants("reach:gorge_north"), "Quest manager reports the event the next quest waits for")
+	manager.free()
+

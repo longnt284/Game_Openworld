@@ -62,6 +62,9 @@ func _physics_attack(delta: float) -> void:
 func _process(delta: float) -> void:
 	if shockwave_radius < 0.0:
 		return
+	if state == "dead":
+		shockwave_radius = -1.0  # a slain guardian's ring stops hurting the winner
+		return
 	shockwave_radius += 9.0 * delta
 	if int(shockwave_radius * 4.0) % 3 == 0:
 		Vfx.ring(get_parent(), shockwave_center + Vector3.UP * 0.15, shockwave_radius, Color(1.0, 0.55, 0.35, 0.8), 0.12, 0.06)
@@ -97,6 +100,8 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 func _enter_phase_two() -> void:
 	phase = 2
 	speed_scale = 1.18
+	poise = max_poise
+	stagger_time = 0.0
 	_release_token()
 	invulnerable = true
 	state = "roar"

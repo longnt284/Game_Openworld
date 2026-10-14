@@ -34,6 +34,7 @@ var chime_sequence: Array[int] = []
 var title_angle: float = 0.0
 var hinted: Dictionary = {}
 var engaged: int = 0
+var death_serial: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -180,6 +181,11 @@ func _begin_play() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func start_new_game() -> void:
+	death_serial += 1
+	if spawner.arena.fighting:
+		spawner.arena.end_fight(false)
+	hud.hide_boss()
+	hud.fade_to(0.0, 0.3)
 	state.from_dict(GameState.new().to_dict())
 	state.health = state.max_health()
 	chime_sequence.clear()
@@ -202,6 +208,7 @@ func continue_game() -> void:
 		_begin_play()
 
 func return_to_title() -> void:
+	death_serial += 1
 	set_paused(false)
 	show_title()
 
@@ -391,6 +398,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("interact") and focus and player.state == "move":
 		get_viewport().set_input_as_handled()
+		# Conversations, visions and shrines lock the controls, so they wait until the fight is over.
+		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate"]):
+			hud.show_message("Không thể làm việc này khi đang giao chiến")
+			return
 		if focus is Npc:
 			start_dialogue(focus as Npc)
 		else:
@@ -756,7 +767,12 @@ func _on_player_died() -> void:
 	audio.play("death")
 	audio.set_combat(0)
 	hud.fade_to(1.0, 1.2, "Gục ngã", "Lâm An sẽ tỉnh lại ở Miếu Gió gần nhất. Hành trang, nhiệm vụ và kinh nghiệm được giữ nguyên;\nquái trong trại và kẻ gác đấu trường sẽ hồi phục.")
-	get_tree().create_timer(3.2).timeout.connect(respawn)
+	death_serial += 1
+	var serial: int = death_serial
+	get_tree().create_timer(3.2).timeout.connect(func() -> void:
+		# A load, new game or return to title during the death screen cancels this respawn.
+		if serial == death_serial and playing and player.is_dead():
+			respawn())
 
 func respawn() -> void:
 	set_paused(false)
@@ -892,8 +908,12 @@ func load_game() -> bool:
 	if data.is_empty():
 		hud.show_message("Chưa có bản lưu hợp lệ")
 		return false
+	death_serial += 1
+	hud.fade_to(0.0, 0.4)
 	if int(data["seed"]) != settings.world_seed:
+		# The valley is authored for the default seed; props, water and the map are not rebuilt.
 		world.reset_seed(int(data["seed"]))
+		spawner.reset_navzones()
 	state.from_dict(data["state"])
 	_check_echo_skill(false)
 	spawner.clear_all()

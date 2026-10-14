@@ -52,6 +52,7 @@ var last_safe: Vector3 = Vector3.ZERO
 var safe_timer: float = 0.0
 var step_distance: float = 0.0
 var was_on_floor: bool = true
+var fall_speed: float = 0.0
 var lock_target: Node3D
 
 func initialize(config: GameSettings, library: AssetLibrary = null, state_data: GameState = null) -> void:
@@ -174,6 +175,12 @@ func _physics_process(delta: float) -> void:
 	if state == "loading":
 		state = "move"
 	_tick_timers(delta)
+	# Button releases can be missed while paused, in dialogue or dead: trust the real button state.
+	if not (input_enabled and Input.is_action_pressed("block")):
+		block_held = false
+	if attack_held >= 0.0 and not (input_enabled and Input.is_action_pressed("attack")):
+		attack_held = -1.0
+	fall_speed = velocity.y
 	if attack_held >= 0.0 and input_enabled:
 		attack_held += delta
 		if attack_held >= 0.4 and state == "move" and is_on_floor():
@@ -206,7 +213,7 @@ func _tick_timers(delta: float) -> void:
 	for skill: String in cooldowns:
 		cooldowns[skill] = maxf(0.0, cooldowns[skill] - delta)
 	stamina_delay -= delta
-	var draining: bool = sprinting or gliding or state == "dodge" or (state == "move" and block_held and is_on_floor() and current_action() == "")
+	var draining: bool = (state == "move" and (sprinting or gliding)) or state == "dodge" or (state == "move" and block_held and is_on_floor() and current_action() == "")
 	if stamina_delay <= 0.0 and not draining and stamina < max_stamina:
 		set_stamina(stamina + 32.0 * delta)
 	game.play_time += delta
@@ -500,6 +507,8 @@ func _resolve_hits(name: String, data: Dictionary, t: float, hit_start: float, h
 			var level_bonus: float = 1.0 + 0.25 * (game.skill_level("gust") - 1)
 			blade.launch(global_position + Vector3.UP * 1.1 + facing * 0.8, facing, 22.0, game.attack_power() * float(data["mult"]) * level_bonus, data, Combat.LAYER_HURT_ENEMY, self)
 			emit_signal("footstep", "wind")
+	if data.get("projectile", false):
+		return  # Phong Trảm damages only through its wind blade, never twice up close.
 	if name == "skill_cyclone":
 		action["tick"] = float(action["tick"]) - get_physics_process_delta_time()
 		if float(action["tick"]) <= 0.0:
@@ -540,16 +549,18 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		return {"hit": false}
 	var from_front: bool = facing.dot(-damage.direction) > 0.2
 	var parry_window: bool = current_action() == "parry" and float(action.get("t", 9.0)) <= float((action["data"] as Dictionary).get("hit_end", 0.2))
-	if invulnerable > 0.0 and not parry_window:
+	var parries: bool = parry_window and from_front and not damage.unblockable
+	if invulnerable > 0.0 and not parries:
 		return {"hit": false, "dodged": state == "dodge"}
-	if parry_window and from_front and not damage.unblockable:
+	if parries:
 		visual.hitstop(0.12)
 		camera_rig.add_trauma(0.25)
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.2 + facing * 0.6, Color(1.0, 0.95, 0.7), 26, 7.0, 0.07)
 		Vfx.glint(get_parent(), global_position + Vector3.UP * 1.3 + facing * 0.7, Color(1, 1, 0.85), 1.2)
 		counter_bonus = 2.5
 		set_stamina(stamina + 12.0)
-		if damage.source and damage.source.has_method("on_parried"):
+		# Deflecting a projectile protects the player but does not stagger the distant thrower.
+		if damage.source and damage.source.has_method("on_parried") and not damage.ranged:
 			damage.source.on_parried(self)
 		emit_signal("parried", damage.source)
 		return {"hit": false, "parried": true}
@@ -559,6 +570,9 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		set_stamina(stamina - damage.amount * 1.2)
 		stamina_delay = 1.0
 		_apply_damage(chip)
+		if health <= 0.0:
+			_die()
+			return {"hit": true, "blocked": true, "amount": chip, "killed": true}
 		velocity += damage.direction * damage.knockback * 0.6
 		camera_rig.add_trauma(0.15)
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.2 + facing * 0.6, Color(0.9, 0.95, 1.0), 12, 4.0, 0.06)
@@ -684,7 +698,7 @@ func _after_move(delta: float) -> void:
 	var on_floor: bool = is_on_floor()
 	if on_floor and not was_on_floor and state == "move":
 		emit_signal("footstep", "land")
-		if velocity.y < -9.0:
+		if fall_speed < -9.0:
 			visual.play_action("land")
 	was_on_floor = on_floor
 	var horizontal: float = Vector2(velocity.x, velocity.z).length()

@@ -24,7 +24,7 @@ const ATTACKS: Dictionary = {
 	"boar/charge": {"damage": 18, "poise": 30, "arc": [0, 0], "radius": 0.9, "height": 0.6, "hit_radius": 0.95, "hitstop": 0.07, "shake": 0.45, "knockback": 7.0, "lunge": 0.0, "sfx": "boar_hit"},
 	"guardian/attack": {"damage": 26, "poise": 40, "arc": [-26, 26], "radius": 2.6, "height": 0.8, "hit_radius": 1.25, "hitstop": 0.09, "shake": 0.5, "knockback": 5.0, "lunge": 5.0, "sfx": "glaive_slam"},
 	"guardian/sweep": {"damage": 22, "poise": 35, "arc": [-40, 260], "radius": 3.1, "height": 1.0, "hit_radius": 1.3, "hitstop": 0.08, "shake": 0.4, "knockback": 5.5, "lunge": 0.0, "sfx": "glaive_sweep"},
-	"guardian/slam": {"damage": 34, "poise": 60, "arc": [0, 0], "radius": 1.0, "height": 0.4, "hit_radius": 4.6, "hitstop": 0.1, "shake": 0.8, "knockback": 8.0, "lunge": 0.0, "unblockable": true, "sfx": "ground_slam"},
+	"guardian/slam": {"damage": 34, "poise": 60, "arc": [0, 0], "radius": 1.6, "track": false, "height": 0.4, "hit_radius": 4.6, "hitstop": 0.1, "shake": 0.8, "knockback": 8.0, "lunge": 0.0, "unblockable": true, "sfx": "ground_slam"},
 }
 
 class Damage:
@@ -36,6 +36,7 @@ class Damage:
 	var source: Node3D
 	var attack: String = ""
 	var unblockable: bool = false
+	var ranged: bool = false
 	var hitstop: float = 0.05
 	var shake: float = 0.0
 	var position: Vector3 = Vector3.ZERO
@@ -83,6 +84,7 @@ static func make_damage(source: Node3D, data: Dictionary, amount: float, target_
 	damage.knockback = float(data.get("knockback", 1.0))
 	damage.source = source
 	damage.unblockable = bool(data.get("unblockable", false))
+	damage.ranged = bool(data.get("ranged", false))
 	damage.hitstop = float(data.get("hitstop", 0.05))
 	damage.shake = float(data.get("shake", 0.0))
 	var direction: Vector3 = target_position - source.global_position

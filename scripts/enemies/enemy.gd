@@ -45,6 +45,9 @@ var invulnerable: bool = false
 var death_timer: float = 0.0
 var stuck_time: float = 0.0
 var last_position: Vector3
+var body_shape: CollisionShape3D
+var blocked_time: float = 0.0
+var quadruped: bool = false
 
 func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManager) -> void:
 	data = ContentDB.enemy(String(entity["enemy"]))
@@ -69,11 +72,13 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	var collision: CollisionShape3D = CollisionShape3D.new()
 	collision.shape = capsule
 	collision.position.y = height * 0.5
-	if data.get("quadruped", false):
+	quadruped = bool(data.get("quadruped", false))
+	if quadruped:
 		collision.rotation.x = PI * 0.5
 		capsule.height = float(data.get("length", 1.4))
 		collision.position.y = radius + 0.05
 	add_child(collision)
+	body_shape = collision
 	visual = CharacterVisual.new()
 	add_child(visual)
 	visual.setup(assets, String(data["model"]), false)
@@ -118,12 +123,14 @@ func _physics_process(delta: float) -> void:
 	if world == null or not world.is_position_ready(global_position):
 		velocity = Vector3.ZERO
 		return
-	state_time += delta
-	cooldown -= delta
 	if state == "dead":
+		state_time += delta
 		_physics_dead(delta)
 		return
+	# Hit-stop freezes the animation, so the attack clock and cooldown freeze with it.
 	if not visual.is_frozen():
+		state_time += delta
+		cooldown -= delta
 		_think(delta)
 	if not is_on_floor():
 		velocity.y -= 20.0 * delta
@@ -209,10 +216,12 @@ func _physics_chase(delta: float) -> void:
 		_set_state("return")
 		return
 	var reach: float = float(data.get("attack_range", 1.9))
-	if distance <= reach + 0.2 and cooldown <= 0.0 and _take_token():
+	var can_attack: bool = cooldown <= 0.0
+	if distance <= reach + 0.2 and can_attack and _take_token():
 		_begin_attack(_choose_attack(distance))
 		return
-	if distance > reach * 0.85 and (boss or distance > 3.4 or _has_token()):
+	# Close in when ready and an attack slot is free; otherwise circle at a safe distance.
+	if distance > reach * 0.85 and (boss or distance > 3.4 or _has_token() or (can_attack and _token_free())):
 		visual.play_loop("run")
 		_move_toward(target.global_position, float(data.get("run", 4.5)) * speed_scale, delta)
 	else:
@@ -266,7 +275,7 @@ func _physics_attack(delta: float) -> void:
 	var t: float = state_time * speed_scale
 	var hit_start: float = float(attack_data.get("hit_start", 0.6))
 	var hit_end: float = float(attack_data.get("hit_end", 0.7))
-	if t < hit_start - 0.15:
+	if t < hit_start - 0.15 and attack_data.get("track", true):
 		_face_target(delta, 5.0)
 	if not telegraphed and t >= hit_start - 0.38:
 		telegraphed = true
@@ -277,6 +286,8 @@ func _physics_attack(delta: float) -> void:
 	velocity.z = move_toward(velocity.z, facing.z * push, 30.0 * delta)
 	if t >= hit_start and t <= hit_end + delta * speed_scale:
 		_attack_window(t, hit_start, hit_end)
+		if state != "attack":
+			return  # parried or killed by the swing it just delivered
 	if t >= float(attack_data.get("recover", 1.0)):
 		cooldown = randf_range(float(data.get("cooldown", [1.2, 2.2])[0]), float(data.get("cooldown", [1.2, 2.2])[1])) / speed_scale
 		_set_state("recover")
@@ -379,6 +390,10 @@ func _take_token() -> bool:
 	tokens[camp] = holders
 	return true
 
+func _token_free() -> bool:
+	var holders: Array = (tokens.get(camp, []) as Array).filter(func(item: Variant) -> bool: return is_instance_valid(item) and (item as Enemy).state == "attack")
+	return holders.size() < 2
+
 func _has_token() -> bool:
 	return (tokens.get(camp, []) as Array).has(self)
 
@@ -413,15 +428,23 @@ func _face_target(delta: float, rate: float) -> void:
 
 func _apply_facing(_instant: bool = false) -> void:
 	visual.rotation.y = atan2(facing.x, facing.z)
+	if quadruped:
+		# Long body capsules lie along the facing so walls and hurtboxes match the model.
+		body_shape.rotation = Vector3(PI * 0.5, visual.rotation.y, 0.0)
+		(hurtbox.get_child(0) as CollisionShape3D).rotation = Vector3(PI * 0.5, visual.rotation.y, 0.0)
 
 func _move_toward(point: Vector3, speed: float, delta: float, turn: bool = true) -> void:
 	var next: Vector3 = point
 	var map: RID = get_world_3d().navigation_map
 	if NavigationServer3D.map_get_iteration_id(map) > 0 and not NavigationServer3D.map_get_regions(map).is_empty():
-		nav.target_position = point
-		var candidate: Vector3 = nav.get_next_path_position()
-		if candidate.distance_to(global_position) > 0.05:
-			next = candidate
+		# Path only while standing on a baked encounter zone and when the path really reaches the
+		# goal; otherwise (zone not baked yet, goal off the mesh) steer straight with obstacle probes.
+		if NavigationServer3D.map_get_closest_point(map, global_position).distance_to(global_position) < 1.5:
+			nav.target_position = point
+			var candidate: Vector3 = nav.get_next_path_position()
+			var reaches: bool = Vector2(nav.get_final_position().x - point.x, nav.get_final_position().z - point.z).length() < 1.5
+			if reaches and candidate.distance_to(global_position) > 0.05:
+				next = candidate
 	var direction: Vector3 = next - global_position
 	direction.y = 0.0
 	if direction.length() < 0.1:
@@ -447,11 +470,32 @@ func _avoid(direction: Vector3) -> Vector3:
 	return direction
 
 func _guard_edges() -> void:
-	## Stop before stepping into water, chasms or unloaded chunks.
-	var ahead: Vector3 = global_position + Vector3(velocity.x, 0, velocity.z) * 0.25
-	if not world.is_position_ready(ahead) or not world.layout.water_at(ahead.x, ahead.z).is_empty() or world.layout.in_chasm(ahead.x, ahead.z) or not world.layout.inside_bounds(ahead.x, ahead.z):
-		velocity.x = 0.0
-		velocity.z = 0.0
+	## Stop before stepping into water, chasms, drops or unloaded chunks. Terrain triangles are
+	## about 1.3 m wide, so the physical edge begins before the analytic one: look a cell ahead.
+	var flat: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	if flat.length() < 0.05:
+		return
+	var probe: Vector3 = global_position + flat.normalized() * maxf(flat.length() * 0.25, 1.6)
+	for point: Vector3 in [global_position + flat * 0.25, probe]:
+		if not world.is_position_ready(point) or not world.layout.water_at(point.x, point.z).is_empty() or world.layout.in_chasm(point.x, point.z) or not world.layout.inside_bounds(point.x, point.z):
+			_block_move()
+			return
+	if is_on_floor():
+		var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+		var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(probe + Vector3.UP * 1.5, probe + Vector3.DOWN * 3.0, Combat.LAYER_WORLD)
+		if space.intersect_ray(query).is_empty():
+			_block_move()
+			return
+	blocked_time = 0.0
+
+func _block_move() -> void:
+	velocity.x = 0.0
+	velocity.z = 0.0
+	blocked_time += get_physics_process_delta_time()
+	# A target across water or a gorge cannot be reached: give up and walk home.
+	if state == "chase" and blocked_time > 2.5:
+		blocked_time = 0.0
+		_set_state("return")
 
 func _track_stuck(delta: float) -> void:
 	if state in ["chase", "return"] and Vector2(velocity.x, velocity.z).length() > 0.5:

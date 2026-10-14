@@ -46,9 +46,25 @@ func _build_title() -> void:
 	root.add_child(title_screen)
 	var shade: ColorRect = ColorRect.new()
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.03, 0.07, 0.08, 0.35)
+	shade.color = Color(0.03, 0.07, 0.08, 0.25)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_screen.add_child(shade)
+	# Darker band behind the title column so text stays readable over the bright valley.
+	var gradient: Gradient = Gradient.new()
+	gradient.set_color(0, Color(0.03, 0.07, 0.08, 0.82))
+	gradient.set_color(1, Color(0.03, 0.07, 0.08, 0.0))
+	gradient.add_point(0.55, Color(0.03, 0.07, 0.08, 0.6))
+	var band_texture: GradientTexture2D = GradientTexture2D.new()
+	band_texture.gradient = gradient
+	band_texture.width = 256
+	band_texture.height = 4
+	var band: TextureRect = TextureRect.new()
+	band.texture = band_texture
+	band.stretch_mode = TextureRect.STRETCH_SCALE
+	band.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	band.offset_right = 860
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_screen.add_child(band)
 	var box: VBoxContainer = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	box.set_anchors_preset(Control.PRESET_CENTER_LEFT)

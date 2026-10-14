@@ -8,6 +8,9 @@ signal quest_started(id: String)
 signal quest_updated(id: String)
 signal quest_completed(id: String)
 
+## Interactables are used once and leave one of these flags (see Interactable.flag_key()).
+const ONE_TIME_PREFIXES: PackedStringArray = ["read:", "opened:", "echo_seen:", "memory:", "lit:"]
+
 var state: GameState
 var rewarder: Callable
 
@@ -65,7 +68,7 @@ func notify(event: String) -> void:
 	refresh()
 
 func refresh() -> void:
-	## Re-evaluates inventory ("have") and flag objectives after any state change.
+	## Re-evaluates inventory ("have"), flag and world-fact objectives after any state change.
 	var changed: bool = true
 	var guard: int = 0
 	while changed and guard < 8:
@@ -87,6 +90,47 @@ func refresh() -> void:
 			elif String(objective.get("event", "")).begins_with("flag:") and state.has_flag(String(objective["event"]).substr(5)):
 				_advance(id)
 				changed = true
+			else:
+				var done: int = _world_progress(String(objective.get("event", "")))
+				if done >= int(objective.get("count", 1)):
+					_advance(id)
+					changed = true
+				elif done > progress(id):
+					state.quests[id]["progress"] = done
+					emit_signal("quest_updated", id)
+
+func wants(event: String) -> bool:
+	## True when some active quest is currently waiting for this event.
+	for id: String in state.quests.keys():
+		if is_active(id) and String(current_objective(id).get("event", "")) == event:
+			return true
+	return false
+
+func _world_progress(event: String) -> int:
+	## One-time world facts (cleared camps, heard echoes, read diaries, opened chests, slain bosses)
+	## can happen before a quest asks for them. Counting them from GameState keeps the quest from
+	## locking when the player explores ahead. Returns -1 for events that are not world facts.
+	var parts: PackedStringArray = event.split(":")
+	match parts[0]:
+		"camp_clear":
+			return 1 if state.has_flag(event) else 0
+		"echo":
+			var heard: int = 0
+			for key: String in state.flags:
+				if key.begins_with("echo_seen:echo_"):
+					heard += 1
+			return heard
+		"interact":
+			for prefix: String in ONE_TIME_PREFIXES:
+				if state.has_flag(prefix + parts[1]):
+					return 1
+			return 0
+		"kill":
+			for entry: Dictionary in ContentDB.get_data("entities").get("entities", []):
+				if String(entry.get("enemy", "")) == parts[1] and state.has_flag("dead:" + String(entry["id"])):
+					return 1
+			return 0
+	return -1
 
 func _advance(id: String) -> void:
 	state.quests[id]["stage"] = stage(id) + 1

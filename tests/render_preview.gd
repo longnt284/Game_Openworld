@@ -93,6 +93,8 @@ func _run() -> void:
 		await settle()
 		await frames(60)
 		await shot("title")
+		game.audio.stop_all()
+		await create_timer(0.2, true, false, true).timeout
 		quit(0)
 		return
 	game = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D

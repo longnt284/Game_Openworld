@@ -62,9 +62,11 @@ func _physics_attack(delta: float) -> void:
 	for area: Area3D in Combat.sweep(self, charge_direction, attack_data, 0.0, 0.0, Combat.LAYER_HURT_PLAYER, attack_hits):
 		_deliver(area, attack_data)
 		charge_hit = true
+	if state != "attack":
+		return  # parried mid-charge
 	if is_on_wall() and state_time > 0.15:
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 0.6 + charge_direction, Color(0.8, 0.75, 0.6), 18, 5.0)
-		_stagger(1.6)
+		_daze(1.6)
 		return
 	if charge_distance >= float(data.get("charge_length", 14.0)) or (charge_hit and state_time > 0.25):
 		cooldown = randf_range(1.6, 2.6)
@@ -72,4 +74,10 @@ func _physics_attack(delta: float) -> void:
 
 func on_parried(_player: Node) -> void:
 	if state != "dead":
-		_stagger(1.8)
+		_daze(1.8)
+
+func _daze(duration: float) -> void:
+	## Stops the rush dead so the dazed boar stays in front of the player, open to punishment.
+	velocity.x = 0.0
+	velocity.z = 0.0
+	_stagger(duration)

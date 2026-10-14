@@ -24,6 +24,15 @@ Cập nhật: 14/10/2026. Nhánh `claude/adoring-darwin-bwa9t8`. Đọc file nà
 - **Lưu game:** schema v2, migrate từ v1, backup, phục hồi file hỏng, tự lưu ở mốc an toàn.
 - **Kiểm thử:** smoke test (bản nền, giữ nguyên độ bao phủ) và gameplay test chơi trọn đoạn mẫu từ New Game đến kết. Xem [validation.md](validation.md).
 
+## Review mã và sửa lỗi (14/10)
+
+Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế giới, dữ liệu nhiệm vụ, save/UI), mỗi phát hiện được đối chiếu lại với code trước khi sửa. Đã sửa:
+
+- **Chặn tiến trình:** dọn trại tàn binh, nghe tiếng vọng, đọc nhật ký, mở rương hay hạ boss *trước* khi nhiệm vụ yêu cầu giờ vẫn được tính (QuestManager đọc lại các "sự kiện một lần" từ GameState); trigger vẫn kích hoạt nếu người chơi đã đứng sẵn trong vùng.
+- **AI:** tàn binh chỉ lượn vòng mà không áp sát (lỗi token tấn công); địch dùng navmesh của khu khác hoặc đứng im ở mép navmesh; tường gió bị bake vào navmesh làm boss kẹt; hit-stop làm lệch thời điểm đòn của địch; heo trượt xa sau khi bị phản; khối va chạm heo không xoay theo hướng; sóng xung kích vẫn gây sát thương sau khi boss chết; vòng báo đòn nện lệch vùng sát thương thật; phản lưỡi gió từ xa làm boss choáng.
+- **Người chơi:** chết vì sát thương xuyên đỡ không kích hoạt; nút đỡ/đánh bị "kẹt" sau khi tạm dừng hoặc hội thoại; thể lực không hồi sau khi chạy rồi đánh; animation tiếp đất mạnh không bao giờ chạy; nhấn đỡ trong lúc bất tử sau hồi sinh vẫn bị đánh; Phong Trảm trúng hai lần ở cự ly gần.
+- **Luồng game:** tải save trong màn hình gục ngã bị hồi sinh đè lên; bắt đầu game mới giữa trận boss giữ nguyên trạng thái trận; mở hội thoại/thị kiến/miếu giữa lúc giao chiến.
+
 ## Đang làm / làm tiếp ngay
 
 1. Người chơi thử thật đoạn mẫu trên Windows, ghi lại cảm giác điều khiển, độ khó, chỗ lạc đường.

@@ -64,7 +64,10 @@ func _physics_process(delta: float) -> void:
 		if entity and entity.has_method("take_damage") and is_instance_valid(source):
 			var damage: Combat.Damage = Combat.make_damage(source, data, amount, (entity as Node3D).global_position)
 			damage.direction = velocity.normalized()
-			entity.take_damage(damage)
+			damage.ranged = true
+			var outcome: Dictionary = entity.take_damage(damage)
+			if outcome.get("hit", false) and source.has_signal("attack_landed"):
+				source.emit_signal("attack_landed", entity, float(outcome.get("amount", amount)))
 			Vfx.burst(get_parent(), (entity as Node3D).global_position + Vector3.UP, color, 14, 5.0)
 		if not pierce:
 			queue_free()

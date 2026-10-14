@@ -22,7 +22,9 @@ func setup(data: Dictionary, layout: WorldLayout) -> void:
 	var center: Vector2 = Vector2(float(data["pos"][0]), float(data["pos"][1]))
 	global_position = Vector3(center.x, layout.height_at(center.x, center.y), center.y)
 	body = StaticBody3D.new()
-	body.collision_layer = Combat.LAYER_WORLD | Combat.LAYER_ENEMY
+	# Enemy layer only: it still blocks the player and the guardian, but stays out of the
+	# camera spring arm and of navmesh baking (which parses the world layer).
+	body.collision_layer = Combat.LAYER_ENEMY
 	add_child(body)
 	var segments: int = 32
 	for index: int in range(segments):

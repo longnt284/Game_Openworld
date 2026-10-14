@@ -30,7 +30,17 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 
 ## Kiểm tra hình ảnh — đã chạy (renderer phần mềm)
 
-`tests/render_preview.gd` chụp các cảnh thật trong game (ảnh trong `docs/screenshots/`): bến sông, làng, hội thoại, giao tranh, từng đòn đánh nhìn ngang, Trúc Hải, Khe Gió, đấu trường, boss, bản đồ, nhật ký, túi đồ, thiết lập, ghi công, màn hình chính. Đã kiểm tra bằng mắt: vật liệu toon, bóng, viền, vũ khí gắn tay, tư thế đòn đánh khớp khung gây sát thương, chữ tiếng Việt đủ dấu, UI nằm trong khung 1280 × 720.
+`tests/render_preview.gd` chụp các cảnh thật trong game ở 1280 × 720: bến sông, làng, hội thoại, giao tranh, Trúc Hải, Khe Gió, đấu trường, boss, bản đồ, nhật ký, túi đồ, thiết lập, ghi công, màn hình chính. Cảnh "moves" tua từng đòn tới giữa khung gây sát thương (lấy từ `data/anim_timings.json`) và chụp nhìn ngang. Đã kiểm tra bằng mắt: vật liệu toon, bóng, viền, vũ khí gắn tay, tư thế đòn khớp khung sát thương, chữ tiếng Việt đủ dấu, UI nằm trong khung hình.
+
+| | |
+|---|---|
+| ![Màn hình chính](screenshots/title.jpg) | ![Bến sông](screenshots/dock.jpg) |
+| ![Hội thoại](screenshots/dialogue.jpg) | ![Giao tranh](screenshots/combat_swing.jpg) |
+| ![Trúc Hải](screenshots/bamboo.jpg) | ![Khe Gió](screenshots/gorge.jpg) |
+| ![Trúc Tướng](screenshots/boss_slam.jpg) | ![Bản đồ](screenshots/map.jpg) |
+| ![Nhật ký](screenshots/journal.jpg) | ![Túi đồ](screenshots/inventory.jpg) |
+
+![Tám đòn của Lâm An ở giữa khung gây sát thương: chuỗi 3 đòn, trọng kích, Phong Trảm, Toàn Phong, phản đòn, né](screenshots/moves.jpg)
 
 ## Hiệu năng — chưa đo được trên GPU thật
 
@@ -46,7 +56,12 @@ Script in `PROFILE setup` (độ phân giải, GPU, chất lượng) rồi ba d�
 
 | Máy | Cảnh | FPS TB | p95 ms | Draw call | RAM tĩnh | VRAM |
 |---|---|---:|---:|---:|---:|---:|
-| _(chưa đo)_ | | | | | | |
+| _GPU thật — chưa đo_ | | | | | | |
+| Xeon 4 nhân, llvmpipe, 1280 × 720 (chỉ để xác nhận script chạy) | Làng | 3,2 | 391 | 778 | 106 MB | 51 MB |
+| như trên | Chuyển vùng | 3,1 | 361 | 1 242 | 106 MB | 52 MB |
+| như trên | Trận boss | 3,3 | 335 | 480 | 106 MB | 50 MB |
+
+Bộ nhớ và số draw call không phụ thuộc GPU nên đã dùng được làm ngân sách ban đầu: ~106 MB RAM tĩnh, ~51 MB VRAM, tối đa ~1 250 draw call khi chuyển vùng (cao nhất ở bến sông/chuyển vùng do nhiều đạo cụ riêng lẻ). Nếu đo trên GPU thật thấy nghẽn ở CPU/driver, ưu tiên gộp đạo cụ tĩnh cùng vật liệu thành MultiMesh.
 
 Các biện pháp đã có: pool vùng cố định 25 node, tính mesh trên worker thread, MultiMesh cho cây/cỏ/đá, khoảng hiển thị theo chất lượng (cỏ 26/46/60 m, cây chi tiết 48/72/96 m, xa hơn dùng bóng cây ít đa giác), giới hạn bóng đổ 0/55/90 m, MSAA 0/2×/4×, NPC/địch/vật tương tác chỉ được tạo trong bán kính 85 m và hủy khi xa hơn 115 m, navmesh chỉ bake ở khu giao tranh.
 
