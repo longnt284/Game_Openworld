@@ -1,0 +1,12 @@
+{
+	"tan_binh": {"name": "Tàn binh mặt nạ", "role": "melee", "owner": "bandit", "model": "tan_binh", "weapon": "sabre", "hp": 70, "poise": 34, "speed": 2.0, "run": 5.0,
+		"detect": 13, "lose": 24, "leash": 28, "wander": 5, "attack_range": 1.9, "attacks": ["attack"], "cooldown": [1.0, 2.0], "xp": 28,
+		"drops": [["coins", 4, 9, 1.0], ["banh_ngai", 1, 1, 0.22], ["da_gio", 1, 1, 0.3]], "radius": 0.4, "height": 1.8, "parry_stagger": 1.4, "break_stagger": 1.4},
+	"heo_gio": {"name": "Heo gió", "role": "charger", "owner": "boar", "model": "heo_gio", "class": "boar", "hp": 85, "poise": 46, "speed": 1.8, "run": 4.2,
+		"charge_speed": 13.0, "charge_length": 14.0, "detect": 15, "lose": 26, "leash": 32, "wander": 7, "attack_range": 9.0, "cooldown": [1.6, 2.6], "xp": 34,
+		"drops": [["coins", 2, 6, 1.0], ["manh_gio", 1, 1, 0.35]], "radius": 0.42, "height": 1.0, "length": 1.5, "quadruped": true, "knockback_scale": 0.5},
+	"truc_tuong": {"name": "Trúc Tướng", "title": "Kẻ gác rừng trúc", "role": "miniboss", "owner": "guardian", "model": "truc_tuong", "weapon": "glaive", "class": "guardian",
+		"hp": 950, "poise": 140, "speed": 1.6, "run": 4.4, "detect": 30, "lose": 60, "leash": 40, "wander": 2, "attack_range": 3.4, "attacks": ["attack", "sweep", "slam"],
+		"cooldown": [0.9, 1.7], "xp": 320, "drops": [["ngoc_phong_an", 1, 1, 1.0], ["manh_gio", 3, 3, 1.0], ["coins", 60, 60, 1.0]], "radius": 0.75, "height": 2.8,
+		"armor": true, "knockback_scale": 0.15, "parry_stagger": 0.8, "break_stagger": 2.6, "damage_scale": 1.0}
+}

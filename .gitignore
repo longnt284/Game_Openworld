@@ -7,3 +7,4 @@ build/
 *.tmp
 *.log
 .DS_Store
+__pycache__/

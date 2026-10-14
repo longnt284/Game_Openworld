@@ -4,6 +4,6 @@
 script = ExtResource("1")
 world_seed = 284
 chunk_size = 32
-subdivisions = 16
+subdivisions = 24
 view_radius = 2
 trees_per_chunk = 10

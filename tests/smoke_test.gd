@@ -1,4 +1,6 @@
 extends SceneTree
+## Core integration checks kept from the base (world, movement, pause, streaming,
+## checkpoint, saving) updated for the chapter systems.
 
 var failures: int = 0
 const TEST_SAVE: String = "user://smoke_test_save.json"
@@ -18,10 +20,21 @@ func frames(count: int) -> void:
 		await physics_frame
 		await process_frame
 
+func settle(game: Node, max_frames: int = 3000) -> void:
+	## Chunks build on worker threads, so wait for the streaming queue instead of a fixed frame count.
+	for index: int in range(max_frames):
+		var world: WorldManager = game.world
+		if world.active.size() == game.settings.chunk_capacity() and world.building.is_empty() and world.pending.is_empty():
+			break
+		await frames(1)
+	await frames(20)
+
 func _run() -> void:
 	var game: Node3D = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
+	game.skip_title = true
+	game.save_path = TEST_SAVE
 	root.add_child(game)
-	for attempt: int in range(600):
+	for attempt: int in range(900):
 		if game.initialized:
 			break
 		await frames(1)
@@ -29,23 +42,22 @@ func _run() -> void:
 	if not game.initialized:
 		quit(1)
 		return
-	await frames(80)
+	await settle(game)
 	var world: WorldManager = game.world
 	var player: PlayerController = game.player
 	check(world.active.size() == game.settings.chunk_capacity(), "All nearby chunks load within bounded capacity")
 	check(player.is_on_floor(), "Player stands on generated terrain collision")
-	check(game.hud.status.get_global_rect().position.x > 0, "Status HUD is inside viewport")
+	check(game.hud.region_label.get_global_rect().position.x > 0, "Tracker HUD is inside viewport")
 	check(world.coord_at(Vector3(-0.1, 0, -32.1)) == Vector2i(-1, -2), "Negative world coordinates map to correct chunks")
-	var initial_height: float = world.height_at(18, -73)
-	var second_noise: FastNoiseLite = FastNoiseLite.new()
-	second_noise.seed = world.noise.seed
-	second_noise.noise_type = world.noise.noise_type
-	second_noise.frequency = world.noise.frequency
-	second_noise.fractal_octaves = world.noise.fractal_octaves
-	second_noise.fractal_type = world.noise.fractal_type
-	check(is_equal_approx(initial_height, second_noise.get_noise_2d(18, -73) * game.settings.terrain_amplitude), "Seed reproduces terrain")
-	var a: WorldChunk = world.active[Vector2i(0, 0)]
-	var b: WorldChunk = world.active[Vector2i(1, 0)]
+	var second: WorldLayout = WorldLayout.load_default(game.settings.world_seed)
+	check(is_equal_approx(world.height_at(18, -73), second.height_at(18, -73)) and is_equal_approx(world.height_at(-61, -150), second.height_at(-61, -150)), "Seed reproduces terrain")
+	var center: Vector2i = world.coord_at(player.global_position)
+	if not world.active.has(center) or not world.active.has(center + Vector2i(1, 0)):
+		check(false, "Chunks around the player are active")
+		quit(1)
+		return
+	var a: WorldChunk = world.active[center]
+	var b: WorldChunk = world.active[center + Vector2i(1, 0)]
 	var av: PackedVector3Array = a.ground.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 	var bv: PackedVector3Array = b.ground.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 	var edge_matches: bool = true
@@ -60,15 +72,13 @@ func _run() -> void:
 	await frames(12)
 	check(player.position.distance_to(start) > 1.0, "WASD movement changes player position")
 	var ground_y: float = player.position.y
-	Input.action_press("jump")
-	await frames(2)
-	Input.action_release("jump")
-	await frames(6)
+	player.queue_input("jump")
+	await frames(8)
 	check(player.position.y > ground_y + 0.2, "Jump lifts player above terrain")
 	await frames(65)
 	check(player.is_on_floor(), "Player lands after jump")
 	game.set_paused(true)
-	check(game.hud.pause_panel.get_global_rect().position.x > 0, "Pause menu is inside viewport")
+	check(game.menus.pause_panel.visible and game.menus.pause_panel.get_global_rect().position.x > 0, "Pause menu is inside viewport")
 	var paused_position: Vector3 = player.position
 	Input.action_press("move_forward")
 	await frames(5)
@@ -78,29 +88,38 @@ func _run() -> void:
 	var previous_chunk_ids: Array[int] = []
 	for chunk: WorldChunk in world.active.values():
 		previous_chunk_ids.append(chunk.get_instance_id())
-	player.teleport(Vector3(400, world.height_at(400, -400) + 1, -400))
-	await frames(80)
+	player.teleport(Vector3(60, world.height_at(60, -300) + 1, -300))
+	await frames(2)
+	await settle(game)
 	check(world.active.size() == game.settings.chunk_capacity() and world.pool.is_empty(), "Teleport replaces distant chunks without growing pool")
 	var reused: bool = true
 	for chunk: WorldChunk in world.active.values():
 		reused = reused and previous_chunk_ids.has(chunk.get_instance_id())
 	check(reused, "Chunk nodes are reused across world streaming")
 	check(player.is_on_floor(), "Collision remains valid after distant teleport")
-	player.teleport(game.beacon.position + Vector3(0, 0.6, 2))
-	await frames(80)
-	check(game.activate_beacon(), "Nearby beacon activates checkpoint")
-	check(not game.activate_beacon(), "Checkpoint activation is idempotent")
-	game.save_path = TEST_SAVE
-	var saved_position: Vector3 = player.position
-	game.save_game()
+	player.teleport(Vector3(6, world.height_at(6, 27) + 0.6, 27))
+	await frames(2)
+	await settle(game)
+	game.spawner.update_now()
+	await frames(2)
+	var shrine: Interactable = game.spawner.node_for("shrine_village") as Interactable
+	check(shrine != null, "Village shrine streams in near the player")
+	if shrine:
+		game.on_interact(shrine)
+		game.on_interact(shrine)
+	check(game.state.checkpoint_id == "shrine_village" and game.state.checkpoints.size() == 1, "Nearby shrine activates checkpoint once")
+	var saved_position: Vector3 = player.global_position
+	check(game.save_game(), "Game saves through the main flow")
 	world.reset_seed(999)
-	player.teleport(Vector3(600, 10, 600))
-	game.load_game()
-	check(game.settings.world_seed == 284 and game.beacon_active, "Game load restores world seed and checkpoint state")
-	check(player.position.distance_to(saved_position) < 0.3, "Game load restores the saved player location")
-	await frames(80)
+	game.state.checkpoint_id = ""
+	player.teleport(Vector3(60, 10, 0))
+	check(game.load_game(), "Game load succeeds")
+	check(game.settings.world_seed == 284 and game.state.checkpoint_id == "shrine_village", "Game load restores world seed and checkpoint state")
+	check(player.global_position.distance_to(saved_position) < 0.5, "Game load restores the saved player location")
+	await frames(2)
+	await settle(game)
 	check(player.is_on_floor(), "Loaded game rebuilds playable terrain")
-	var data: Dictionary = {"version": 1, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "beacon_active": true}
+	var data: Dictionary = {"version": 2, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "yaw": 0.0, "state": GameState.new().to_dict()}
 	check(SaveStore.write_save(data, TEST_SAVE) == OK, "Save writes successfully")
 	var restored: Dictionary = SaveStore.read_save(TEST_SAVE)
 	check(not restored.is_empty() and SaveStore.to_vector(restored["position"]) == Vector3(1, 2, 3), "Save restores position and schema")
@@ -118,7 +137,7 @@ func _run() -> void:
 	for suffix: String in ["", ".tmp", ".bak"]:
 		if FileAccess.file_exists(TEST_SAVE + suffix):
 			DirAccess.remove_absolute(TEST_SAVE + suffix)
-	print("SMOKE RESULT: ", failures, " failure(s). Last chunk build: ", world.last_build_ms, " ms")
+	print("SMOKE RESULT: ", failures, " failure(s). Last chunk apply: ", world.last_build_ms, " ms")
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)

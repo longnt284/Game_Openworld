@@ -1,0 +1,61 @@
+{
+	"bounds": {"min_x": -132, "max_x": 132, "min_z": -462, "max_z": 100},
+	"elevation": [[110, 0.0], [40, 0.0], [-40, 1.0], [-110, 9.0], [-150, 6.0], [-250, 6.0], [-300, 5.0], [-340, 8.0], [-380, 24.0], [-420, 38.0], [-470, 44.0]],
+	"noise_amplitude": [[110, 1.4], [30, 1.4], [-60, 4.0], [-120, 3.0], [-340, 3.0], [-400, 6.0]],
+	"edge_rise": {"start_x": 92, "power": 1.6, "scale": 0.15, "north_z": -448, "south_z": 98},
+	"regions": [
+		{"id": "ben_van_khe", "name": "Bến Vân Khê", "max_z": 200, "min_z": -45, "music": "village", "ambience": "village", "grass": ["5f9446", "9db85c"], "fog": "c9d6c0"},
+		{"id": "doi_gio", "name": "Đồi Gió", "max_z": -45, "min_z": -115, "music": "explore", "ambience": "wind", "grass": ["5d8c48", "93ad5c"], "fog": "c6d3c4"},
+		{"id": "truc_hai", "name": "Trúc Hải", "max_z": -115, "min_z": -358, "music": "bamboo", "ambience": "forest", "grass": ["3f7f4c", "77a85c"], "fog": "b7d3c6"},
+		{"id": "den_tich_phong", "name": "Đền Tịch Phong", "max_z": -358, "min_z": -600, "music": "temple", "ambience": "wind", "grass": ["687f5c", "939f7c"], "fog": "c8cdd2"}
+	],
+	"flats": [
+		{"id": "plaza", "x": 0, "z": 14, "r": 34, "blend": 14, "h": 0.25, "surface": "stone"},
+		{"id": "dock", "x": -20, "z": 63, "r": 9, "blend": 8, "h": 0.45},
+		{"id": "meadow", "x": 70, "z": 10, "r": 15, "blend": 10},
+		{"id": "lookout", "x": 15, "z": -76, "r": 8, "blend": 6},
+		{"id": "stream_south", "x": 5, "z": -150, "r": 6, "blend": 5},
+		{"id": "stream_north", "x": 6, "z": -171, "r": 6, "blend": 5},
+		{"id": "shrine_bamboo", "x": 18, "z": -190, "r": 6, "blend": 5},
+		{"id": "camp", "x": -45, "z": -200, "r": 16, "blend": 8},
+		{"id": "watchtower", "x": 45, "z": -215, "r": 12, "blend": 7},
+		{"id": "gorge_south", "x": 0, "z": -244, "r": 8, "blend": 6},
+		{"id": "gorge_north", "x": 0, "z": -271, "r": 8, "blend": 6},
+		{"id": "chimes", "x": -5, "z": -288, "r": 12, "blend": 7},
+		{"id": "shrine_arena", "x": 9, "z": -300, "r": 4, "blend": 4},
+		{"id": "arena", "x": 0, "z": -334, "r": 24, "blend": 8, "surface": "stone"},
+		{"id": "seal_gate", "x": 2, "z": -372, "r": 8, "blend": 5},
+		{"id": "temple", "x": 0, "z": -440, "r": 26, "blend": 10, "surface": "stone"}
+	],
+	"paths": [
+		{"id": "dock_road", "width": 4.0, "points": [[-20, 70], [-16, 56], [-8, 45], [-2, 34], [0, 24]]},
+		{"id": "main_road", "width": 4.0, "points": [[0, 20], [0, -8], [2, -26], [6, -46], [10, -70], [8, -95], [4, -115], [6, -138], [5, -150], [5, -160], [6, -171], [8, -185], [15, -200], [12, -224], [2, -244], [0, -271], [-3, -282], [-2, -294], [2, -304], [0, -314], [0, -334], [0, -352], [2, -372], [6, -398], [2, -422], [0, -440]]},
+		{"id": "meadow_road", "width": 3.0, "points": [[12, 20], [34, 18], [54, 14], [70, 10]]},
+		{"id": "tower_road", "width": 3.0, "points": [[15, -200], [32, -210], [45, -215]]},
+		{"id": "camp_road", "width": 3.0, "points": [[8, -185], [-18, -193], [-45, -200]]},
+		{"id": "lane_west", "width": 2.6, "points": [[-26, 25], [-12, 22], [0, 20]]},
+		{"id": "lane_north", "width": 2.6, "points": [[-16, 2], [-6, 8], [0, 12]]},
+		{"id": "lane_east", "width": 2.6, "points": [[24, 15], [12, 17], [0, 18]]}
+	],
+	"waters": [
+		{"id": "river", "kind": "river", "width": 26, "depth": 4.5, "level": -1.2, "points": [[-170, 88], [-80, 84], [-20, 86], [40, 90], [100, 86], [170, 90]]},
+		{"id": "stream", "kind": "stream", "width": 11, "depth": 4.0, "level_offset": 0.7, "points": [[-112, -158], [-60, -165], [0, -160], [60, -155], [112, -162]]}
+	],
+	"chasms": [
+		{"id": "gorge", "min_z": -262, "max_z": -252, "min_x": -160, "max_x": 160, "depth": 30, "edge": 1.5}
+	],
+	"ridges": [
+		{"id": "pass_west", "min_x": -160, "max_x": -9, "min_z": -384, "max_z": -360, "height": 26, "edge": 7},
+		{"id": "pass_east", "min_x": 13, "max_x": 160, "min_z": -384, "max_z": -360, "height": 26, "edge": 7}
+	],
+	"biomes": [
+		{"region": "ben_van_khe", "trees": {"maple": 3, "pine": 2}, "rocks": 2, "grass": 26, "bamboo": 0},
+		{"region": "doi_gio", "trees": {"pine": 6, "maple": 1}, "rocks": 4, "grass": 18, "bamboo": 1},
+		{"region": "truc_hai", "trees": {"pine": 1}, "rocks": 2, "grass": 16, "bamboo": 14},
+		{"region": "den_tich_phong", "trees": {"pine": 5}, "rocks": 5, "grass": 8, "bamboo": 0}
+	],
+	"clearings": [
+		{"x": -20, "z": 66, "r": 12}, {"x": 8, "z": 30, "r": 6}, {"x": -5, "z": 47, "r": 9}, {"x": 47, "z": -219, "r": 10},
+		{"x": -30, "z": -130, "r": 12}, {"x": 8, "z": -80, "r": 10}, {"x": -60, "z": -150, "r": 6}
+	]
+}
