@@ -24,7 +24,7 @@ python3 tools/asset_manifest.py                      # cập nhật docs/assets.
 ./tools/run.ps1 -Mode test                           # import lại và kiểm tra
 ```
 
-Không truyền tên thì script dựng tất cả. `--preview` render ảnh Workbench vào `.cache/blender_previews/` (không commit). Script ghi đè file của chính nó: nếu chỉnh `.blend` bằng tay, hãy export file đó trực tiếp thay vì chạy lại generator.
+Không truyền tên thì script dựng tất cả. `--preview` render ảnh Workbench vào `.cache/blender_previews/` (không commit); cần OpenGL — trên Linux không màn hình hãy chạy qua `xvfb-run -a`, nếu không Blender dừng ở bước preview (GLB và `.blend` đã ghi xong trước đó). Script ghi đè file của chính nó: nếu chỉnh `.blend` bằng tay, hãy export file đó trực tiếp thay vì chạy lại generator.
 
 ## Quy ước
 
@@ -38,4 +38,4 @@ Không truyền tên thì script dựng tất cả. `--preview` render ảnh Wor
 
 ## Giới hạn hiện tại
 
-Model low-poly dựng bằng thủ tục (1–6 nghìn tam giác mỗi nhân vật), không có texture vẽ tay, không có blend shape biểu cảm. Animation là keyframe tư thế tay (không motion capture). Tư thế trọng kích còn cứng. Đủ cho vertical slice; bản phát hành nên có họa sĩ chỉnh mesh mặt/tóc và animator làm lại các đòn chính.
+Model low-poly dựng bằng thủ tục (1–6 nghìn tam giác mỗi nhân vật), không có texture vẽ tay, không có blend shape biểu cảm. Animation là keyframe tư thế tay (không motion capture). Đủ cho vertical slice; bản phát hành nên có họa sĩ chỉnh mesh mặt/tóc và animator làm lại các đòn chính.

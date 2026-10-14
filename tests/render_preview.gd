@@ -154,23 +154,25 @@ func _run() -> void:
 				side.current = true
 				game.state.unlock_skill("gust")
 				game.state.unlock_skill("cyclone")
-				for move: Array in [["attack_1", 0.2], ["attack_2", 0.22], ["attack_3", 0.4], ["heavy", 0.6], ["skill_gust", 0.36], ["skill_cyclone", 0.6], ["parry", 0.1], ["dodge", 0.12]]:
-					p.face_direction(Vector3(0, 0, -1), true)
-					if move[0] == "dodge":
-						p._start_dodge()
-					else:
-						p._start_action(move[0])
-					var waited: float = 0.0
-					while waited < float(move[1]):
-						await physics_frame
-						waited += get_root().get_physics_process_delta_time() if false else 1.0 / 60.0
-					await process_frame
-					await shot("move_" + move[0])
-					p.teleport(Vector3(0, game.world.height_at(0, 14) + 0.3, 14))
-					p.state = "move"
-					p.action = {}
-					p.visual.stop_action()
-					await frames(20)
+				# Pose each move at the middle of its damage window by seeking the clip directly,
+				# so the frame matches data/anim_timings.json regardless of the render frame rate.
+				var timings: Dictionary = ContentDB.get_data("timings").get("player", {})
+				p.process_mode = Node.PROCESS_MODE_DISABLED
+				p.visual.set_sheathed(false)
+				p.visual.tree.active = false
+				for move: String in ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "parry", "dodge"]:
+					var timing: Dictionary = timings.get(move, {})
+					var at: float = 0.1
+					if timing.has("hit_start"):
+						at = (float(timing["hit_start"]) + float(timing["hit_end"])) * 0.5
+					p.visual.player.play(move)
+					p.visual.player.seek(at, true)
+					p.visual.player.pause()
+					await frames(3)
+					await shot("move_" + move)
+				p.visual.player.stop()
+				p.visual.tree.active = true
+				p.process_mode = Node.PROCESS_MODE_PAUSABLE
 				side.queue_free()
 				game.player.camera_rig.camera.current = true
 			"boss":
@@ -212,8 +214,7 @@ func _run() -> void:
 	if only.is_empty() or only.has("profile"):
 		await profile()
 	game.audio.stop_all()
-	for index: int in range(3):
-		await process_frame
+	await create_timer(0.2, true, false, true).timeout
 	game.queue_free()
 	await process_frame
 	quit(0)

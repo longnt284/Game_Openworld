@@ -282,8 +282,7 @@ func _run() -> void:
 			DirAccess.remove_absolute(TEST_SAVE + suffix)
 	print("GAMEPLAY RESULT: ", failures, " failure(s)")
 	game.audio.stop_all()
-	for index: int in range(3):
-		await process_frame
+	await create_timer(0.2, true, false, true).timeout
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)

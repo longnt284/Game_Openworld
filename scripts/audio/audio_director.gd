@@ -22,6 +22,7 @@ var pool_2d: Array[AudioStreamPlayer] = []
 var pool_3d: Array[AudioStreamPlayer3D] = []
 var cache: Dictionary = {}
 var variants: Dictionary = {}
+var silenced: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -79,7 +80,7 @@ func set_area(music: String, ambience: String) -> void:
 	set_ambience(ambience)
 
 func set_music(name: String, fade: float = 2.5) -> void:
-	if name == current_music:
+	if name == current_music or silenced:
 		return
 	current_music = name
 	var old: AudioStreamPlayer = music_players[music_index]
@@ -116,7 +117,8 @@ func _exit_tree() -> void:
 	stop_all()
 
 func stop_all() -> void:
-	## Stops every stream so the audio server releases its playbacks before shutdown.
+	## Stops every stream and refuses new ones so the audio server releases its playbacks before shutdown.
+	silenced = true
 	var players: Array[Node] = [river_player]
 	players.append_array(music_players)
 	players.append_array(ambience_players)
@@ -131,7 +133,7 @@ func stop_all() -> void:
 # ------------------------------------------------------------------ ambience
 
 func set_ambience(name: String) -> void:
-	if name == current_ambience:
+	if name == current_ambience or silenced:
 		return
 	current_ambience = name
 	var old: AudioStreamPlayer = ambience_players[ambience_index]
@@ -146,6 +148,8 @@ func set_ambience(name: String) -> void:
 	tween.chain().tween_callback(old.stop)
 
 func set_river_distance(distance: float) -> void:
+	if silenced:
+		return
 	if river_player.stream == null:
 		river_player.stream = _stream(AMBIENCE_DIR % "river", true)
 		river_player.volume_db = -60.0
@@ -156,6 +160,8 @@ func set_river_distance(distance: float) -> void:
 # ------------------------------------------------------------------ effects
 
 func play(name: String, position: Variant = null, volume_db: float = 0.0, pitch_spread: float = 0.08, bus: String = "SFX") -> void:
+	if silenced:
+		return
 	var stream: AudioStream = _pick(name)
 	if stream == null:
 		return

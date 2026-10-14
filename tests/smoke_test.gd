@@ -139,8 +139,7 @@ func _run() -> void:
 			DirAccess.remove_absolute(TEST_SAVE + suffix)
 	print("SMOKE RESULT: ", failures, " failure(s). Last chunk apply: ", world.last_build_ms, " ms")
 	game.audio.stop_all()
-	for index: int in range(3):
-		await process_frame
+	await create_timer(0.2, true, false, true).timeout
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)

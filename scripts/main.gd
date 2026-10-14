@@ -88,8 +88,7 @@ func _notification(what: int) -> void:
 func quit_game() -> void:
 	## Lets the audio server release its streams before the tree is torn down.
 	audio.stop_all()
-	for index: int in range(3):
-		await get_tree().process_frame
+	await get_tree().create_timer(0.2, true, false, true).timeout
 	get_tree().quit()
 
 func _start_world() -> void:
