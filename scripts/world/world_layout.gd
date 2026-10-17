@@ -13,7 +13,8 @@ const KEEPOUT_CELL: float = 32.0
 const PROP_KEEPOUT: Dictionary = {
 	"house_small": 5.5, "house_teal": 5.5, "house_long": 7.5, "smithy": 6.0, "gate_village": 4.5, "shrine_wind": 3.5, "watchtower": 4.0,
 	"bridge_wood": 6.0, "dock": 6.0, "market_stall": 3.0, "tent": 3.0, "well": 2.2, "ruins_wall": 3.5, "seal_gate": 5.0, "rock_cliff": 4.0,
-	"boat": 0.0,
+	"boat": 0.0, "gate_tam_quan": 5.0, "pagoda_bell_tower": 4.5, "rice_rack": 2.5, "haystack": 2.0, "lantern_string": 1.0,
+	"flower_pot": 0.8, "basket_produce": 0.8, "prayer_banner": 1.0,
 }
 const DEFAULT_PROP_KEEPOUT: float = 1.6
 const ENTITY_KEEPOUT: Dictionary = {"npc": 2.5, "shrine": 3.0, "chest": 2.5, "echo": 2.5, "diary": 2.5, "chime": 2.5, "memory_core": 3.0, "seal_gate": 4.0, "enemy": 1.5}

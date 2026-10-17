@@ -160,10 +160,19 @@ func _run() -> void:
 				# Pose each move at the middle of its damage window by seeking the clip directly,
 				# so the frame matches data/anim_timings.json regardless of the render frame rate.
 				var timings: Dictionary = ContentDB.get_data("timings").get("player", {})
+				# The sword trail needs real playback: slow time so a slow renderer still samples the swing.
+				Engine.time_scale = 0.05
+				p._start_action("attack_2")
+				for step: int in range(60):
+					await frames(1)
+					if p.visual.action_time >= float(timings.get("attack_2", {}).get("hit_end", 0.3)):
+						break
+				await shot("move_trail")
+				Engine.time_scale = 1.0
 				p.process_mode = Node.PROCESS_MODE_DISABLED
 				p.visual.set_sheathed(false)
 				p.visual.tree.active = false
-				for move: String in ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "parry", "dodge"]:
+				for move: String in ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "parry", "dodge", "dash_slash", "ultimate"]:
 					var timing: Dictionary = timings.get(move, {})
 					var at: float = 0.1
 					if timing.has("hit_start"):

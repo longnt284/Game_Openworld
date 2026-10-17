@@ -4,12 +4,13 @@ extends RefCounted
 ## converts materials to the toon look and exposes mesh parts for MultiMesh flora.
 
 const CHARACTERS: PackedStringArray = ["lam_an", "tieu_mac", "ba_luc", "chu_bay", "ba_hanh", "tich_phong", "tan_binh", "truc_tuong", "heo_gio"]
-const WEAPONS: PackedStringArray = ["sword_old", "sword_bamboo", "sword_wind", "sabre", "glaive"]
+const WEAPONS: PackedStringArray = ["sword_old", "sword_bamboo", "sword_wind", "sabre", "glaive", "sword_water", "sword_thunder", "sword_flame", "sword_frost"]
 const PROPS: PackedStringArray = [
 	"house_small", "house_long", "house_teal", "smithy", "gate_village", "shrine_wind", "bridge_wood", "dock", "boat", "lantern_stone",
 	"lantern_post", "signboard", "table", "bench", "chest", "stele", "ruins_pillar", "ruins_wall", "well", "barrel", "crate", "fence_bamboo",
 	"market_stall", "watchtower", "wind_chime_post", "seal_gate", "campfire", "tent", "steps_stone", "rock_cliff", "memory_stone",
-	"karst_peak",
+	"karst_peak", "gate_tam_quan", "pagoda_bell_tower", "incense_burner", "stone_nghe", "prayer_banner", "rice_rack", "haystack",
+	"lantern_string", "flower_pot", "basket_produce",
 ]
 
 ## flora kind -> model key, from data/world/flora.json

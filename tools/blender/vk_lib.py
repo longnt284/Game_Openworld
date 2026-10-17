@@ -44,8 +44,14 @@ PALETTE = {
     "mushroom_cap": "c2482f", "mushroom_spot": "f6efe0", "hay": "d8b866", "hay_dark": "a8853f",
     "pot": "b5643e", "pot_dark": "7d3f28", "fruit_orange": "f09a2c", "fruit_green": "8fbf4a",
     "banner_red": "b8352b", "banner_cream": "efe0b8",
+    # Lâm An's outfit has its own keys so skins can recolour it without touching eyes or NPCs.
+    "robe": "2a9d93", "robe_dark": "1b6f69", "robe_trim": "f3ead2", "sash": "c93b2b", "ribbon": "d23a2c",
+    "scarf_white": "f2f5f1", "boot": "6a4128", "pauldron_dark": "22252b", "jade_bead": "56c2a6",
+    # Elemental sword accents (glowing) and fittings.
+    "water_glow": "5fb8ff", "thunder_glow": "ffe066", "flame_glow": "ff7a3a", "frost_glow": "bfefff",
+    "steel_blue": "9fb8d0", "steel_frost": "d8ecf4", "violet": "6b4fa0", "ember": "8a2418", "navy": "203a5c",
 }
-EMISSIVE = {"lantern": 2.2, "spirit": 1.6, "seal": 1.4}
+EMISSIVE = {"lantern": 2.2, "spirit": 1.6, "seal": 1.4, "water_glow": 1.8, "thunder_glow": 2.0, "flame_glow": 2.0, "frost_glow": 1.6}
 # Generators that set this to True build every MeshBuilder vertex-coloured unless told otherwise.
 DEFAULT_VCOL = False
 

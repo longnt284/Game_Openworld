@@ -258,6 +258,32 @@ def player_animations():
     keys += [(1.08, land), (1.3, rest)]
     anims["skill_cyclone"] = (keys, 1.3, False)
 
+    # dash_slash (elemental dashing forms): low lunge, sword drawn back, then a long cut across the path
+    hs, he = t("player", "dash_slash", "hit_start"), t("player", "dash_slash", "hit_end")
+    lunge = merge(rest, legs=(-52, 36, 6), drop=0.2, spine=(28, 14, 0), chest=(10, 30, 0), head=(-26, -24, 0), ponytail=(55, 0, 10), scarf=(65, 0, 15))
+    lunge["armR"] = ((0.55, 0.5, -0.65), (0.85, 0.35, -0.4), (0.9, -0.2, -0.35))
+    lunge["armL"] = ((0.4, -0.7, -0.55), (0.1, -0.95, -0.25))
+    cut = merge(lunge, spine=(26, -16, 0), chest=(8, -36, 0), head=(-24, 26, 0), drop=0.18)
+    cut["armR"] = ((-0.9, -0.35, -0.2), (-0.7, -0.7, -0.05), (-0.35, -0.94, 0.05))
+    cut["armL"] = ((0.75, 0.4, -0.5), (0.6, 0.7, -0.3))
+    recover = merge(cut, legs=(-30, 22, 6), drop=0.1, spine=(12, -8, 0), chest=(4, -18, 0), head=(-8, 12, 0))
+    anims["dash_slash"] = ([(0.0, rest), (hs - 0.04, lunge), (hs + (he - hs) * 0.35, merge(lunge, drop=0.21)), (he, cut), (0.5, recover), (0.62, rest)], 0.62, False)
+
+    # ultimate: gather, leap with the blade overhead, crash down into the ground
+    hs, he = t("player", "ultimate", "hit_start"), t("player", "ultimate", "hit_end")
+    gather = merge(rest, legs=(-48, 34, 10), drop=0.22, spine=(22, 0, 0), chest=(10, -24, 0), head=(-18, 20, 0))
+    gather["armR"] = ((-0.6, 0.6, -0.5), (-0.3, 0.9, -0.3), (0.1, 0.9, -0.45))
+    gather["armL"] = ((0.5, -0.6, -0.6), (0.2, -0.9, -0.4))
+    rise = merge(rest, spine=(-14, 0, 0), chest=(-10, 0, 0), head=(10, 0, 0), off=(0, 0, 0.55), ponytail=(-35, 0, 0), scarf=(-40, 0, 0),
+                 **{"thigh.L": (-70, 0, -6), "shin.L": (95, 0, 0), "thigh.R": (-20, 0, 6), "shin.R": (60, 0, 0)})
+    rise["armR"] = ((-0.15, 0.1, 1.0), (-0.05, 0.4, 0.9), (0.0, 0.85, 0.5))
+    rise["armL"] = ((0.15, -0.1, 1.0), (-0.35, 0.3, 0.88))
+    apex = merge(rise, off=(0, 0, 0.8), spine=(-20, 0, 0))
+    slam = merge(rest, legs=(-62, 44, 9), drop=0.26, spine=(34, 0, 0), chest=(12, 2, 0), head=(-24, 0, 0), off=(0, -0.05, 0), ponytail=(45, 0, 0), scarf=(40, 0, 0))
+    slam["armR"] = ((-0.1, -0.75, -0.65), (0.0, -0.55, -0.84), (0.0, -0.45, -0.89))
+    slam["armL"] = ((0.15, -0.75, -0.6), (-0.3, -0.6, -0.74))
+    anims["ultimate"] = ([(0.0, rest), (0.3, gather), (0.55, rise), (hs - 0.18, apex), (hs, slam), (he, merge(slam, drop=0.28)), (1.55, slam), (1.9, rest)], 1.9, False)
+
     guard = merge(rest, legs=(-16, 18, 7), drop=0.08, spine=(6, 0, 0), chest=(2, 12, 0), head=(-4, -10, 0))
     guard["armR"] = ((-0.4, -0.65, -0.45), (0.35, -0.9, 0.3), (0.95, -0.15, 0.3))
     guard["armL"] = ((0.3, -0.6, -0.55), (0.0, -0.9, 0.42))

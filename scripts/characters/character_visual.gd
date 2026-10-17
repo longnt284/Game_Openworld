@@ -6,6 +6,8 @@ extends Node3D
 
 const LOOPING: PackedStringArray = ["idle", "walk", "run", "fall", "glide", "block", "talk", "work", "charge"]
 const STATES: PackedStringArray = ["ground", "jump", "fall", "glide", "block", "dead"]
+## Clips that sweep the blade and so draw the sword trail.
+const TRAIL_CLIPS: PackedStringArray = ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "dash_slash", "ultimate"]
 
 var model: Node3D
 var player: AnimationPlayer
@@ -28,6 +30,8 @@ var status_material: StandardMaterial3D
 var meshes: Array[MeshInstance3D] = []
 var base_speed: float = 1.0
 var has_tree: bool = false
+## Only the player opts in (enable_trail); enemies keep plain swings.
+var trail: SwordTrail
 
 func setup(assets: AssetLibrary, key: String, use_tree: bool = true) -> void:
 	model = assets.instantiate("characters/" + key)
@@ -134,6 +138,8 @@ func play_action(anim_name: String, speed: float = 1.0) -> void:
 	action_time = 0.0
 	action_length = animation_length(anim_name) / maxf(speed, 0.01)
 	base_speed = speed
+	if trail:
+		trail.emitting = TRAIL_CLIPS.has(anim_name)
 	if has_tree:
 		action_node.animation = anim_name
 		tree.set("parameters/speed/scale", speed)
@@ -143,6 +149,8 @@ func play_action(anim_name: String, speed: float = 1.0) -> void:
 
 func stop_action() -> void:
 	current_action = ""
+	if trail:
+		trail.emitting = false
 	if has_tree:
 		tree.set("parameters/action/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FADE_OUT)
 		tree.set("parameters/speed/scale", 1.0)
@@ -164,6 +172,20 @@ func attach_weapon(assets: AssetLibrary, key: String, sheathed: bool = false) ->
 		socket.add_child(weapon)
 	else:
 		add_child(weapon)
+	if trail:
+		_bind_trail()
+
+func enable_trail() -> void:
+	if trail == null:
+		trail = SwordTrail.new()
+		add_child(trail)
+	if weapon:
+		_bind_trail()
+
+func _bind_trail() -> void:
+	var data: Dictionary = ContentDB.weapon(weapon_key)
+	var element: String = String(data.get("element", ""))
+	trail.bind(weapon, StyleBook.element_color(element) if element != "" else Color(0.62, 0.95, 0.88))
 
 func set_sheathed(sheathed: bool) -> void:
 	if weapon == null or sheath_socket == null or sword_socket == null:
@@ -209,6 +231,8 @@ func _process(delta: float) -> void:
 		action_time += delta
 		if action_time >= action_length:
 			current_action = ""
+			if trail:
+				trail.emitting = false
 	if flash_left > 0.0:
 		flash_left -= delta
 		if flash_left <= 0.0:

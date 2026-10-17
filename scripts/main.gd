@@ -15,6 +15,7 @@ var profile: PlayerProfile
 var quests: QuestManager
 var audio: AudioDirector
 var atmosphere: Atmosphere
+var ambient: AmbientFx
 var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
@@ -143,6 +144,10 @@ func _start_world() -> void:
 	spawner.setup(self, assets, world, player)
 	spawner.arena.fight_started.connect(_on_fight_started)
 	MapView.prepare(world.layout)
+	ambient = AmbientFx.new()
+	ambient.name = "AmbientFx"
+	add_child(ambient)
+	ambient.target = player
 	player.health_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.stamina_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.died.connect(_on_player_died)
@@ -308,6 +313,7 @@ func _update_region() -> void:
 		var first: bool = current_region != "" and not state.has_flag("visited:" + id)
 		current_region = id
 		atmosphere.set_region(id)
+		ambient.set_region(id)
 		audio.set_area(String(region.get("music", "explore")), String(region.get("ambience", "wind")))
 		if first:
 			state.set_flag("visited:" + id)
@@ -917,6 +923,7 @@ func apply_settings() -> void:
 	viewport.scaling_3d_scale = float(preset["scale"])
 	if world:
 		world.configure(int(preset["view_radius"]), float(preset["density"]))
+		ambient.set_budget(float(preset["ambient"]))
 		atmosphere.set_view_distance(world.settings.view_radius * world.settings.chunk_size)
 		for chunk: WorldChunk in world.pool + world.active.values():
 			_apply_chunk_quality(chunk, preset)

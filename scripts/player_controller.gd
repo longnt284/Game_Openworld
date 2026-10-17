@@ -79,6 +79,7 @@ func initialize(config: GameSettings, library: AssetLibrary = null, state_data: 
 	if assets:
 		visual.setup(assets, "lam_an", true)
 		visual.attach_weapon(assets, game.sword)
+		visual.enable_trail()
 	hurtbox = Combat.make_hurtbox(self, Combat.LAYER_HURT_PLAYER, 0.4, 1.7)
 	camera_rig = CameraRig.new()
 	camera_rig.name = "CameraRig"
