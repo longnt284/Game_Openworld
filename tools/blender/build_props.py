@@ -16,6 +16,9 @@ from mathutils import Vector  # noqa: E402
 
 import vk_lib as vk  # noqa: E402
 
+# Props are vertex-coloured: one material per building instead of ten (fewer draw calls).
+vk.DEFAULT_VCOL = True
+
 RNG = random.Random(284)
 
 
@@ -115,81 +118,7 @@ def hanging_lantern(b, x, y, z, color="vermilion"):
     b.segment((x, y, z - 0.24), (x, y, z - 0.45), 0.02, 0.0, mat=color, segments=4)
 
 
-# ---------------------------------------------------------------- flora
-
-def tree_pine():
-    b = vk.MeshBuilder("TreePine")
-    b.cylinder(0.24, 3.6, (0, 0, 1.8), mat="wood_dark", top=0.13, segments=8)
-    tiers = [(1.75, 2.3, 2.3, "jade_dark"), (1.42, 2.1, 3.3, "bamboo_dark"), (1.08, 1.9, 4.25, "jade_dark"), (0.7, 1.6, 5.1, "bamboo_dark")]
-    for radius, depth, z, mat in tiers:
-        b.cone(radius, depth, (0, 0, z), mat=mat, segments=9)
-        b.cone(radius * 0.92, depth * 0.3, (0, 0, z - depth * 0.42), (180, 0, 0), mat=mat, segments=9)
-    return b
-
-
-def tree_maple():
-    b = vk.MeshBuilder("TreeMaple")
-    b.cylinder(0.26, 2.6, (0, 0, 1.3), mat="wood", top=0.17, segments=8)
-    b.segment((0, 0, 2.2), (0.9, 0.2, 3.3), 0.11, 0.06, mat="wood", segments=6)
-    b.segment((0, 0, 2.4), (-0.8, -0.4, 3.4), 0.1, 0.06, mat="wood", segments=6)
-    blobs = [((0, 0, 3.6), 1.55, "vermilion"), ((1.0, 0.3, 3.4), 1.05, "gold"), ((-0.9, -0.4, 3.5), 1.1, "vermilion_dark"),
-             ((0.2, -0.8, 4.1), 1.0, "vermilion"), ((-0.3, 0.7, 4.3), 0.95, "gold"), ((0.3, 0.1, 4.7), 0.9, "vermilion")]
-    for (x, y, z), r, mat in blobs:
-        b.sphere(r, (x, y, z), scale=(1, 1, 0.78), mat=mat, segments=9, rings=6)
-    return b
-
-
-def bamboo_cluster():
-    b = vk.MeshBuilder("Bamboo")
-    rng = random.Random(7)
-    for k in range(7):
-        angle = k * 2.4
-        x, y = math.cos(angle) * (0.15 + 0.12 * k), math.sin(angle) * (0.15 + 0.1 * k)
-        height = rng.uniform(6.0, 9.0)
-        lean = Vector((rng.uniform(-0.08, 0.08), rng.uniform(-0.08, 0.08), 1)).normalized()
-        segments = int(height / 0.9)
-        mat = "bamboo" if k % 3 else "bamboo_light"
-        for s in range(segments):
-            start = Vector((x, y, 0)) + lean * (s * height / segments)
-            end = Vector((x, y, 0)) + lean * ((s + 1) * height / segments - 0.04)
-            b.segment(start, end, 0.055 - s * 0.002, 0.052 - s * 0.002, mat=mat, segments=6)
-            b.torus(0.056 - s * 0.002, 0.012, end + lean * 0.02, (math.degrees(math.atan2(lean.y, lean.z)) * -1, math.degrees(math.atan2(lean.x, lean.z)), 0),
-                    mat="bamboo_dark", segments=6, ring=3)
-        top = Vector((x, y, 0)) + lean * height
-        for leaf in range(5):
-            a = leaf * 1.3 + k
-            tip = top + Vector((math.cos(a) * 0.9, math.sin(a) * 0.9, -0.5 - leaf * 0.25))
-            mid = top.lerp(tip, 0.5) + Vector((0, 0, 0.15))
-            b.strip([top - lean * leaf * 0.5, mid - lean * leaf * 0.5, tip - lean * leaf * 0.5], [0.18, 0.32, 0.02], normal=(0, 0, 1),
-                    mat="bamboo_dark" if leaf % 2 else "jade", thickness=0.008)
-    return b
-
-
-def grass_tuft():
-    b = vk.MeshBuilder("Grass")
-    rng = random.Random(3)
-    for k in range(9):
-        a = k * 0.7
-        r = rng.uniform(0.0, 0.18)
-        base = Vector((math.cos(a) * r, math.sin(a) * r, 0))
-        tip = base + Vector((math.cos(a) * 0.12, math.sin(a) * 0.12, rng.uniform(0.35, 0.6)))
-        b.strip([base, base.lerp(tip, 0.5) + Vector((0, 0, 0.02)), tip], [0.07, 0.05, 0.0], normal=(math.cos(a + 1.57), math.sin(a + 1.57), 0),
-                mat="bamboo_light" if k % 3 else "bamboo", thickness=0.004)
-    for k in range(2):
-        a = k * 3.0 + 0.5
-        b.sphere(0.04, (math.cos(a) * 0.15, math.sin(a) * 0.15, 0.42), mat="cream" if k else "gold", segments=6, rings=4)
-    return b
-
-
-def rock_moss():
-    b = vk.MeshBuilder("Rock")
-    rng = random.Random(5)
-
-    def lumpy(co):
-        return co * (1.0 + rng.uniform(-0.08, 0.08))
-    b.sphere(0.8, (0, 0, 0.35), scale=(1.25, 0.95, 0.7), mat="stone", segments=9, rings=6, shape=lumpy)
-    b.sphere(0.55, (0.1, 0.05, 0.72), scale=(1.1, 0.9, 0.35), mat="moss", segments=8, rings=5, shape=lumpy)
-    return b
+# Flora (trees, bamboo, grass, rocks and ground cover) lives in build_flora.py.
 
 
 # ---------------------------------------------------------------- buildings
@@ -660,7 +589,6 @@ def memory_stone():
 
 
 ASSETS = {
-    "tree_pine": tree_pine, "tree_maple": tree_maple, "bamboo_cluster": bamboo_cluster, "grass_tuft": grass_tuft, "rock_moss": rock_moss,
     "house_small": house_small, "house_long": house_long, "house_teal": house_teal, "smithy": smithy, "gate_village": gate_village,
     "shrine_wind": shrine_wind, "bridge_wood": bridge_wood, "dock": dock, "boat": boat, "lantern_stone": lantern_stone,
     "lantern_post": lantern_post, "signboard": signboard, "table": table, "bench": bench, "chest": chest, "stele": stele,
@@ -668,7 +596,6 @@ ASSETS = {
     "market_stall": market_stall, "watchtower": watchtower, "wind_chime_post": wind_chime_post, "seal_gate": seal_gate,
     "campfire": campfire, "tent": tent, "steps_stone": steps_stone, "rock_cliff": rock_cliff, "memory_stone": memory_stone,
 }
-FLORA = {"tree_pine", "tree_maple", "bamboo_cluster", "grass_tuft", "rock_moss"}
 
 
 def main(names, preview):
@@ -683,7 +610,7 @@ def main(names, preview):
         original_models = vk.MODELS
         vk.MODELS = out_dir
         vk.ART = original_art / "env"
-        info = vk.save_and_export(name, extra={"kind": "flora" if name in FLORA else "prop"})
+        info = vk.save_and_export(name, extra={"kind": "prop"})
         vk.MODELS, vk.ART = original_models, original_art
         vk.write_manifest_entry(info, "env")
         if preview:

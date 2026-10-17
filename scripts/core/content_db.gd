@@ -8,6 +8,7 @@ const FILES: Dictionary = {
 	"dialogue": "res://data/dialogue.json",
 	"entities": "res://data/world/entities.json",
 	"props": "res://data/world/props.json",
+	"flora": "res://data/world/flora.json",
 	"enemies": "res://data/enemies.json",
 	"timings": "res://data/anim_timings.json",
 	"attacks": "res://data/attacks.json",

@@ -123,7 +123,7 @@ func _build_skills() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_END
 	_anchored(row, Control.PRESET_BOTTOM_RIGHT, Vector2(-330, -112), Vector2(-28, -24))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.offset_left = -470
+	row.offset_left = -560
 	for slot: String in StyleBook.SLOTS:
 		var panel: PanelContainer = PanelContainer.new()
 		panel.custom_minimum_size = Vector2(140, 80)

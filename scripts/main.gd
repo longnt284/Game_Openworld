@@ -113,6 +113,7 @@ func _start_world() -> void:
 	player.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(player)
 	player.initialize(settings, assets, state)
+	settings.view_radius = int(user_settings.preset()["view_radius"])
 	world = WorldManager.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -127,7 +128,9 @@ func _start_world() -> void:
 	var backdrop: Backdrop = Backdrop.new()
 	backdrop.name = "Backdrop"
 	add_child(backdrop)
-	backdrop.build(Vector2(0, -180), settings.world_seed)
+	backdrop.build(Vector2(0, -180), settings.world_seed, assets)
+	atmosphere.haze_changed.connect(backdrop.set_haze)
+	backdrop.set_haze(atmosphere.haze())
 	props = PropPlacer.new()
 	props.name = "Props"
 	props.add_to_group(EntitySpawner.NAV_SOURCE)
@@ -908,10 +911,13 @@ func apply_settings() -> void:
 	var preset: Dictionary = user_settings.preset()
 	atmosphere.set_shadow_distance(float(preset["shadow"]))
 	atmosphere.environment.glow_enabled = bool(preset["glow"])
+	RenderingServer.directional_shadow_atlas_set_size(int(preset["shadow_atlas"]), true)
 	var viewport: Viewport = get_viewport()
 	viewport.msaa_3d = preset["msaa"]
 	viewport.scaling_3d_scale = float(preset["scale"])
 	if world:
+		world.configure(int(preset["view_radius"]), float(preset["density"]))
+		atmosphere.set_view_distance(world.settings.view_radius * world.settings.chunk_size)
 		for chunk: WorldChunk in world.pool + world.active.values():
 			_apply_chunk_quality(chunk, preset)
 		for job: Dictionary in world.building.values():
@@ -922,13 +928,12 @@ func apply_settings() -> void:
 			DisplayServer.window_set_mode(window_mode)
 
 func _apply_chunk_quality(chunk: WorldChunk, preset: Dictionary) -> void:
+	var ranges: Dictionary = {"tree": "tree_distance", "bamboo": "bamboo", "grass": "grass", "clutter": "clutter", "rock": "rock"}
 	for kind: String in chunk.batches:
 		for batch: MultiMeshInstance3D in chunk.batches[kind]:
-			if kind == "grass":
-				batch.visibility_range_end = float(preset["grass"])
-			elif kind in ["pine", "maple", "bamboo"]:
-				batch.visibility_range_end = float(preset["tree_distance"])
-	chunk.distant_trees.visibility_range_begin = float(preset["tree_distance"])
+			batch.visibility_range_end = float(preset[ranges.get(String(batch.get_meta("range", "clutter")), "clutter")])
+	for group: String in chunk.far_batches:
+		(chunk.far_batches[group] as MultiMeshInstance3D).visibility_range_begin = float(preset["bamboo" if group == "bamboo" else "tree_distance"])
 
 # ------------------------------------------------------------------ save / load
 

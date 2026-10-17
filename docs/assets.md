@@ -16,51 +16,63 @@ Sinh tự động bằng `python3 tools/asset_manifest.py` từ các file thật
 | `assets/models/characters/tich_phong.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tich_phong.blend` | 4,668 | 0 | 12 | 0 | 20 | idle, talk, walk, wave |
 | `assets/models/characters/tieu_mac.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tieu_mac.blend` | 5,034 | 0 | 17 | 0 | 20 | idle, talk, walk, wave |
 | `assets/models/characters/truc_tuong.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/truc_tuong.blend` | 6,158 | 0 | 17 | 0 | 20 | attack, death, hit, idle, roar, slam, stagger, sweep, walk |
-| `assets/models/env/bamboo_cluster.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bamboo_cluster.blend` | 3,500 | 0 | 4 | 0 | — | — |
-| `assets/models/env/barrel.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/barrel.blend` | 232 | 28 | 3 | 0 | — | — |
-| `assets/models/env/bench.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bench.blend` | 68 | 12 | 2 | 0 | — | — |
-| `assets/models/env/boat.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/boat.blend` | 448 | 0 | 5 | 0 | — | — |
-| `assets/models/env/bridge_wood.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bridge_wood.blend` | 1,272 | 120 | 4 | 0 | — | — |
-| `assets/models/env/campfire.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/campfire.blend` | 378 | 0 | 3 | 0 | — | — |
-| `assets/models/env/chest.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/chest.blend` | 148 | 12 | 3 | 0 | — | — |
-| `assets/models/env/crate.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/crate.blend` | 96 | 12 | 3 | 0 | — | — |
-| `assets/models/env/dock.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/dock.blend` | 1,020 | 12 | 4 | 0 | — | — |
-| `assets/models/env/fence_bamboo.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/fence_bamboo.blend` | 224 | 12 | 3 | 0 | — | — |
-| `assets/models/env/gate_village.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/gate_village.blend` | 1,204 | 56 | 11 | 0 | — | — |
-| `assets/models/env/grass_tuft.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/grass_tuft.blend` | 216 | 0 | 4 | 0 | — | — |
-| `assets/models/env/house_long.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_long.blend` | 3,708 | 12 | 13 | 0 | — | — |
-| `assets/models/env/house_small.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_small.blend` | 3,200 | 12 | 12 | 0 | — | — |
-| `assets/models/env/house_teal.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_teal.blend` | 3,200 | 12 | 11 | 0 | — | — |
-| `assets/models/env/lantern_post.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/lantern_post.blend` | 334 | 28 | 5 | 0 | — | — |
-| `assets/models/env/lantern_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/lantern_stone.blend` | 214 | 12 | 3 | 0 | — | — |
-| `assets/models/env/market_stall.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/market_stall.blend` | 460 | 12 | 8 | 0 | — | — |
-| `assets/models/env/memory_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/memory_stone.blend` | 126 | 28 | 3 | 0 | — | — |
-| `assets/models/env/rock_cliff.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/rock_cliff.blend` | 282 | 12 | 3 | 0 | — | — |
-| `assets/models/env/rock_moss.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/rock_moss.blend` | 154 | 0 | 2 | 0 | — | — |
-| `assets/models/env/ruins_pillar.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/ruins_pillar.blend` | 176 | 28 | 3 | 0 | — | — |
-| `assets/models/env/ruins_wall.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/ruins_wall.blend` | 936 | 12 | 3 | 0 | — | — |
-| `assets/models/env/seal_gate.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/seal_gate.blend` | 780 | 24 | 8 | 0 | — | — |
-| `assets/models/env/shrine_wind.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/shrine_wind.blend` | 796 | 36 | 11 | 0 | — | — |
-| `assets/models/env/signboard.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/signboard.blend` | 176 | 12 | 5 | 0 | — | — |
-| `assets/models/env/smithy.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/smithy.blend` | 1,276 | 136 | 12 | 0 | — | — |
-| `assets/models/env/stele.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/stele.blend` | 280 | 12 | 3 | 0 | — | — |
-| `assets/models/env/steps_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/steps_stone.blend` | 264 | 12 | 2 | 0 | — | — |
-| `assets/models/env/table.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/table.blend` | 184 | 12 | 4 | 0 | — | — |
-| `assets/models/env/tent.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tent.blend` | 84 | 12 | 3 | 0 | — | — |
-| `assets/models/env/tree_maple.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_maple.blend` | 608 | 0 | 4 | 0 | — | — |
-| `assets/models/env/tree_pine.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_pine.blend` | 156 | 0 | 3 | 0 | — | — |
-| `assets/models/env/watchtower.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/watchtower.blend` | 776 | 12 | 6 | 0 | — | — |
-| `assets/models/env/well.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/well.blend` | 572 | 36 | 9 | 0 | — | — |
-| `assets/models/env/wind_chime_post.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/wind_chime_post.blend` | 228 | 28 | 6 | 0 | — | — |
+| `assets/models/env/bamboo_cluster.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bamboo_cluster.blend` | 810 | 0 | 1 | 0 | — | — |
+| `assets/models/env/bamboo_far.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bamboo_far.blend` | 50 | 0 | 1 | 0 | — | — |
+| `assets/models/env/barrel.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/barrel.blend` | 232 | 28 | 1 | 0 | — | — |
+| `assets/models/env/bench.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bench.blend` | 68 | 12 | 1 | 0 | — | — |
+| `assets/models/env/boat.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/boat.blend` | 448 | 0 | 1 | 0 | — | — |
+| `assets/models/env/bridge_wood.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bridge_wood.blend` | 1,272 | 120 | 1 | 0 | — | — |
+| `assets/models/env/bush_flower.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bush_flower.blend` | 580 | 0 | 1 | 0 | — | — |
+| `assets/models/env/bush_round.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/bush_round.blend` | 400 | 0 | 1 | 0 | — | — |
+| `assets/models/env/campfire.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/campfire.blend` | 378 | 0 | 2 | 0 | — | — |
+| `assets/models/env/chest.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/chest.blend` | 148 | 12 | 1 | 0 | — | — |
+| `assets/models/env/crate.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/crate.blend` | 96 | 12 | 1 | 0 | — | — |
+| `assets/models/env/dock.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/dock.blend` | 1,020 | 12 | 1 | 0 | — | — |
+| `assets/models/env/fence_bamboo.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/fence_bamboo.blend` | 224 | 12 | 1 | 0 | — | — |
+| `assets/models/env/fern_clump.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/fern_clump.blend` | 112 | 0 | 1 | 0 | — | — |
+| `assets/models/env/flower_patch.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/flower_patch.blend` | 192 | 0 | 1 | 0 | — | — |
+| `assets/models/env/gate_village.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/gate_village.blend` | 1,204 | 56 | 2 | 0 | — | — |
+| `assets/models/env/grass_tuft.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/grass_tuft.blend` | 78 | 0 | 1 | 0 | — | — |
+| `assets/models/env/house_long.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_long.blend` | 3,724 | 12 | 2 | 0 | — | — |
+| `assets/models/env/house_small.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_small.blend` | 3,200 | 12 | 2 | 0 | — | — |
+| `assets/models/env/house_teal.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/house_teal.blend` | 3,216 | 12 | 2 | 0 | — | — |
+| `assets/models/env/karst_peak.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/karst_peak.blend` | 238 | 0 | 1 | 0 | — | — |
+| `assets/models/env/lantern_post.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/lantern_post.blend` | 334 | 28 | 2 | 0 | — | — |
+| `assets/models/env/lantern_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/lantern_stone.blend` | 214 | 12 | 2 | 0 | — | — |
+| `assets/models/env/log_fallen.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/log_fallen.blend` | 108 | 0 | 1 | 0 | — | — |
+| `assets/models/env/market_stall.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/market_stall.blend` | 460 | 12 | 1 | 0 | — | — |
+| `assets/models/env/memory_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/memory_stone.blend` | 126 | 28 | 2 | 0 | — | — |
+| `assets/models/env/mushroom_cluster.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/mushroom_cluster.blend` | 232 | 0 | 1 | 0 | — | — |
+| `assets/models/env/pebbles.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/pebbles.blend` | 216 | 0 | 1 | 0 | — | — |
+| `assets/models/env/reed_clump.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/reed_clump.blend` | 130 | 0 | 1 | 0 | — | — |
+| `assets/models/env/rock_cliff.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/rock_cliff.blend` | 282 | 12 | 1 | 0 | — | — |
+| `assets/models/env/rock_moss.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/rock_moss.blend` | 90 | 0 | 1 | 0 | — | — |
+| `assets/models/env/ruins_pillar.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/ruins_pillar.blend` | 176 | 28 | 1 | 0 | — | — |
+| `assets/models/env/ruins_wall.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/ruins_wall.blend` | 936 | 12 | 1 | 0 | — | — |
+| `assets/models/env/seal_gate.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/seal_gate.blend` | 780 | 24 | 2 | 0 | — | — |
+| `assets/models/env/shrine_wind.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/shrine_wind.blend` | 796 | 36 | 2 | 0 | — | — |
+| `assets/models/env/signboard.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/signboard.blend` | 176 | 12 | 1 | 0 | — | — |
+| `assets/models/env/smithy.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/smithy.blend` | 1,276 | 136 | 2 | 0 | — | — |
+| `assets/models/env/stele.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/stele.blend` | 280 | 12 | 1 | 0 | — | — |
+| `assets/models/env/steps_stone.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/steps_stone.blend` | 264 | 12 | 1 | 0 | — | — |
+| `assets/models/env/table.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/table.blend` | 184 | 12 | 1 | 0 | — | — |
+| `assets/models/env/tent.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tent.blend` | 84 | 12 | 1 | 0 | — | — |
+| `assets/models/env/tree_blossom.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_blossom.blend` | 792 | 0 | 1 | 0 | — | — |
+| `assets/models/env/tree_maple.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_maple.blend` | 776 | 0 | 1 | 0 | — | — |
+| `assets/models/env/tree_pine.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_pine.blend` | 152 | 0 | 1 | 0 | — | — |
+| `assets/models/env/tree_round.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/tree_round.blend` | 1,032 | 0 | 1 | 0 | — | — |
+| `assets/models/env/watchtower.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/watchtower.blend` | 776 | 12 | 1 | 0 | — | — |
+| `assets/models/env/well.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/well.blend` | 572 | 36 | 1 | 0 | — | — |
+| `assets/models/env/wind_chime_post.glb` | Dùng trong slice | `tools/blender/build_props.py` | `art/env/wind_chime_post.blend` | 228 | 28 | 1 | 0 | — | — |
 | `assets/models/rock.glb` | Legacy (bản nền cũ, runtime không dùng) | `tools/blender/build_assets.py` | `art/rock.blend` | 20 | 0 | 1 | 0 | — | — |
 | `assets/models/tree.glb` | Legacy (bản nền cũ, runtime không dùng) | `tools/blender/build_assets.py` | `art/tree.blend` | 60 | 0 | 4 | 0 | — | — |
 | `assets/models/weapons/glaive.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/glaive.blend` | 504 | 0 | 6 | 0 | — | — |
 | `assets/models/weapons/sabre.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sabre.blend` | 530 | 0 | 4 | 0 | — | — |
 | `assets/models/weapons/sword_bamboo.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_bamboo.blend` | 462 | 0 | 7 | 0 | — | — |
-| `assets/models/weapons/sword_old.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_old.blend` | 538 | 0 | 4 | 0 | — | — |
+| `assets/models/weapons/sword_old.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_old.blend` | 550 | 0 | 5 | 0 | — | — |
 | `assets/models/weapons/sword_wind.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_wind.blend` | 630 | 0 | 5 | 0 | — | — |
 
-Tổng: 53 model, 73,174 tam giác hiển thị. Mọi model của dự án được dựng bằng script Blender 5.2.2 chạy nền (`blender --background --factory-startup --python <script>`), giấy phép: Của dự án (chủ repo chọn giấy phép).
+Tổng: 65 model, 74,572 tam giác hiển thị. Mọi model của dự án được dựng bằng script Blender 5.2.2 chạy nền (`blender --background --factory-startup --python <script>`), giấy phép: Của dự án (chủ repo chọn giấy phép).
 
 ## Âm thanh
 
