@@ -1,7 +1,8 @@
 class_name MapView
 extends Control
 ## Painted overview of the valley generated from WorldLayout (cached once, built
-## off-thread), with discovered places, shrines, the tracked objective and the player.
+## off-thread, or a few rows per frame on single-threaded web builds), with discovered
+## places, shrines, the tracked objective and the player.
 
 const RESOLUTION: float = 2.0
 
@@ -9,14 +10,35 @@ static var texture: ImageTexture
 static var image: Image
 static var task: int = -1
 static var bounds: Rect2
+static var next_row: int = -1
+static var source: WorldLayout
 
 var main: Node
 
 static func prepare(layout: WorldLayout) -> void:
-	if task != -1 or texture != null:
+	if task != -1 or texture != null or next_row != -1:
 		return
 	bounds = layout.bounds
+	if OS.has_feature("nothreads"):
+		# A task would run inline here and stall the first frame for seconds.
+		source = layout
+		image = _blank(layout)
+		next_row = 0
+		return
 	task = WorkerThreadPool.add_task(func() -> void: image = _paint(layout))
+
+static func step(rows: int) -> void:
+	## Paints the next rows of the incremental (no-threads) map.
+	if next_row < 0 or texture != null:
+		return
+	for index: int in range(rows):
+		if next_row >= image.get_height():
+			texture = ImageTexture.create_from_image(image)
+			source = null
+			next_row = -1
+			return
+		_paint_row(source, image, next_row)
+		next_row += 1
 
 static func shutdown() -> void:
 	## Worker tasks must finish before the engine tears down.
@@ -24,29 +46,33 @@ static func shutdown() -> void:
 		WorkerThreadPool.wait_for_task_completion(task)
 		texture = ImageTexture.create_from_image(image)
 
+static func _blank(layout: WorldLayout) -> Image:
+	return Image.create(int(layout.bounds.size.x / RESOLUTION), int(layout.bounds.size.y / RESOLUTION), false, Image.FORMAT_RGB8)
+
 static func _paint(layout: WorldLayout) -> Image:
-	var width: int = int(layout.bounds.size.x / RESOLUTION)
-	var height: int = int(layout.bounds.size.y / RESOLUTION)
-	var result: Image = Image.create(width, height, false, Image.FORMAT_RGB8)
-	var light: Vector3 = Vector3(-0.5, 0.75, -0.4).normalized()
-	for py: int in range(height):
-		for px: int in range(width):
-			var x: float = layout.bounds.position.x + px * RESOLUTION
-			var z: float = layout.bounds.position.y + py * RESOLUTION
-			var h: float = layout.height_at(x, z)
-			var dx: float = layout.height_at(x + RESOLUTION, z) - h
-			var dz: float = layout.height_at(x, z + RESOLUTION) - h
-			var normal: Vector3 = Vector3(-dx, RESOLUTION, -dz).normalized()
-			var color: Color = layout.ground_color(x, z, h, 1.0 - normal.y * normal.y)
-			var water: Dictionary = layout.water_at(x, z)
-			if not water.is_empty():
-				color = Color("4f9fb0")
-			elif layout.in_chasm(x, z):
-				color = Color("2a3436")
-			var shade: float = clampf(normal.dot(light) * 1.1, 0.55, 1.15)
-			color = Color(color.r * shade, color.g * shade, color.b * shade).lerp(Color("efe3c2"), 0.18)
-			result.set_pixel(px, py, color)
+	var result: Image = _blank(layout)
+	for py: int in range(result.get_height()):
+		_paint_row(layout, result, py)
 	return result
+
+static func _paint_row(layout: WorldLayout, result: Image, py: int) -> void:
+	var light: Vector3 = Vector3(-0.5, 0.75, -0.4).normalized()
+	for px: int in range(result.get_width()):
+		var x: float = layout.bounds.position.x + px * RESOLUTION
+		var z: float = layout.bounds.position.y + py * RESOLUTION
+		var h: float = layout.height_at(x, z)
+		var dx: float = layout.height_at(x + RESOLUTION, z) - h
+		var dz: float = layout.height_at(x, z + RESOLUTION) - h
+		var normal: Vector3 = Vector3(-dx, RESOLUTION, -dz).normalized()
+		var color: Color = layout.ground_color(x, z, h, 1.0 - normal.y * normal.y)
+		var water: Dictionary = layout.water_at(x, z)
+		if not water.is_empty():
+			color = Color("4f9fb0")
+		elif layout.in_chasm(x, z):
+			color = Color("2a3436")
+		var shade: float = clampf(normal.dot(light) * 1.1, 0.55, 1.15)
+		color = Color(color.r * shade, color.g * shade, color.b * shade).lerp(Color("efe3c2"), 0.18)
+		result.set_pixel(px, py, color)
 
 func _process(_delta: float) -> void:
 	if texture == null and task != -1 and WorkerThreadPool.is_task_completed(task):

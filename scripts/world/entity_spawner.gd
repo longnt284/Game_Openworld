@@ -7,6 +7,8 @@ extends Node3D
 
 const SPAWN_RADIUS: float = 85.0
 const DESPAWN_RADIUS: float = 115.0
+## Group holding the nodes whose static colliders feed encounter navmeshes.
+const NAV_SOURCE: StringName = &"nav_source"
 
 var main: Node
 var assets: AssetLibrary
@@ -203,6 +205,9 @@ func _bake_navzone(data: Dictionary) -> void:
 	mesh.cell_height = 0.25
 	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	mesh.geometry_collision_mask = Combat.LAYER_WORLD
+	# Only terrain and props are walked, not characters, UI or the arena wind wall.
+	mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
+	mesh.geometry_source_group_name = NAV_SOURCE
 	var low: float = world.height_at(center.x, center.y) - 20.0
 	mesh.filter_baking_aabb = AABB(Vector3(center.x - size * 0.5, low, center.y - size * 0.5), Vector3(size, 60.0, size))
 	var source: NavigationMeshSourceGeometryData3D = NavigationMeshSourceGeometryData3D.new()

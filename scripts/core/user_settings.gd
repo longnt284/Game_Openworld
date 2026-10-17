@@ -34,6 +34,9 @@ var bindings: Dictionary = {}
 func load_file(path: String = PATH) -> void:
 	var config: ConfigFile = ConfigFile.new()
 	if config.load(path) != OK:
+		if OS.has_feature("web"):
+			# First visit in a browser: software or integrated GPUs are common there.
+			quality = "low"
 		return
 	mouse_sensitivity = clampf(float(config.get_value("controls", "mouse_sensitivity", mouse_sensitivity)), 0.0005, 0.01)
 	invert_y = bool(config.get_value("controls", "invert_y", invert_y))

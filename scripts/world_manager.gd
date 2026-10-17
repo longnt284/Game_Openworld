@@ -3,7 +3,8 @@ extends Node3D
 ## Streams a bounded pool of terrain chunks around the player. Heights come from
 ## WorldLayout; chunk geometry is computed on WorkerThreadPool and applied here.
 
-const MAX_TASKS: int = 2
+## Without threads a task runs inline on the main thread, so build one chunk per frame there.
+var max_tasks: int = 1 if OS.has_feature("nothreads") else 2
 
 var settings: GameSettings
 var assets: AssetLibrary
@@ -84,7 +85,7 @@ func _process(_delta: float) -> void:
 	if next_center != center:
 		_recenter(next_center)
 	_collect_builds()
-	while not pending.is_empty() and not pool.is_empty() and building.size() < MAX_TASKS:
+	while not pending.is_empty() and not pool.is_empty() and building.size() < max_tasks:
 		var coordinate: Vector2i = pending.pop_front()
 		var chunk: WorldChunk = pool.pop_back()
 		var job: Dictionary = {"chunk": chunk, "result": {}, "layout": layout}

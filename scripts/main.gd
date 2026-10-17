@@ -35,6 +35,10 @@ var title_angle: float = 0.0
 var hinted: Dictionary = {}
 var engaged: int = 0
 var death_serial: int = 0
+## Browser build: no quit, fullscreen only from a click, Esc releases the pointer first.
+var web: bool = OS.has_feature("web")
+var had_pointer: bool = false
+var announced_ready: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -85,9 +89,17 @@ func _exit_tree() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		quit_game()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and web and initialized and playing and engaged == 0:
+		# A closed tab gives no warning, so the browser build saves whenever it loses focus.
+		save_game(true)
 
 func quit_game() -> void:
 	## Lets the audio server release its streams before the tree is torn down.
+	if web:
+		# Quitting would leave a frozen canvas in the page; go back to the title instead.
+		if playing:
+			return_to_title()
+		return
 	audio.stop_all()
 	await get_tree().create_timer(0.2, true, false, true).timeout
 	get_tree().quit()
@@ -101,6 +113,7 @@ func _start_world() -> void:
 	world = WorldManager.new()
 	world.name = "World"
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
+	world.add_to_group(EntitySpawner.NAV_SOURCE)
 	add_child(world)
 	world.initialize(settings, assets, player)
 	player.world = world
@@ -114,6 +127,7 @@ func _start_world() -> void:
 	backdrop.build(Vector2(0, -180), settings.world_seed)
 	props = PropPlacer.new()
 	props.name = "Props"
+	props.add_to_group(EntitySpawner.NAV_SOURCE)
 	add_child(props)
 	props.build(assets, world.layout)
 	spawner = EntitySpawner.new()
@@ -165,6 +179,9 @@ func show_title() -> void:
 	audio.set_music("title", 1.5)
 	audio.set_ambience("wind")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if not announced_ready:
+		announced_ready = true
+		print("VK_READY")
 
 func _begin_play() -> void:
 	in_title = false
@@ -201,7 +218,7 @@ func start_new_game() -> void:
 	if DisplayServer.get_name() != "headless":
 		show_vision("Vân Khê — Mùa sương", ["Lâm An cập bến khi sương còn đọng trên mặt sông. Trên lưng là thanh kiếm cũ, trong tai là tiếng gió.",
 			"Từ ngọn núi phía bắc, một hồi chuông vọng xuống. Rồi có tiếng ai kêu cứu trên con đường lên làng."], func() -> void:
-			hud.show_hint("WASD: di chuyển  •  Chuột: nhìn quanh\nShift: né (giữ để chạy nhanh)  •  Space: nhảy\nF: tương tác  •  M: bản đồ  •  J: nhật ký  •  Esc: tạm dừng", 12.0))
+			hud.show_hint("WASD: di chuyển  •  Chuột: nhìn quanh\nShift: né (giữ để chạy nhanh)  •  Space: nhảy\nF: tương tác  •  M: bản đồ  •  J: nhật ký  •  Esc / P: tạm dừng", 12.0))
 
 func continue_game() -> void:
 	if load_game():
@@ -217,6 +234,7 @@ func set_paused(value: bool) -> void:
 		get_tree().paused = false
 		return
 	get_tree().paused = value
+	had_pointer = false
 	menus.set_paused(value)
 	audio.ui("ui_open" if value else "ui_close")
 	if DisplayServer.get_name() != "headless":
@@ -244,6 +262,7 @@ func _process(delta: float) -> void:
 		else:
 			hud.set_tracker("Vân Khê", "", "Đang tải thung lũng… %d%%" % roundi(assets.progress() * 100.0))
 		return
+	MapView.step(6)
 	if in_title:
 		title_angle += delta * 0.05
 		var center: Vector3 = Vector3(-6, world.height_at(-6, 40) + 6.0, 40)
@@ -252,12 +271,14 @@ func _process(delta: float) -> void:
 		return
 	if get_tree().paused:
 		return
+	if web:
+		_watch_pointer()
 	_update_region()
 	_update_focus()
 	_update_combat_state()
 	autosave_timer -= delta
 	if autosave_timer <= 0.0 and player.state == "move" and engaged == 0:
-		autosave_timer = 300.0
+		autosave_timer = 60.0 if web else 300.0
 		save_game(true)
 	hud_elapsed += delta
 	if hud_elapsed >= 0.1:
@@ -265,6 +286,14 @@ func _process(delta: float) -> void:
 		_refresh_hud()
 	hud.update_marker(player.camera_rig.camera, _marker_world(), player.global_position)
 	hud.update_reticle(player.camera_rig.camera, player.lock_target)
+
+func _watch_pointer() -> void:
+	## Esc in a browser releases pointer lock before the game sees the key; treat losing it as a pause.
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		had_pointer = true
+	elif had_pointer and not _ui_blocking() and not player.is_dead():
+		had_pointer = false
+		set_paused(true)
 
 func _update_region() -> void:
 	var region: Dictionary = world.layout.region_at(player.global_position.z)
@@ -600,6 +629,8 @@ func _on_state_changed(kind: String, _key: String) -> void:
 # ------------------------------------------------------------------ world events
 
 func discover(poi: Dictionary) -> void:
+	if in_title:
+		return
 	if state.discover(String(poi["id"])):
 		hud.show_banner(String(poi["name"]), "Địa điểm mới")
 		audio.play("discovery", null, -2.0)
@@ -866,7 +897,7 @@ func apply_settings() -> void:
 			_apply_chunk_quality(chunk, preset)
 		for job: Dictionary in world.building.values():
 			_apply_chunk_quality(job["chunk"], preset)
-	if DisplayServer.get_name() != "headless":
+	if DisplayServer.get_name() != "headless" and not web:
 		var window_mode: DisplayServer.WindowMode = DisplayServer.WINDOW_MODE_FULLSCREEN if user_settings.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
 		if DisplayServer.window_get_mode() != window_mode:
 			DisplayServer.window_set_mode(window_mode)

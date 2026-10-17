@@ -19,6 +19,8 @@ var scenes: Dictionary = {}
 var mesh_parts: Dictionary = {}
 var failure: String = ""
 var headless: bool = DisplayServer.get_name() == "headless"
+## Single-threaded web builds would load every request inline in one frame, so load one per frame.
+var sync_load: bool = headless or OS.has_feature("nothreads")
 
 func _init() -> void:
 	for kind: String in FLORA:
@@ -32,7 +34,7 @@ func _init() -> void:
 
 func request_all() -> void:
 	# Avoid the headless RID failures observed with threaded GLB loading on 4.7.2.
-	if headless:
+	if sync_load:
 		return
 	for key: String in paths:
 		var error: Error = ResourceLoader.load_threaded_request(paths[key], "PackedScene")
@@ -49,7 +51,7 @@ func poll() -> bool:
 		if scenes.has(key):
 			continue
 		var packed: PackedScene
-		if headless:
+		if sync_load:
 			packed = ResourceLoader.load(paths[key], "PackedScene") as PackedScene
 		else:
 			var status: int = ResourceLoader.load_threaded_get_status(paths[key])

@@ -17,6 +17,7 @@ var main: Node
 var root: Control
 var title_screen: Control
 var continue_button: Button
+var new_game_button: Button
 var pause_panel: PanelContainer
 var panel_host: PanelContainer
 var panel_title: Label
@@ -79,15 +80,22 @@ func _build_title() -> void:
 	tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tagline.custom_minimum_size.x = 480
 	box.add_child(tagline)
+	if OS.has_feature("web") and not OS.is_userfs_persistent():
+		var storage: Label = UiTheme.label("Trình duyệt đang chặn lưu trữ (chế độ ẩn danh?): hành trình sẽ mất khi đóng thẻ.", 15, UiTheme.VERMILION)
+		storage.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		storage.custom_minimum_size.x = 480
+		box.add_child(storage)
 	var spacer: Control = Control.new()
 	spacer.custom_minimum_size.y = 26
 	box.add_child(spacer)
 	continue_button = UiTheme.button("Tiếp tục hành trình", func() -> void: emit_signal("continue_requested"), 300)
 	box.add_child(continue_button)
-	box.add_child(UiTheme.button("Hành trình mới", func() -> void: emit_signal("new_game_requested"), 300))
+	new_game_button = UiTheme.button("Hành trình mới", func() -> void: emit_signal("new_game_requested"), 300)
+	box.add_child(new_game_button)
 	box.add_child(UiTheme.button("Thiết lập", func() -> void: open_panel("settings"), 300))
 	box.add_child(UiTheme.button("Ghi công", func() -> void: open_panel("credits"), 300))
-	box.add_child(UiTheme.button("Thoát game", func() -> void: emit_signal("quit_requested"), 300))
+	if not OS.has_feature("web"):
+		box.add_child(UiTheme.button("Thoát game", func() -> void: emit_signal("quit_requested"), 300))
 	var credit: Label = UiTheme.label("Chương I — đoạn chơi mẫu  •  Game của Nguyễn Thành Long", 13, UiTheme.MUTED)
 	credit.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	credit.offset_left = 90
@@ -100,7 +108,7 @@ func _build_title() -> void:
 func show_title(has_save: bool) -> void:
 	title_screen.visible = true
 	continue_button.disabled = not has_save
-	(continue_button if has_save else continue_button.get_parent().get_child(5)).call_deferred("grab_focus")
+	(continue_button if has_save else new_game_button).call_deferred("grab_focus")
 
 func hide_title() -> void:
 	title_screen.visible = false
@@ -126,6 +134,8 @@ func _build_pause() -> void:
 			["Thiết lập", func() -> void: open_panel("settings")], ["Về Miếu Gió gần nhất", func() -> void: emit_signal("checkpoint_requested")],
 			["Lưu hành trình  (F5)", func() -> void: emit_signal("save_requested")], ["Tải lần lưu gần nhất  (F9)", func() -> void: emit_signal("load_requested")],
 			["Về màn hình chính", func() -> void: emit_signal("title_requested")], ["Thoát game", func() -> void: emit_signal("quit_requested")]]:
+		if entry[0] == "Thoát game" and OS.has_feature("web"):
+			continue
 		box.add_child(UiTheme.button(entry[0], entry[1], 320))
 	pause_panel.visible = false
 
@@ -439,6 +449,9 @@ func _settings_view() -> Control:
 	video.add_child(quality_row)
 	video.add_child(_check_row("Toàn màn hình", settings.fullscreen, func(value: bool) -> void:
 		settings.fullscreen = value
+		if OS.has_feature("web"):
+			# Browsers only allow fullscreen inside the click that asks for it.
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if value else DisplayServer.WINDOW_MODE_WINDOWED)
 		_changed()))
 	video.add_child(_check_row("Hiện số sát thương", settings.damage_numbers, func(value: bool) -> void:
 		settings.damage_numbers = value
