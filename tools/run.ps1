@@ -9,10 +9,11 @@ if (-not (Test-Path -LiteralPath $GodotPath)) { throw 'Run tools/setup.ps1 first
 if ($Mode -eq 'test') {
     & $GodotPath --headless --path $projectRoot --editor --import
     if ($LASTEXITCODE -ne 0) { throw 'Asset import failed.' }
-    & $GodotPath --headless --render-thread safe --path $projectRoot --script res://tests/smoke_test.gd
-    if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed.' }
-    & $GodotPath --headless --render-thread safe --path $projectRoot --script res://tests/gameplay_test.gd
-    if ($LASTEXITCODE -ne 0) { throw 'Gameplay tests failed.' }
+    foreach ($suite in @('smoke_test', 'gameplay_test', 'combat_test', 'progression_test')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $projectRoot ('tests/' + $suite + '.gd')))) { continue }
+        & $GodotPath --headless --render-thread safe --path $projectRoot --script ('res://tests/' + $suite + '.gd')
+        if ($LASTEXITCODE -ne 0) { throw ($suite + ' failed.') }
+    }
 } elseif ($Mode -eq 'preview') {
     & $GodotPath --path $projectRoot --resolution 1920x1080 --script res://tests/render_preview.gd
 } elseif ($Mode -eq 'export') {
