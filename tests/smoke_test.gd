@@ -33,6 +33,7 @@ func _run() -> void:
 	var game: Node3D = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	game.skip_title = true
 	game.save_path = TEST_SAVE
+	game.profile_path = "user://smoke_test_profile.json"
 	root.add_child(game)
 	for attempt: int in range(900):
 		if game.initialized:
@@ -119,7 +120,7 @@ func _run() -> void:
 	await frames(2)
 	await settle(game)
 	check(player.is_on_floor(), "Loaded game rebuilds playable terrain")
-	var data: Dictionary = {"version": 2, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "yaw": 0.0, "state": GameState.new().to_dict()}
+	var data: Dictionary = {"version": SaveStore.SCHEMA_VERSION, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "yaw": 0.0, "state": GameState.new().to_dict()}
 	check(SaveStore.write_save(data, TEST_SAVE) == OK, "Save writes successfully")
 	var restored: Dictionary = SaveStore.read_save(TEST_SAVE)
 	check(not restored.is_empty() and SaveStore.to_vector(restored["position"]) == Vector3(1, 2, 3), "Save restores position and schema")

@@ -78,6 +78,7 @@ func _run() -> void:
 	game = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	game.skip_title = true
 	game.save_path = TEST_SAVE
+	game.profile_path = "user://gameplay_test_profile.json"
 	root.add_child(game)
 	while not game.initialized:
 		await frames(1)
@@ -274,7 +275,7 @@ func _run() -> void:
 	legacy.store_string(JSON.stringify({"version": 1, "seed": 284, "position": [3.0, 1.0, -5.0], "checkpoint": [3.0, 1.0, -5.0], "beacon_active": true}))
 	legacy.close()
 	var migrated: Dictionary = SaveStore.read_save(TEST_SAVE)
-	check(not migrated.is_empty() and int(migrated["version"]) == 2 and migrated["state"]["checkpoint_id"] == "shrine_village", "Version 1 saves migrate to schema 2")
+	check(not migrated.is_empty() and int(migrated["version"]) == SaveStore.SCHEMA_VERSION and migrated["state"]["checkpoint_id"] == "shrine_village", "Version 1 saves migrate to the current schema")
 	check(game.load_game() and state.has_flag("migrated_from_v1"), "Migrated save loads into the game")
 
 	_check_sequence_breaks()

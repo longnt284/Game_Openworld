@@ -100,6 +100,7 @@ func _run() -> void:
 	game = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	game.skip_title = true
 	game.save_path = "user://render_preview_save.json"
+	game.profile_path = "user://render_preview_profile.json"
 	root.add_child(game)
 	while not game.initialized:
 		await frames(1)

@@ -4,7 +4,7 @@ extends RefCounted
 ## corrupt files fall back to the backup, older schemas are migrated on read.
 
 const SAVE_PATH: String = "user://world_save.json"
-const SCHEMA_VERSION: int = 2
+const SCHEMA_VERSION: int = 3
 const MAX_BYTES: int = 1048576
 
 static func _is_number(value: Variant) -> bool:
@@ -37,9 +37,14 @@ static func validate(data: Variant) -> bool:
 	for key: String in ["flags", "inventory", "quests", "skills"]:
 		if not state.get(key, {}) is Dictionary:
 			return false
-	for key: String in ["level", "xp", "coins"]:
+	for key: String in ["level", "xp", "coins", "world_tier", "max_tier"]:
 		if not _is_number(state.get(key, 0)) or float(state.get(key, 0)) < 0:
 			return false
+	for key: String in ["checkpoints", "discovered", "swords"]:
+		if not state.get(key, []) is Array:
+			return false
+	if not state.get("sword", "") is String or not _is_number(state.get("equipped_uid", -1)):
+		return false
 	return true
 
 static func migrate(data: Variant) -> Dictionary:
@@ -59,17 +64,36 @@ static func migrate(data: Variant) -> Dictionary:
 			state["checkpoint_id"] = "shrine_village"
 		data = {"version": SCHEMA_VERSION, "seed": data["seed"], "position": data["position"], "checkpoint": data["checkpoint"],
 			"yaw": 0.0, "state": state, "label": "Bản nền cũ", "saved_at": 0}
+	elif version == 2 or version == 2.0:
+		# v3 adds the owned-sword list, the equipped armory weapon and the world tier.
+		if not data.get("state") is Dictionary:
+			return {}
+		var state: Dictionary = data["state"]
+		var sword: String = String(state.get("sword", "sword_old"))
+		var owned: Array = ["sword_old"]
+		for story: String in ["sword_bamboo", "sword_wind"]:
+			if sword == story or (story == "sword_bamboo" and sword == "sword_wind"):
+				owned.append(story)
+		state["swords"] = owned
+		state["equipped_uid"] = -1
+		state["world_tier"] = 0
+		state["max_tier"] = 0
+		data["version"] = SCHEMA_VERSION
 	return data if validate(data) else {}
 
 static func write_save(data: Dictionary, path: String = SAVE_PATH) -> Error:
 	if not validate(data):
 		return ERR_INVALID_DATA
+	return atomic_write(path, JSON.stringify(data, "\t"))
+
+static func atomic_write(path: String, text: String) -> Error:
+	## Writes through path.tmp and keeps the previous file as path.bak (shared with ProfileStore).
 	var temporary: String = path + ".tmp"
 	var backup: String = path + ".bak"
 	var file: FileAccess = FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify(data, "\t"))
+	file.store_string(text)
 	file.flush()
 	var error: Error = file.get_error()
 	file.close()
@@ -89,6 +113,10 @@ static func write_save(data: Dictionary, path: String = SAVE_PATH) -> Error:
 	return error
 
 static func read_save(path: String = SAVE_PATH) -> Dictionary:
+	return read_json(path, migrate)
+
+static func read_json(path: String, accept: Callable) -> Dictionary:
+	## First of path / path.bak that parses and that accept() turns into a non-empty Dictionary.
 	for candidate: String in [path, path + ".bak"]:
 		if not FileAccess.file_exists(candidate):
 			continue
@@ -97,9 +125,9 @@ static func read_save(path: String = SAVE_PATH) -> Dictionary:
 			continue
 		var parser: JSON = JSON.new()
 		if parser.parse(file.get_as_text()) == OK:
-			var migrated: Dictionary = migrate(parser.data)
-			if not migrated.is_empty():
-				return migrated
+			var accepted: Dictionary = accept.call(parser.data)
+			if not accepted.is_empty():
+				return accepted
 	return {}
 
 static func has_save(path: String = SAVE_PATH) -> bool:

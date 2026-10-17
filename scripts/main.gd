@@ -5,11 +5,13 @@ extends Node3D
 const ECHO_COUNT: int = 3
 
 @export var save_path: String = SaveStore.SAVE_PATH
+@export var profile_path: String = PlayerProfile.PATH
 @export var skip_title: bool = false
 var settings: GameSettings = preload("res://config/default_settings.tres").duplicate() as GameSettings
 var user_settings: UserSettings = UserSettings.new()
 var assets: AssetLibrary = AssetLibrary.new()
 var state: GameState = GameState.new()
+var profile: PlayerProfile
 var quests: QuestManager
 var audio: AudioDirector
 var atmosphere: Atmosphere
@@ -45,6 +47,7 @@ func _ready() -> void:
 	get_tree().set_auto_accept_quit(false)
 	user_settings.load_file()
 	user_settings.apply_input()
+	profile = PlayerProfile.load_file(profile_path)
 	audio = AudioDirector.new()
 	audio.name = "Audio"
 	add_child(audio)
@@ -553,7 +556,8 @@ func run_action(action: String) -> void:
 		"unlock":
 			unlock_skill(parts[1])
 		"sword":
-			state.sword = parts[1]
+			state.grant_sword(parts[1])
+			state.equip_sword(parts[1])
 			player.visual.attach_weapon(assets, state.sword)
 			audio.play("sword_draw")
 			hud.show_banner("Nhận " + String(ContentDB.weapon(state.sword).get("name", state.sword)), "Công lực tăng lên %d" % roundi(state.attack_power()))
@@ -946,6 +950,11 @@ func save_game(silent: bool = false) -> bool:
 		return true
 	hud.show_message("Không thể lưu: " + error_string(error))
 	return false
+
+func save_profile() -> void:
+	var error: Error = profile.save_file(profile_path)
+	if error != OK:
+		hud.show_message("Không thể lưu hồ sơ: " + error_string(error))
 
 func load_game() -> bool:
 	if not initialized:

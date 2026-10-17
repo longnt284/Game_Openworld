@@ -70,6 +70,7 @@ func _run() -> void:
 	game = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	game.skip_title = true
 	game.save_path = TEST_SAVE
+	game.profile_path = "user://combat_test_profile.json"
 	root.add_child(game)
 	for attempt: int in range(900):
 		if game.initialized:
