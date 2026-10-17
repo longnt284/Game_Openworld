@@ -23,6 +23,8 @@ var locomotion_speeds: Vector3 = Vector3(0.0, 1.8, 5.5)
 var hitstop_left: float = 0.0
 var flash_left: float = 0.0
 var flash_material: StandardMaterial3D
+## Elemental status glow kept on the meshes between hit flashes (null when none).
+var status_material: StandardMaterial3D
 var meshes: Array[MeshInstance3D] = []
 var base_speed: float = 1.0
 var has_tree: bool = false
@@ -154,7 +156,9 @@ func attach_weapon(assets: AssetLibrary, key: String, sheathed: bool = false) ->
 	if weapon:
 		weapon.queue_free()
 	weapon_key = key
-	weapon = assets.instantiate("weapons/" + key)
+	# Swords name their model in data/weapons.json; a missing model falls back to the wind sword.
+	var model_key: String = "weapons/" + String(ContentDB.weapon(key).get("model", key))
+	weapon = assets.instantiate(model_key if assets.scenes.has(model_key) else "weapons/sword_wind")
 	var socket: Node3D = sheath_socket if sheathed and sheath_socket else sword_socket
 	if socket:
 		socket.add_child(weapon)
@@ -174,6 +178,20 @@ func flash(color: Color = Color(1.0, 0.92, 0.8), duration: float = 0.09) -> void
 	flash_material.albedo_color = color * 0.55
 	for mesh: MeshInstance3D in meshes:
 		mesh.material_overlay = flash_material
+
+func set_status_tint(color: Color) -> void:
+	if color.a <= 0.0:
+		status_material = null
+	else:
+		if status_material == null:
+			status_material = StandardMaterial3D.new()
+			status_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			status_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			status_material.rim_enabled = false
+		status_material.albedo_color = Color(color.r * 0.35, color.g * 0.35, color.b * 0.35)
+	if flash_left <= 0.0:
+		for mesh: MeshInstance3D in meshes:
+			mesh.material_overlay = status_material
 
 func hitstop(duration: float) -> void:
 	hitstop_left = maxf(hitstop_left, duration)
@@ -195,7 +213,7 @@ func _process(delta: float) -> void:
 		flash_left -= delta
 		if flash_left <= 0.0:
 			for mesh: MeshInstance3D in meshes:
-				mesh.material_overlay = null
+				mesh.material_overlay = status_material
 
 func _set_playback_speed(factor: float) -> void:
 	if has_tree:

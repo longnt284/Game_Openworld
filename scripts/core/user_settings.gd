@@ -4,12 +4,13 @@ extends RefCounted
 
 const PATH: String = "user://settings.cfg"
 const REBINDABLE: PackedStringArray = [
-	"move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "block", "skill_1", "skill_2",
+	"move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "block", "skill_1", "skill_2", "skill_ult",
 	"interact", "heal", "lock_on", "open_map", "open_journal", "open_inventory",
 ]
 const ACTION_NAMES: Dictionary = {
 	"move_forward": "Đi tới", "move_back": "Lùi", "move_left": "Sang trái", "move_right": "Sang phải", "jump": "Nhảy / Khinh công",
-	"sprint": "Né / Chạy nhanh", "attack": "Đánh (giữ: trọng kích)", "block": "Đỡ / Phản đòn", "skill_1": "Phong Trảm", "skill_2": "Toàn Phong",
+	"sprint": "Né / Chạy nhanh", "attack": "Đánh (giữ: trọng kích)", "block": "Đỡ / Phản đòn", "skill_1": "Chiêu thức 1", "skill_2": "Chiêu thức 2",
+	"skill_ult": "Tuyệt kỹ (đủ nộ khí)",
 	"interact": "Tương tác", "heal": "Dùng thuốc", "lock_on": "Khóa mục tiêu", "open_map": "Bản đồ", "open_journal": "Nhật ký",
 	"open_inventory": "Túi đồ",
 }

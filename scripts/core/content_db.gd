@@ -10,6 +10,10 @@ const FILES: Dictionary = {
 	"props": "res://data/world/props.json",
 	"enemies": "res://data/enemies.json",
 	"timings": "res://data/anim_timings.json",
+	"attacks": "res://data/attacks.json",
+	"weapons": "res://data/weapons.json",
+	"styles": "res://data/styles.json",
+	"elements": "res://data/elements.json",
 }
 
 static var _cache: Dictionary = {}
@@ -35,6 +39,18 @@ static func enemy(id: String) -> Dictionary:
 
 static func timing(owner: String, attack: String) -> Dictionary:
 	return ((get_data("timings") as Dictionary).get(owner, {}) as Dictionary).get(attack, {})
+
+static func weapon(id: String) -> Dictionary:
+	return (get_data("weapons") as Dictionary).get(id, {})
+
+static func style(id: String) -> Dictionary:
+	return (get_data("styles") as Dictionary).get(id, {})
+
+static func element(id: String) -> Dictionary:
+	return ((get_data("elements") as Dictionary).get("elements", {}) as Dictionary).get(id, {})
+
+static func status(id: String) -> Dictionary:
+	return ((get_data("elements") as Dictionary).get("statuses", {}) as Dictionary).get(id, {})
 
 static func dialogue_node(id: String) -> Dictionary:
 	return (get_data("dialogue") as Dictionary).get(id, {})

@@ -1,7 +1,8 @@
 class_name PlayerController
 extends CharacterBody3D
 ## Lâm An: movement (run, sprint, dodge, jump, khinh công leap and glide) and
-## sword combat (3-hit combo, charged heavy, parry/block, two wind skills).
+## sword combat (3-hit combo, charged heavy, parry/block, and the three forms of the
+## equipped sword's style on E, Q and X; X spends the full charge meter).
 
 signal health_changed(current: float, maximum: float)
 signal stamina_changed(current: float, maximum: float)
@@ -12,8 +13,9 @@ signal parried(enemy: Node)
 signal footstep(surface: String)
 signal skill_used(skill: String, cooldown: float)
 signal notice(text: String)
+signal meter_changed(current: float, maximum: float)
 
-const SKILL_COOLDOWN: Dictionary = {"gust": 6.0, "cyclone": 14.0}
+const METER_MAX: float = 100.0
 const HEAL_ITEMS: Array = [["tra_sen", 0.65], ["banh_ngai", 0.4]]
 
 var settings: GameSettings
@@ -40,7 +42,10 @@ var block_held: bool = false
 var invulnerable: float = 0.0
 var hit_cooldown: float = 0.0
 var counter_bonus: float = 0.0
-var cooldowns: Dictionary = {"gust": 0.0, "cyclone": 0.0}
+## skill id -> seconds left / seconds at cast (for the HUD ratio)
+var cooldowns: Dictionary = {}
+var cooldown_max: Dictionary = {}
+var meter: float = 0.0
 var used_leap: bool = false
 var gliding: bool = false
 var sprinting: bool = false
@@ -137,9 +142,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("sprint"):
 		queue_input("dodge")
 	elif event.is_action_pressed("skill_1"):
-		queue_input("gust")
+		queue_input("skill_e")
 	elif event.is_action_pressed("skill_2"):
-		queue_input("cyclone")
+		queue_input("skill_q")
+	elif event.is_action_pressed("skill_ult"):
+		queue_input("skill_x")
 	elif event.is_action_pressed("heal"):
 		queue_input("heal")
 	elif event.is_action_pressed("lock_on"):
@@ -212,6 +219,8 @@ func _tick_timers(delta: float) -> void:
 	combat_timer += delta
 	for skill: String in cooldowns:
 		cooldowns[skill] = maxf(0.0, cooldowns[skill] - delta)
+	if combat_timer > 8.0 and meter > 0.0:
+		set_meter(meter - 6.0 * delta)
 	stamina_delay -= delta
 	var draining: bool = (state == "move" and (sprinting or gliding)) or state == "dodge" or (state == "move" and block_held and is_on_floor() and current_action() == "")
 	if stamina_delay <= 0.0 and not draining and stamina < max_stamina:
@@ -304,9 +313,9 @@ func _consume_ground_commands(on_floor: bool) -> void:
 	elif command == "parry" and on_floor:
 		buffered = ""
 		_start_action("parry")
-	elif command in ["gust", "cyclone"]:
+	elif command.begins_with("skill_"):
 		buffered = ""
-		_try_skill(command)
+		_try_skill(command.substr(6))
 	elif command == "heal" and on_floor:
 		buffered = ""
 		_try_heal()
@@ -358,15 +367,43 @@ func _physics_dodge(delta: float) -> void:
 
 # ------------------------------------------------------------------ actions
 
-func _try_skill(skill: String) -> void:
+func style_id() -> String:
+	return StyleBook.style_of(game.sword)
+
+func cooldown_ratio(skill: String) -> float:
+	return float(cooldowns.get(skill, 0.0)) / maxf(float(cooldown_max.get(skill, 0.0)), 0.01)
+
+func set_meter(value: float) -> void:
+	var next: float = clampf(value, 0.0, METER_MAX)
+	if is_equal_approx(next, meter):
+		return
+	meter = next
+	emit_signal("meter_changed", meter, METER_MAX)
+
+func _try_skill(slot: String) -> void:
+	var form: Dictionary = StyleBook.form(style_id(), slot)
+	if form.is_empty():
+		return
+	var skill: String = String(form["skill"])
 	if game.skill_level(skill) <= 0:
 		emit_signal("notice", "Chưa lĩnh hội chiêu này")
 		return
-	if cooldowns[skill] > 0.0:
+	if float(cooldowns.get(skill, 0.0)) > 0.0:
 		return
-	_start_action("skill_gust" if skill == "gust" else "skill_cyclone")
+	var cost: float = float(form.get("meter", 0.0))
+	if cost > 0.0 and meter < cost:
+		emit_signal("notice", "Nộ khí chưa đầy")
+		return
+	_start_action(String(form["attack"]), slot, skill)
+	if state != "action" or current_action() != String(form["attack"]):
+		return
+	if cost > 0.0:
+		set_meter(meter - cost)
+		# The ultimate cannot be interrupted: Lâm An is untouchable until it lands.
+		invulnerable = maxf(invulnerable, float((action["data"] as Dictionary).get("recover", 1.0)))
 	var reduction: float = 1.0 - 0.15 * (game.skill_level(skill) - 1)
-	cooldowns[skill] = SKILL_COOLDOWN[skill] * reduction
+	cooldown_max[skill] = float(form.get("cooldown", 0.0)) * reduction
+	cooldowns[skill] = cooldown_max[skill]
 	emit_signal("skill_used", skill, cooldowns[skill])
 
 func _try_heal() -> void:
@@ -381,8 +418,13 @@ func _try_heal() -> void:
 			return
 	emit_signal("notice", "Không còn thuốc hồi phục")
 
-func _start_action(anim_name: String) -> void:
+func _start_action(anim_name: String, slot: String = "", skill: String = "") -> void:
 	var data: Dictionary = Combat.attack("player", anim_name)
+	var clip: String = String(data.get("clip", anim_name))
+	if not visual.has_animation(clip) and data.has("fallback_clip"):
+		# The dedicated clip is not in this model yet: play a close cousin with its timings.
+		clip = String(data["fallback_clip"])
+		data = Combat.attack("player", anim_name, clip)
 	if data.is_empty():
 		data = {"length": visual.animation_length(anim_name), "hit_start": 99.0, "hit_end": 99.0, "combo_open": 99.0, "recover": visual.animation_length(anim_name)}
 	if anim_name == "interact":
@@ -396,14 +438,16 @@ func _start_action(anim_name: String) -> void:
 		set_stamina(stamina - cost)
 		stamina_delay = 0.8
 	state = "action"
-	action = {"name": anim_name, "data": data, "t": 0.0, "hits": {}, "prev_u": -1.0, "fired": false, "tick": 0.0, "healed": false}
+	if slot != "":
+		data["slot"] = slot
+	action = {"name": anim_name, "data": data, "t": 0.0, "hits": {}, "prev_u": -1.0, "fired": false, "tick": 0.0, "healed": false, "skill": skill, "start": global_position}
 	combat_timer = 0.0 if anim_name != "interact" else combat_timer
 	visual.set_sheathed(false)
-	visual.play_action(anim_name)
+	visual.play_action(clip, float(data.get("speed", 1.0)))
 	var aim: Vector3 = _aim_direction()
 	if aim != Vector3.ZERO:
 		face_direction(aim, true)
-	if anim_name.begins_with("attack") or anim_name in ["heavy", "skill_gust", "skill_cyclone"]:
+	if data.has("mult"):
 		emit_signal("footstep", "swing")
 
 func _aim_direction() -> Vector3:
@@ -445,6 +489,14 @@ func _physics_action(delta: float) -> void:
 	if lock_target and t < hit_start and name != "interact":
 		face_direction(lock_target.global_position - global_position)
 	var target_velocity: Vector3 = facing * push
+	if String(data.get("kind", "")) == "dash" and t >= hit_start and t <= hit_end:
+		target_velocity = facing * float(data.get("dash_distance", 6.0)) / maxf(hit_end - hit_start, 0.05)
+		if not _dash_clear(target_velocity * delta * 3.0):
+			target_velocity = Vector3.ZERO
+		if data.get("invulnerable", false):
+			invulnerable = maxf(invulnerable, hit_end - t + 0.05)
+		velocity.x = target_velocity.x
+		velocity.z = target_velocity.z
 	velocity.x = move_toward(velocity.x, target_velocity.x, 40.0 * delta)
 	velocity.z = move_toward(velocity.z, target_velocity.z, 40.0 * delta)
 	_apply_gravity(delta)
@@ -474,9 +526,9 @@ func _physics_action(delta: float) -> void:
 			buffered = ""
 			_start_action("attack_1")
 			return
-		if next in ["gust", "cyclone"]:
+		if next.begins_with("skill_"):
 			buffered = ""
-			_try_skill(next)
+			_try_skill(next.substr(6))
 			if state == "action" and current_action() != name:
 				return
 	if t >= hit_end and buffered == "dodge" and stamina >= 12.0 and is_on_floor():
@@ -490,57 +542,106 @@ func _physics_action(delta: float) -> void:
 	if t >= float(data.get("recover", 0.5)) and (move_direction() != Vector3.ZERO or t >= float(data.get("length", 0.6))):
 		_finish_action()
 
+func _dash_clear(step: Vector3) -> bool:
+	## Dashing forms stop at gorges, deep water and the valley walls instead of carrying Lâm An over.
+	var ahead: Vector3 = global_position + step
+	if world == null:
+		return true
+	return world.layout.inside_bounds(ahead.x, ahead.z) and not world.layout.in_chasm(ahead.x, ahead.z) and world.layout.water_at(ahead.x, ahead.z).is_empty()
+
 func _finish_action() -> void:
+	if String((action.get("data", {}) as Dictionary).get("kind", "")) == "dash":
+		Vfx.streak(get_parent(), action.get("start", global_position), global_position, SkillRunner.form_color(action["data"]), 1.1, 0.5)
 	if current_action() != "parry" or not block_held:
 		visual.stop_action()
 	action = {}
 	state = "move"
 
-func _resolve_hits(name: String, data: Dictionary, t: float, hit_start: float, hit_end: float) -> void:
+func skill_bonus() -> float:
+	## Each cultivation level of the casting form adds 25% damage.
+	var skill: String = String(action.get("skill", ""))
+	return 1.0 + 0.25 * (game.skill_level(skill) - 1) if skill != "" and game.skill_level(skill) > 0 else 1.0
+
+func _resolve_hits(_name: String, data: Dictionary, t: float, hit_start: float, hit_end: float) -> void:
+	var kind: String = String(data.get("kind", "sweep"))
 	if not action["fired"]:
 		action["fired"] = true
-		if name != "skill_cyclone":
-			Vfx.slash(get_parent(), global_position, facing, data, Color(0.85, 1.0, 0.95, 0.9) if name.begins_with("skill") else Color(1, 1, 1, 0.8))
-		if data.get("projectile", false):
-			var blade: WindProjectile = WindProjectile.new()
-			get_parent().add_child(blade)
-			var level_bonus: float = 1.0 + 0.25 * (game.skill_level("gust") - 1)
-			blade.launch(global_position + Vector3.UP * 1.1 + facing * 0.8, facing, 22.0, game.attack_power() * float(data["mult"]) * level_bonus, data, Combat.LAYER_HURT_ENEMY, self)
+		if data.get("slot", "") == "x":
+			_ultimate_flourish(data)
+		SkillRunner.fire(self, data, skill_bonus())
+		if kind == "projectile":
 			emit_signal("footstep", "wind")
-	if data.get("projectile", false):
-		return  # Phong Trảm damages only through its wind blade, never twice up close.
-	if name == "skill_cyclone":
-		action["tick"] = float(action["tick"]) - get_physics_process_delta_time()
-		if float(action["tick"]) <= 0.0:
-			action["tick"] = float(data.get("tick", 0.13))
-			action["hits"] = {}
-			Vfx.ring(get_parent(), global_position + Vector3.UP * 0.6, 3.3, Vfx.WIND, 0.25, 0.12)
-			_hit_targets(Combat.sweep(self, facing, data, 0.0, 0.0, Combat.LAYER_HURT_ENEMY, action["hits"]), data, 1.0 + 0.25 * (game.skill_level("cyclone") - 1))
-		return
+	match kind:
+		"projectile", "chain", "strikes", "nova", "field":
+			return  # these deal damage through the nodes SkillRunner spawned, never twice up close
+		"tick":
+			action["tick"] = float(action["tick"]) - get_physics_process_delta_time()
+			if float(action["tick"]) <= 0.0:
+				action["tick"] = float(data.get("tick", 0.13))
+				action["hits"] = {}
+				SkillRunner.tick_vfx(self, data)
+				_hit_targets(Combat.sweep(self, facing, data, 0.0, 0.0, Combat.LAYER_HURT_ENEMY, action["hits"]), data, skill_bonus())
+			return
+		"dash":
+			# The whole arc travels with Lâm An, so everything along the path is cut once.
+			_hit_targets(Combat.sweep(self, facing, data, 0.0, 1.0, Combat.LAYER_HURT_ENEMY, action["hits"]), data, skill_bonus())
+			return
 	var u: float = clampf((t - hit_start) / maxf(hit_end - hit_start, 0.001), 0.0, 1.0)
 	var previous: float = maxf(float(action["prev_u"]), 0.0)
 	action["prev_u"] = u
-	_hit_targets(Combat.sweep(self, facing, data, previous, u, Combat.LAYER_HURT_ENEMY, action["hits"]), data, 1.0)
+	_hit_targets(Combat.sweep(self, facing, data, previous, u, Combat.LAYER_HURT_ENEMY, action["hits"]), data, skill_bonus())
 
 func _hit_targets(areas: Array[Area3D], data: Dictionary, bonus: float) -> void:
 	for area: Area3D in areas:
 		var entity: Node = Combat.entity_of(area)
 		if entity == null or entity == self or not entity.has_method("take_damage"):
 			continue
-		var amount: float = game.attack_power() * float(data.get("mult", 1.0)) * bonus
-		if counter_bonus > 0.0:
-			amount *= 1.5
-			counter_bonus = 0.0
-		var damage: Combat.Damage = Combat.make_damage(self, data, amount, (entity as Node3D).global_position)
-		if float(data.get("knockback", 0.0)) < 0.0:
-			damage.direction = -damage.direction
-			damage.knockback = absf(damage.knockback)
-		var result: Dictionary = entity.take_damage(damage)
-		if result.get("hit", false):
+		strike(entity, data, bonus)
+
+func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = Vector3.ZERO, ranged: bool = false) -> Dictionary:
+	## Every player hit goes through here: melee sweeps, missiles, chains, novas and fields.
+	var amount: float = game.attack_power() * float(data.get("mult", 1.0)) * scale
+	if counter_bonus > 0.0:
+		amount *= 1.5
+		counter_bonus = 0.0
+	var damage: Combat.Damage = Combat.make_damage(self, data, amount, (entity as Node3D).global_position)
+	damage.status_power = game.attack_power()
+	if direction != Vector3.ZERO:
+		damage.direction = direction
+	if float(data.get("knockback", 0.0)) < 0.0:
+		damage.direction = -damage.direction
+		damage.knockback = absf(damage.knockback)
+	damage.ranged = ranged
+	if damage.element == "":
+		_apply_sword_element(damage)
+	var result: Dictionary = entity.take_damage(damage)
+	if result.get("hit", false):
+		if not ranged:
 			visual.hitstop(damage.hitstop)
 			camera_rig.add_trauma(damage.shake)
-			Vfx.burst(get_parent(), damage.position, Vfx.SPARK if not current_action().begins_with("skill") else Vfx.WIND, 16, 6.0)
-			emit_signal("attack_landed", entity, float(result.get("amount", amount)))
+		Vfx.burst(get_parent(), damage.position, Vfx.element_color(damage.element) if damage.element != "" else Vfx.SPARK, 16, 6.0)
+		var slot: String = String(data.get("slot", ""))
+		set_meter(meter + float(data.get("meter_gain", 0.0 if slot == "x" else (2.0 if slot != "" else 5.0))))
+		emit_signal("attack_landed", entity, float(result.get("amount", amount)))
+	return result
+
+func _apply_sword_element(damage: Combat.Damage) -> void:
+	## Plain strikes of an elemental sword carry its element and sometimes its status.
+	var weapon: Dictionary = ContentDB.weapon(game.sword)
+	var element: String = String(weapon.get("element", ""))
+	if element == "":
+		return
+	damage.element = element
+	damage.status = {"id": String(ContentDB.element(element).get("status", "")), "chance": float(weapon.get("status_chance", 0.0))}
+
+func _ultimate_flourish(data: Dictionary) -> void:
+	camera_rig.add_trauma(float(data.get("shake", 0.5)))
+	camera_rig.punch_fov(10.0, 0.45)
+	Vfx.pillar(get_parent(), global_position, SkillRunner.form_color(data), 10.0, 1.2, 0.5)
+	if DisplayServer.get_name() != "headless":
+		# A breath of slow motion sells the ultimate; real time keeps it short at any time scale.
+		Engine.time_scale = 0.35
+		get_tree().create_timer(0.22, true, false, true).timeout.connect(func() -> void: Engine.time_scale = 1.0)
 
 # ------------------------------------------------------------------ damage
 
@@ -559,6 +660,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		Vfx.glint(get_parent(), global_position + Vector3.UP * 1.3 + facing * 0.7, Color(1, 1, 0.85), 1.2)
 		counter_bonus = 2.5
 		set_stamina(stamina + 12.0)
+		set_meter(meter + 15.0)
 		# Deflecting a projectile protects the player but does not stagger the distant thrower.
 		if damage.source and damage.source.has_method("on_parried") and not damage.ranged:
 			damage.source.on_parried(self)
@@ -582,6 +684,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 			emit_signal("notice", "Phá thế đỡ!")
 		return {"hit": true, "blocked": true, "amount": chip}
 	_apply_damage(damage.amount)
+	set_meter(meter + 4.0)
 	visual.flash(Color(1.0, 0.55, 0.45))
 	camera_rig.add_trauma(damage.shake + 0.15)
 	Vfx.burst(get_parent(), global_position + Vector3.UP * 1.1, Color(1.0, 0.5, 0.4), 12, 4.0)
@@ -619,6 +722,8 @@ func _physics_hit(delta: float) -> void:
 func _die() -> void:
 	state = "dead"
 	action = {}
+	Engine.time_scale = 1.0
+	set_meter(0.0)
 	set_lock(null)
 	visual.stop_action()
 	visual.set_state("dead")

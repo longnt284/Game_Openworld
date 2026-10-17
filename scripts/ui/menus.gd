@@ -363,30 +363,60 @@ func _inventory_view() -> Control:
 	right.add_child(UiTheme.label("Lâm An — Cấp %d" % state.level, 20, UiTheme.GOLD, true))
 	right.add_child(UiTheme.label("Kinh nghiệm: %d / %d   •   Điểm tu luyện: %d" % [state.xp, state.xp_for_next(), state.skill_points], 16))
 	right.add_child(UiTheme.label("Khí huyết tối đa: %d   •   Công lực: %d" % [roundi(state.max_health()), roundi(state.attack_power())], 16))
-	right.add_child(UiTheme.label("Kiếm: %s" % GameState.SWORDS[state.sword]["name"], 16, UiTheme.JADE_LIGHT, true))
+	var style: String = StyleBook.style_of(state.sword)
+	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ContentDB.style(style).get("name", "")], 16, UiTheme.JADE_LIGHT, true))
 	right.add_child(UiTheme.label("Tơ ký ức đã kết: %d" % state.count("to_ky_uc"), 16, UiTheme.CREAM))
 	var spacer: Control = Control.new()
 	spacer.custom_minimum_size.y = 10
 	right.add_child(spacer)
 	right.add_child(UiTheme.label("Võ học", 20, UiTheme.GOLD, true))
-	var skills: Array = [["gust", "Phong Trảm", "Chém ra lưỡi gió xuyên địch. Mỗi bậc: +25% sát thương, -15% hồi chiêu."],
-		["cyclone", "Toàn Phong", "Xoáy kiếm trên không, hút và chém liên tục quanh mình. Mỗi bậc: +25% sát thương, -15% hồi chiêu."],
-		["khinh_cong", "Khinh công", "Nhảy trên không (Space) và lướt gió (giữ Space). Mỗi bậc giảm thể lực tiêu hao."]]
-	for skill: Array in skills:
-		var row: HBoxContainer = HBoxContainer.new()
-		var level: int = state.skill_level(skill[0])
-		var text: Label = UiTheme.label("%s — %s\n%s" % [skill[1], ("bậc %d/3" % level) if level > 0 else "chưa lĩnh hội", skill[2]], 15)
-		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(text)
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	right.add_child(scroll)
+	var list: VBoxContainer = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	# The equipped sword's style first, then any other style with a learned form.
+	var shown: Array = [style]
+	for other: String in StyleBook.styles():
+		if other != style and ["e", "q"].any(func(slot: String) -> bool: return state.skill_level(String(StyleBook.form(other, slot).get("skill", ""))) > 0):
+			shown.append(other)
+	for shown_style: String in shown:
+		list.add_child(UiTheme.label(String(ContentDB.style(shown_style).get("name", "")), 16, StyleBook.color(shown_style), true))
+		for slot: String in StyleBook.SLOTS:
+			var form: Dictionary = StyleBook.form(shown_style, slot)
+			_skill_row(list, String(form["skill"]), "%s [%s]" % [form.get("name", ""), UserSettings.event_label(StyleBook.SLOT_ACTIONS[slot])],
+				String(form.get("description", "")) + ("  Tốn đầy nộ khí." if slot == "x" else "  Mỗi bậc: +25% sát thương, -15% hồi chiêu."),
+				String(StyleBook.form(shown_style, "q").get("skill", "")) if slot == "x" else "")
+	_skill_row(list, "khinh_cong", "Khinh công", "Nhảy trên không (Space) và lướt gió (giữ Space). Mỗi bậc giảm thể lực tiêu hao.", "")
+	return split
+
+func _skill_row(list: VBoxContainer, skill: String, title: String, description: String, ultimate_needs: String) -> void:
+	## One cultivation line. Ultimates (ultimate_needs = the style's Q skill) are learned with points.
+	var state: GameState = main.state
+	var row: HBoxContainer = HBoxContainer.new()
+	var level: int = state.skill_level(skill)
+	var text: Label = UiTheme.label("%s — %s\n%s" % [title, ("bậc %d/3" % level) if level > 0 else "chưa lĩnh hội", description], 15)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(text)
+	if ultimate_needs != "" and level == 0:
+		var learn: Button = UiTheme.button("Lĩnh hội (%d điểm)" % StyleBook.ULT_COST, func() -> void:
+			if state.learn_ultimate(skill, ultimate_needs):
+				main.unlock_skill(skill)
+			refresh_panel(), 170)
+		learn.disabled = state.skill_level(ultimate_needs) <= 0 or state.skill_points < StyleBook.ULT_COST
+		row.add_child(learn)
+	else:
 		var upgrade: Button = UiTheme.button("Nâng bậc", func() -> void:
-			if state.upgrade_skill(skill[0]):
-				main.on_skill_upgraded(skill[0])
+			if state.upgrade_skill(skill):
+				main.on_skill_upgraded(skill)
 			refresh_panel(), 130)
 		upgrade.disabled = level == 0 or level >= 3 or state.skill_points <= 0
 		row.add_child(upgrade)
-		right.add_child(row)
-	return split
+	list.add_child(row)
 
 # ------------------------------------------------------------------ settings
 

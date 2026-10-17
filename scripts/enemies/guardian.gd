@@ -37,18 +37,19 @@ func _begin_attack(name: String) -> void:
 	blades_thrown = false
 	if name == "slam" and target:
 		var landing: Vector3 = global_position + facing * 1.6
-		var hit_start: float = float(attack_data.get("hit_start", 1.3)) / speed_scale
+		var hit_start: float = float(attack_data.get("hit_start", 1.3)) / maxf(speed_scale, 0.1)
 		slam_marker = Vfx.telegraph(get_parent(), Vector3(landing.x, world.height_at(landing.x, landing.z), landing.z), float(attack_data["hit_radius"]), hit_start)
 
 func _physics_attack(delta: float) -> void:
 	super._physics_attack(delta)
 	if state != "attack":
 		return
-	var t: float = state_time * speed_scale
+	var t: float = attack_clock
 	if attack_name == "slam" and t >= float(attack_data.get("hit_start", 1.3)) and not attack_hits.has("landed"):
 		attack_hits["landed"] = true
-		Vfx.ring(get_parent(), global_position + facing * 1.6 + Vector3.UP * 0.2, float(attack_data["hit_radius"]), Color(1.0, 0.7, 0.45), 0.5, 0.25)
-		Vfx.burst(get_parent(), global_position + facing * 1.6, Color(0.8, 0.75, 0.6), 30, 7.0, 0.15, 0.6)
+		Vfx.ring(get_parent(), global_position + facing * 1.6 + Vector3.UP * 0.2, float(attack_data["hit_radius"]), Color(1.0, 0.78, 0.35), 0.5, 0.25)
+		Vfx.crack(get_parent(), global_position + facing * 1.6, float(attack_data["hit_radius"]) * 0.8)
+		Vfx.burst(get_parent(), global_position + facing * 1.6, Color(1.0, 0.85, 0.5), 30, 7.0, 0.12, 0.6)
 		if target:
 			target.camera_rig.add_trauma(0.5)
 		if phase == 2:
@@ -99,7 +100,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 
 func _enter_phase_two() -> void:
 	phase = 2
-	speed_scale = 1.18
+	base_speed_scale = 1.18
 	poise = max_poise
 	stagger_time = 0.0
 	_release_token()

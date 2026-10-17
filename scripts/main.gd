@@ -145,7 +145,7 @@ func _start_world() -> void:
 	player.attack_landed.connect(_on_attack_landed)
 	player.parried.connect(func(_enemy: Node) -> void: audio.play("parry", player.global_position + Vector3.UP, 2.0))
 	player.notice.connect(func(text: String) -> void: hud.show_message(text, 2.0))
-	player.skill_used.connect(func(skill: String, _cooldown: float) -> void: audio.play("wind_slash" if skill == "gust" else "wind_cyclone", player.global_position, 0.0))
+	player.skill_used.connect(_on_skill_used)
 	title_camera = Camera3D.new()
 	title_camera.far = 1500
 	title_camera.fov = 55
@@ -377,10 +377,13 @@ func _refresh_hud() -> void:
 	_refresh_vitals()
 	hud.set_level(state.level, state.xp, state.xp_for_next(), state.skill_points)
 	hud.set_heal_count("%s  •  Bánh ngải ×%d  •  Trà sen ×%d" % [UserSettings.event_label("heal"), state.count("banh_ngai"), state.count("tra_sen")])
-	for skill: String in ["gust", "cyclone"]:
+	var style: String = player.style_id()
+	for slot: String in StyleBook.SLOTS:
+		var form: Dictionary = StyleBook.form(style, slot)
+		var skill: String = String(form.get("skill", ""))
 		var level: int = state.skill_level(skill)
-		var ratio: float = player.cooldowns[skill] / maxf(PlayerController.SKILL_COOLDOWN[skill], 0.01)
-		hud.set_skill(skill, level > 0, ratio, level)
+		var fill: float = player.meter / PlayerController.METER_MAX if slot == "x" else 1.0 - player.cooldown_ratio(skill)
+		hud.set_skill(slot, String(form.get("name", "")), level > 0, fill, level, StyleBook.color(style))
 	var region_name: String = String(world.layout.region_at(player.global_position.z).get("name", ""))
 	var tracked: String = state.tracked_quest
 	if tracked != "" and quests.is_active(tracked):
@@ -553,19 +556,31 @@ func run_action(action: String) -> void:
 			state.sword = parts[1]
 			player.visual.attach_weapon(assets, state.sword)
 			audio.play("sword_draw")
-			hud.show_banner("Nhận " + String(GameState.SWORDS[state.sword]["name"]), "Công lực tăng lên %d" % roundi(state.attack_power()))
+			hud.show_banner("Nhận " + String(ContentDB.weapon(state.sword).get("name", state.sword)), "Công lực tăng lên %d" % roundi(state.attack_power()))
 		"xp":
 			_add_xp(int(parts[1]))
 
 func unlock_skill(skill: String) -> void:
 	state.unlock_skill(skill)
-	var names: Dictionary = {"gust": "Phong Trảm", "cyclone": "Toàn Phong", "khinh_cong": "Khinh công"}
-	var hints: Dictionary = {"gust": "%s: Phong Trảm — chém ra lưỡi gió bay xa", "cyclone": "%s: Toàn Phong — xoáy kiếm quanh mình",
-		"khinh_cong": "%s trên không: khinh công bật nhảy  •  giữ %s khi rơi: lướt gió"}
 	audio.play("level_up")
-	hud.show_banner("Lĩnh hội: " + String(names.get(skill, skill)), "Võ học mới")
-	var key: String = UserSettings.event_label({"gust": "skill_1", "cyclone": "skill_2", "khinh_cong": "jump"}[skill])
-	hud.show_hint(String(hints[skill]) % ([key, key] if skill == "khinh_cong" else [key]), 10.0)
+	hud.show_banner("Lĩnh hội: " + StyleBook.skill_name(skill), "Võ học mới")
+	if skill == "khinh_cong":
+		var jump: String = UserSettings.event_label("jump")
+		hud.show_hint("%s trên không: khinh công bật nhảy  •  giữ %s khi rơi: lướt gió" % [jump, jump], 10.0)
+		return
+	var found: Dictionary = StyleBook.find(skill)
+	if not found.is_empty():
+		var key: String = UserSettings.event_label(StyleBook.SLOT_ACTIONS[found["slot"]])
+		hud.show_hint("%s: %s — %s" % [key, StyleBook.skill_name(skill), String(found["form"].get("description", ""))], 10.0)
+
+func _on_skill_used(skill: String, _cooldown: float) -> void:
+	var found: Dictionary = StyleBook.find(skill)
+	if found.is_empty():
+		return
+	var data: Dictionary = Combat.attack("player", String(found["form"]["attack"]))
+	audio.play(String(data.get("sfx", "wind_slash")), player.global_position, 0.0)
+	if found["slot"] == "x":
+		hud.show_banner(StyleBook.skill_name(skill), String(ContentDB.style(found["style"]).get("name", "")))
 
 func _check_echo_skill(announce: bool) -> void:
 	## Hearing all three memory echoes in Trúc Hải teaches Toàn Phong (also repairs older saves).
@@ -610,7 +625,7 @@ func _add_xp(amount: int) -> void:
 
 func on_skill_upgraded(skill: String) -> void:
 	audio.ui("ui_confirm")
-	hud.show_message("Đã nâng bậc " + {"gust": "Phong Trảm", "cyclone": "Toàn Phong", "khinh_cong": "Khinh công"}[skill])
+	hud.show_message("Đã nâng bậc " + StyleBook.skill_name(skill))
 
 func _on_quest_started(id: String) -> void:
 	var data: Dictionary = quests.definition(id)

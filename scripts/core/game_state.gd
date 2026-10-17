@@ -6,11 +6,6 @@ extends RefCounted
 signal changed(kind: String, key: String)
 
 const XP_CURVE: Array[int] = [0, 100, 260, 480, 760, 1100, 1500, 1960, 2480, 3060]
-const SWORDS: Dictionary = {
-	"sword_old": {"name": "Kiếm Cũ", "attack": 10},
-	"sword_bamboo": {"name": "Thanh Trúc Kiếm", "attack": 16},
-	"sword_wind": {"name": "Phong Ngân Kiếm", "attack": 24},
-}
 
 var flags: Dictionary = {}
 var camp_kills: Dictionary = {}
@@ -19,7 +14,7 @@ var quests: Dictionary = {}
 var level: int = 1
 var xp: int = 0
 var skill_points: int = 0
-var skills: Dictionary = {"gust": 0, "cyclone": 0, "khinh_cong": 0}
+var skills: Dictionary = GameState.default_skills()
 var sword: String = "sword_old"
 var coins: int = 0
 var health: float = -1.0
@@ -66,8 +61,15 @@ func remove_item(item: String, amount: int = 1) -> bool:
 func max_health() -> float:
 	return 120.0 + (level - 1) * 14.0
 
+static func default_skills() -> Dictionary:
+	## Every sword form (data/styles.json) plus khinh công, all unlearned.
+	var result: Dictionary = {"khinh_cong": 0}
+	for skill: String in StyleBook.all_skill_ids():
+		result[skill] = 0
+	return result
+
 func attack_power() -> float:
-	return float(SWORDS[sword]["attack"]) + (level - 1) * 1.5
+	return float(ContentDB.weapon(sword).get("attack", 10)) + (level - 1) * 1.5
 
 func xp_for_next() -> int:
 	return XP_CURVE[mini(level, XP_CURVE.size() - 1)] if level < XP_CURVE.size() else XP_CURVE[-1] + 600 * (level - XP_CURVE.size() + 1)
@@ -96,6 +98,15 @@ func upgrade_skill(skill: String) -> bool:
 		return false
 	skill_points -= 1
 	skills[skill] = skill_level(skill) + 1
+	changed.emit("skill", skill)
+	return true
+
+func learn_ultimate(skill: String, requires: String) -> bool:
+	## Ultimates are learned with cultivation points once the style's Q form is known.
+	if skill_level(skill) > 0 or skill_level(requires) <= 0 or skill_points < StyleBook.ULT_COST:
+		return false
+	skill_points -= StyleBook.ULT_COST
+	skills[skill] = 1
 	changed.emit("skill", skill)
 	return true
 
@@ -137,11 +148,11 @@ func from_dict(data: Dictionary) -> void:
 	level = int(data.get("level", 1))
 	xp = int(data.get("xp", 0))
 	skill_points = int(data.get("skill_points", 0))
-	skills = {"gust": 0, "cyclone": 0, "khinh_cong": 0}
+	skills = GameState.default_skills()
 	for skill: String in (data.get("skills", {}) as Dictionary):
 		skills[skill] = int(data["skills"][skill])
 	sword = String(data.get("sword", "sword_old"))
-	if not SWORDS.has(sword):
+	if ContentDB.weapon(sword).is_empty():
 		sword = "sword_old"
 	coins = int(data.get("coins", 0))
 	health = float(data.get("health", -1.0))

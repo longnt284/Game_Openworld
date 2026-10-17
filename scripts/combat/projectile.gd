@@ -1,7 +1,7 @@
 class_name WindProjectile
 extends Node3D
-## Crescent of wind travelling in a straight line; hits each hurtbox once and
-## stops on terrain or props.
+## Elemental missile travelling in a straight line (wind crescent, water wave, ice shard);
+## hits each hurtbox once and stops on terrain or props.
 
 var velocity: Vector3 = Vector3.ZERO
 var data: Dictionary = {}
@@ -14,8 +14,10 @@ var radius: float = 0.8
 var hit_ids: Dictionary = {}
 var color: Color = Vfx.WIND
 var pierce: bool = true
+## Player missiles deal damage through PlayerController.strike with this scale (skill level bonus).
+var strike_scale: float = -1.0
 
-func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: float, attack_data: Dictionary, hit_mask: int, owner_node: Node3D, tint: Color = Vfx.WIND) -> void:
+func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: float, attack_data: Dictionary, hit_mask: int, owner_node: Node3D, tint: Color = Vfx.WIND, shape: String = "crescent") -> void:
 	global_position = origin
 	velocity = direction.normalized() * speed
 	amount = damage_amount
@@ -24,23 +26,39 @@ func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: fl
 	source = owner_node
 	color = tint
 	look_at(origin + velocity, Vector3.UP)
-	var crescent: MeshInstance3D = MeshInstance3D.new()
-	var torus: TorusMesh = TorusMesh.new()
-	torus.inner_radius = 0.75
-	torus.outer_radius = 1.0
-	torus.rings = 24
-	torus.ring_segments = 4
-	crescent.mesh = torus
-	crescent.scale = Vector3(1.2, 0.25, 0.6)
+	var body: MeshInstance3D = MeshInstance3D.new()
+	match shape:
+		"wave":
+			body.mesh = Vfx.wave_mesh(radius * 2.0)
+			body.position.y = -1.0
+		"shard":
+			var prism: CylinderMesh = CylinderMesh.new()
+			prism.top_radius = 0.0
+			prism.bottom_radius = 0.16
+			prism.height = 1.1
+			prism.radial_segments = 4
+			prism.rings = 1
+			body.mesh = prism
+			body.rotation.x = -PI * 0.5
+		_:
+			var torus: TorusMesh = TorusMesh.new()
+			torus.inner_radius = 0.75
+			torus.outer_radius = 1.0
+			torus.rings = 24
+			torus.ring_segments = 4
+			body.mesh = torus
+			body.scale = Vector3(1.2, 0.25, 0.6)
 	var material: StandardMaterial3D = StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.vertex_color_use_as_albedo = shape == "wave"
 	material.albedo_color = Color(color.r, color.g, color.b, 0.85)
-	crescent.material_override = material
-	crescent.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(crescent)
-	Vfx.wisps(self, color, 10, 0.5)
+	body.material_override = material
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(body)
+	Vfx.wisps(self, color, 18 if shape == "wave" else 10, radius * 0.6)
 
 func _physics_process(delta: float) -> void:
 	var step: Vector3 = velocity * delta
@@ -62,12 +80,15 @@ func _physics_process(delta: float) -> void:
 		hit_ids[area.get_instance_id()] = true
 		var entity: Node = Combat.entity_of(area)
 		if entity and entity.has_method("take_damage") and is_instance_valid(source):
-			var damage: Combat.Damage = Combat.make_damage(source, data, amount, (entity as Node3D).global_position)
-			damage.direction = velocity.normalized()
-			damage.ranged = true
-			var outcome: Dictionary = entity.take_damage(damage)
-			if outcome.get("hit", false) and source.has_signal("attack_landed"):
-				source.emit_signal("attack_landed", entity, float(outcome.get("amount", amount)))
+			if strike_scale >= 0.0 and source.has_method("strike"):
+				source.strike(entity, data, strike_scale, velocity.normalized(), true)
+			else:
+				var damage: Combat.Damage = Combat.make_damage(source, data, amount, (entity as Node3D).global_position)
+				damage.direction = velocity.normalized()
+				damage.ranged = true
+				var outcome: Dictionary = entity.take_damage(damage)
+				if outcome.get("hit", false) and source.has_signal("attack_landed"):
+					source.emit_signal("attack_landed", entity, float(outcome.get("amount", amount)))
 			Vfx.burst(get_parent(), (entity as Node3D).global_position + Vector3.UP, color, 14, 5.0)
 		if not pierce:
 			queue_free()

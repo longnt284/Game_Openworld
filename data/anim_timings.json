@@ -8,7 +8,9 @@
 		"skill_gust": {"length": 0.8, "hit_start": 0.3, "hit_end": 0.38, "combo_open": 0.6, "recover": 0.62},
 		"skill_cyclone": {"length": 1.3, "hit_start": 0.36, "hit_end": 0.96, "combo_open": 1.1, "recover": 1.12},
 		"parry": {"length": 0.45, "hit_start": 0.0, "hit_end": 0.2, "combo_open": 0.3, "recover": 0.34},
-		"dodge": {"length": 0.5, "hit_start": 0.03, "hit_end": 0.34, "combo_open": 0.36, "recover": 0.4}
+		"dodge": {"length": 0.5, "hit_start": 0.03, "hit_end": 0.34, "combo_open": 0.36, "recover": 0.4},
+		"dash_slash": {"length": 0.62, "hit_start": 0.1, "hit_end": 0.36, "combo_open": 0.46, "recover": 0.5},
+		"ultimate": {"length": 1.9, "hit_start": 1.0, "hit_end": 1.2, "combo_open": 1.7, "recover": 1.62}
 	},
 	"bandit": {
 		"attack": {"length": 1.3, "hit_start": 0.7, "hit_end": 0.82, "combo_open": 1.3, "recover": 1.1}

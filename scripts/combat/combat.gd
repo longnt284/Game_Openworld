@@ -1,8 +1,10 @@
 class_name Combat
 extends RefCounted
-## Attack definitions and the swept-arc hit query shared by the player and enemies.
-## Active windows come from data/anim_timings.json (the same file the Blender
-## generator keys its strike poses from), so damage lines up with the animation.
+## Attack lookup and the swept-arc hit query shared by the player and enemies.
+## Attack shapes live in data/attacks.json (arc angles in degrees around the attacker's
+## facing, + = attacker's left); active windows come from data/anim_timings.json (the
+## same file the Blender generator keys its strike poses from), so damage lines up with
+## the animation.
 
 const LAYER_WORLD: int = 1
 const LAYER_PLAYER: int = 2
@@ -12,20 +14,6 @@ const LAYER_HURT_PLAYER: int = 16
 const LAYER_HURT_ENEMY: int = 32
 const LAYER_INTERACT: int = 64
 
-## arc angles in degrees around the attacker's facing (+ = attacker's left)
-const ATTACKS: Dictionary = {
-	"player/attack_1": {"mult": 1.0, "poise": 14, "arc": [-75, 80], "radius": 1.6, "height": 1.1, "hit_radius": 0.8, "hitstop": 0.055, "shake": 0.14, "knockback": 1.6, "lunge": 3.2, "sfx": "sword_swing_1"},
-	"player/attack_2": {"mult": 1.05, "poise": 14, "arc": [75, -80], "radius": 1.6, "height": 1.2, "hit_radius": 0.8, "hitstop": 0.055, "shake": 0.14, "knockback": 1.6, "lunge": 2.8, "sfx": "sword_swing_2"},
-	"player/attack_3": {"mult": 1.7, "poise": 32, "arc": [-28, 28], "radius": 1.9, "height": 0.9, "hit_radius": 1.0, "hitstop": 0.09, "shake": 0.35, "knockback": 4.0, "lunge": 6.5, "sfx": "sword_swing_3"},
-	"player/heavy": {"mult": 2.3, "poise": 45, "arc": [-40, 320], "radius": 1.9, "height": 1.0, "hit_radius": 1.0, "hitstop": 0.085, "shake": 0.4, "knockback": 5.0, "lunge": 1.5, "stamina": 18, "sfx": "sword_heavy"},
-	"player/skill_gust": {"mult": 1.6, "poise": 26, "arc": [-50, 50], "radius": 1.7, "height": 1.2, "hit_radius": 0.9, "hitstop": 0.07, "shake": 0.25, "knockback": 3.0, "lunge": 1.0, "projectile": true, "sfx": "wind_slash"},
-	"player/skill_cyclone": {"mult": 0.5, "poise": 10, "arc": [0, 0], "radius": 0.0, "height": 0.8, "hit_radius": 3.3, "hitstop": 0.03, "shake": 0.12, "knockback": -2.0, "lunge": 0.0, "tick": 0.13, "sfx": "wind_cyclone"},
-	"bandit/attack": {"damage": 14, "poise": 20, "arc": [-22, 22], "radius": 1.6, "height": 1.0, "hit_radius": 0.85, "hitstop": 0.06, "shake": 0.3, "knockback": 3.0, "lunge": 4.0, "sfx": "sabre_swing"},
-	"boar/charge": {"damage": 18, "poise": 30, "arc": [0, 0], "radius": 0.9, "height": 0.6, "hit_radius": 0.95, "hitstop": 0.07, "shake": 0.45, "knockback": 7.0, "lunge": 0.0, "sfx": "boar_hit"},
-	"guardian/attack": {"damage": 26, "poise": 40, "arc": [-26, 26], "radius": 2.6, "height": 0.8, "hit_radius": 1.25, "hitstop": 0.09, "shake": 0.5, "knockback": 5.0, "lunge": 5.0, "sfx": "glaive_slam"},
-	"guardian/sweep": {"damage": 22, "poise": 35, "arc": [-40, 260], "radius": 3.1, "height": 1.0, "hit_radius": 1.3, "hitstop": 0.08, "shake": 0.4, "knockback": 5.5, "lunge": 0.0, "sfx": "glaive_sweep"},
-	"guardian/slam": {"damage": 34, "poise": 60, "arc": [0, 0], "radius": 1.6, "track": false, "height": 0.4, "hit_radius": 4.6, "hitstop": 0.1, "shake": 0.8, "knockback": 8.0, "lunge": 0.0, "unblockable": true, "sfx": "ground_slam"},
-}
 
 class Damage:
 	extends RefCounted
@@ -40,12 +28,23 @@ class Damage:
 	var hitstop: float = 0.05
 	var shake: float = 0.0
 	var position: Vector3 = Vector3.ZERO
+	## Elemental payload: "" for plain steel. status is {"id", "stacks", "chance"}.
+	var element: String = ""
+	var status: Dictionary = {}
+	## Attack power of the source, which scales damage-over-time from the status.
+	var status_power: float = 0.0
+	## Ticking areas hurt without making the target flinch, flash or freeze the frame.
+	var flinch: bool = true
 
-static func attack(owner: String, name: String) -> Dictionary:
-	var data: Dictionary = ATTACKS.get(owner + "/" + name, {}).duplicate()
-	var timing: Dictionary = ContentDB.timing(owner, name)
+static func attack(owner: String, name: String, clip: String = "") -> Dictionary:
+	## Attack data merged with the timing of the clip it plays (data "clip", else its own
+	## name), scaled by the attack's playback "speed".
+	var data: Dictionary = (((ContentDB.get_data("attacks") as Dictionary).get(owner, {}) as Dictionary).get(name, {}) as Dictionary).duplicate(true)
+	var timing: Dictionary = ContentDB.timing(owner, clip if clip != "" else String(data.get("clip", name)))
+	var speed: float = maxf(float(data.get("speed", 1.0)), 0.01)
 	for key: String in timing:
-		data[key] = timing[key]
+		if not data.has(key):
+			data[key] = float(timing[key]) / speed
 	return data
 
 static func arc_point(origin: Vector3, facing: Vector3, data: Dictionary, u: float) -> Vector3:
@@ -87,6 +86,9 @@ static func make_damage(source: Node3D, data: Dictionary, amount: float, target_
 	damage.ranged = bool(data.get("ranged", false))
 	damage.hitstop = float(data.get("hitstop", 0.05))
 	damage.shake = float(data.get("shake", 0.0))
+	damage.element = String(data.get("element", ""))
+	damage.status = data.get("status", {}) as Dictionary
+	damage.flinch = bool(data.get("flinch", true))
 	var direction: Vector3 = target_position - source.global_position
 	direction.y = 0.0
 	damage.direction = direction.normalized() if direction.length() > 0.01 else Vector3.FORWARD
