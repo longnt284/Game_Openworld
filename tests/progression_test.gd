@@ -114,6 +114,11 @@ func _gacha() -> void:
 	check(guarantee_kept and float(featured) / ssr > 0.6, "A lost 50/50 guarantees the featured sword next time (%.2f featured)" % (float(featured) / ssr))
 	_remove(PROFILE)
 	var profile: PlayerProfile = PlayerProfile.load_file(PROFILE)
+	# Seeded so the ten-pull below is the same on every run.
+	var seeded: RandomNumberGenerator = RandomNumberGenerator.new()
+	seeded.seed = 2841
+	profile.rng_seed = 2841
+	profile.rng_state = seeded.state
 	check(Gacha.pull(profile, banner, 1).is_empty() and profile.pity.is_empty(), "A pull without enough Ngọc Gió is refused and changes nothing")
 	profile.add_currency(Gacha.currency(), Gacha.cost(banner, 10))
 	var results: Array = Gacha.pull(profile, banner, 10)
@@ -123,7 +128,8 @@ func _gacha() -> void:
 	profile.save_file(PROFILE)
 	var loaded: PlayerProfile = PlayerProfile.load_file(PROFILE)
 	check(loaded.pity[banner] == profile.pity[banner] and loaded.armory.size() == profile.armory.size(), "Pity and rolled weapons survive a profile reload")
-	profile.skins.append("lam_an_huyet_phong")
+	if not profile.skins.has("lam_an_huyet_phong"):
+		profile.skins.append("lam_an_huyet_phong")
 	var before: int = profile.balance(Gacha.shards())
 	Gacha.grant(profile, {"type": "skin", "id": "lam_an_huyet_phong"}, "sr", rng)
 	check(profile.balance(Gacha.shards()) == before + 40 and profile.skins.count("lam_an_huyet_phong") == 1, "A duplicate outfit turns into shards")

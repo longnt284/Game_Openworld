@@ -169,6 +169,10 @@ func _run() -> void:
 						break
 				await shot("move_trail")
 				Engine.time_scale = 1.0
+				# Posed shots below freeze the player, so drop the ribbon left from the live swing.
+				p.visual.stop_action()
+				p.visual.trail.samples.clear()
+				p.visual.trail.strip.clear_surfaces()
 				p.process_mode = Node.PROCESS_MODE_DISABLED
 				p.visual.set_sheathed(false)
 				p.visual.tree.active = false
