@@ -1,0 +1,32 @@
+{
+	"unlock": ["quest_done:mq02_lang_quen"],
+	"arena": {"pos": [0, 230], "radius": 22},
+	"waves": {
+		"base": 3, "per_wave": 0.5, "max_count": 10, "max_alive": 5, "boss_every": 5, "rest": 2.5,
+		"pool": [
+			{"enemy": "tan_binh", "weight": 6, "from": 1},
+			{"enemy": "heo_gio", "weight": 3, "from": 2}
+		],
+		"boss": "truc_tuong",
+		"scaling": {"hp": 0.12, "damage": 0.06, "elite": 0.03, "elite_from": 3, "elite_cap": 0.5, "elite_affixes_every": 7}
+	},
+	"buffs": {
+		"choices": 3,
+		"pool": [
+			{"id": "kiem_phong", "name": "Kiếm Phong", "desc": "+15% sát thương đòn thường", "stat": "melee_mult", "value": 0.15, "max": 3, "weight": 10},
+			{"id": "cong_luc", "name": "Công Lực", "desc": "+10% công lực", "stat": "attack_bonus", "value": 0.10, "max": 4, "weight": 10},
+			{"id": "ho_the", "name": "Hộ Thể", "desc": "Nhận ít hơn 12% sát thương", "stat": "damage_taken", "value": -0.12, "max": 3, "weight": 8},
+			{"id": "bao_kich", "name": "Bạo Kích", "desc": "+8% tỉ lệ bạo kích", "stat": "crit_rate", "value": 0.08, "max": 4, "weight": 8},
+			{"id": "tam_kiem", "name": "Tâm Kiếm", "desc": "+30% sát thương bạo kích", "stat": "crit_dmg", "value": 0.30, "max": 3, "weight": 6},
+			{"id": "linh_hoat", "name": "Linh Hoạt", "desc": "Hồi chiêu nhanh hơn 12%", "stat": "skill_cd", "value": 0.12, "max": 3, "weight": 7},
+			{"id": "no_khi", "name": "Nộ Khí", "desc": "+25% nộ khí nhận được", "stat": "meter_gain", "value": 0.25, "max": 3, "weight": 7},
+			{"id": "nguyen_to", "name": "Ngũ Hành", "desc": "+15% sát thương nguyên tố và +10% tỉ lệ gây trạng thái", "stats": {"element_dmg": 0.15, "status_chance": 0.10}, "max": 3, "weight": 6},
+			{"id": "hoi_khi", "name": "Hồi Khí", "desc": "Hạ một kẻ địch hồi 6% khí huyết", "stat": "heal_on_kill", "value": 0.06, "max": 3, "weight": 6},
+			{"id": "linh_duoc", "name": "Linh Dược", "desc": "Hồi đầy khí huyết ngay", "instant": "heal", "weight": 5}
+		]
+	},
+	"rewards": {
+		"ngoc_per_wave": 8, "coins_per_wave": 12, "xp_per_wave": 18, "chest_every": 5,
+		"milestones": {"5": "sword_water", "10": "sword_thunder", "15": "sword_flame", "20": "sword_frost"}
+	}
+}

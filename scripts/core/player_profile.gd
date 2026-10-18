@@ -26,6 +26,8 @@ var daily: Dictionary = {"date": "", "missions": [], "bonus_claimed": false}
 var login: Dictionary = {"last": "", "streak": 0, "claimed": ""}
 var rng_seed: int = 0
 var rng_state: int = 0
+## Set once the first-run gift of Ngọc Gió has been granted.
+var welcomed: bool = false
 
 func balance(id: String) -> int:
 	return int(currency.get(id, 0))
@@ -78,6 +80,7 @@ func to_dict() -> Dictionary:
 		"version": VERSION, "currency": currency.duplicate(), "pity": pity.duplicate(true), "history": history.duplicate(true),
 		"armory": armory.duplicate(true), "next_uid": next_uid, "skins": skins.duplicate(), "equipped_skins": equipped_skins.duplicate(),
 		"trial": trial.duplicate(true), "daily": daily.duplicate(true), "login": login.duplicate(), "rng": {"seed": str(rng_seed), "state": str(rng_state)},
+		"welcomed": welcomed,
 	}
 
 static func validate(data: Variant) -> Dictionary:
@@ -102,7 +105,12 @@ static func load_file(path: String = PATH) -> PlayerProfile:
 		return profile
 	for id: String in data["currency"]:
 		profile.currency[id] = maxi(0, int(data["currency"][id]))
-	profile.pity = (data["pity"] as Dictionary).duplicate(true)
+	for banner: String in data["pity"]:
+		var record: Variant = data["pity"][banner]
+		if record is Dictionary:
+			# JSON numbers come back as floats; pity counters are whole pulls.
+			profile.pity[banner] = {"since_ssr": int(record.get("since_ssr", 0)), "since_sr": int(record.get("since_sr", 0)),
+				"guaranteed": bool(record.get("guaranteed", false)), "total": int(record.get("total", 0))}
 	profile.history = (data["history"] as Array).duplicate(true)
 	profile.armory = []
 	for item: Dictionary in data["armory"]:
@@ -121,6 +129,7 @@ static func load_file(path: String = PATH) -> PlayerProfile:
 	# 64-bit RNG values are stored as strings: JSON numbers would round them.
 	profile.rng_seed = str(data["rng"].get("seed", "0")).to_int()
 	profile.rng_state = str(data["rng"].get("state", "0")).to_int()
+	profile.welcomed = bool(data.get("welcomed", false))
 	return profile
 
 func save_file(path: String = PATH) -> Error:

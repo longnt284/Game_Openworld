@@ -1,0 +1,9 @@
+{
+	"atk_pct": {"name": "Công lực +%d%%", "range": [4, 10], "weight": 10},
+	"crit_rate": {"name": "Bạo kích +%d%%", "range": [3, 8], "weight": 8},
+	"crit_dmg": {"name": "Sát thương bạo kích +%d%%", "range": [10, 25], "weight": 8},
+	"element_dmg": {"name": "Sát thương nguyên tố +%d%%", "range": [6, 15], "weight": 7},
+	"status_chance": {"name": "Tỉ lệ gây trạng thái +%d%%", "range": [5, 15], "weight": 6},
+	"skill_cd": {"name": "Giảm hồi chiêu %d%%", "range": [4, 10], "weight": 6},
+	"meter_gain": {"name": "Nộ khí nhận được +%d%%", "range": [8, 20], "weight": 6}
+}

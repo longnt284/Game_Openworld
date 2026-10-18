@@ -14,6 +14,7 @@ signal footstep(surface: String)
 signal skill_used(skill: String, cooldown: float)
 signal notice(text: String)
 signal meter_changed(current: float, maximum: float)
+signal status_applied(status: String)
 
 const METER_MAX: float = 100.0
 const HEAL_ITEMS: Array = [["tra_sen", 0.65], ["banh_ngai", 0.4]]
@@ -402,7 +403,7 @@ func _try_skill(slot: String) -> void:
 		set_meter(meter - cost)
 		# The ultimate cannot be interrupted: Lâm An is untouchable until it lands.
 		invulnerable = maxf(invulnerable, float((action["data"] as Dictionary).get("recover", 1.0)))
-	var reduction: float = 1.0 - 0.15 * (game.skill_level(skill) - 1)
+	var reduction: float = (1.0 - 0.15 * (game.skill_level(skill) - 1)) * maxf(0.4, 1.0 - game.stat("skill_cd"))
 	cooldown_max[skill] = float(form.get("cooldown", 0.0)) * reduction
 	cooldowns[skill] = cooldown_max[skill]
 	emit_signal("skill_used", skill, cooldowns[skill])
@@ -605,6 +606,12 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 	if counter_bonus > 0.0:
 		amount *= 1.5
 		counter_bonus = 0.0
+	var slot: String = String(data.get("slot", ""))
+	if slot == "" and not ranged:
+		amount *= 1.0 + game.stat("melee_mult")
+	var critical: bool = game.stat("crit_rate") > 0.0 and randf() < game.stat("crit_rate")
+	if critical:
+		amount *= 1.0 + PlayerStats.CRIT_BASE + game.stat("crit_dmg")
 	var damage: Combat.Damage = Combat.make_damage(self, data, amount, (entity as Node3D).global_position)
 	damage.status_power = game.attack_power()
 	if direction != Vector3.ZERO:
@@ -615,15 +622,24 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 	damage.ranged = ranged
 	if damage.element == "":
 		_apply_sword_element(damage)
+	if damage.element != "":
+		damage.amount *= 1.0 + game.stat("element_dmg")
+	if not damage.status.is_empty() and game.stat("status_chance") > 0.0:
+		# The status dictionary can be the shared attack data: change a copy.
+		damage.status = damage.status.duplicate()
+		damage.status["chance"] = float(damage.status.get("chance", 1.0)) + game.stat("status_chance")
 	var result: Dictionary = entity.take_damage(damage)
+	if critical:
+		result["critical"] = true
 	if result.get("hit", false):
 		if not ranged:
 			visual.hitstop(damage.hitstop)
 			camera_rig.add_trauma(damage.shake)
 		Vfx.burst(get_parent(), damage.position, Vfx.element_color(damage.element) if damage.element != "" else Vfx.SPARK, 16, 6.0)
-		var slot: String = String(data.get("slot", ""))
-		set_meter(meter + float(data.get("meter_gain", 0.0 if slot == "x" else (2.0 if slot != "" else 5.0))))
+		set_meter(meter + float(data.get("meter_gain", 0.0 if slot == "x" else (2.0 if slot != "" else 5.0))) * (1.0 + game.stat("meter_gain")))
 		emit_signal("attack_landed", entity, float(result.get("amount", amount)))
+		if result.has("status") and String(result["status"]) != "":
+			emit_signal("status_applied", String(result["status"]))
 	return result
 
 func _apply_sword_element(damage: Combat.Damage) -> void:
@@ -667,6 +683,8 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 			damage.source.on_parried(self)
 		emit_signal("parried", damage.source)
 		return {"hit": false, "parried": true}
+	if game.stat("damage_taken") != 0.0:
+		damage.amount *= maxf(0.2, 1.0 + game.stat("damage_taken"))
 	var blocking: bool = (current_action() == "parry" or (state == "move" and block_held and is_on_floor())) and from_front
 	if blocking and not damage.unblockable:
 		var chip: float = damage.amount * 0.15

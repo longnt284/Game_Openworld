@@ -52,6 +52,7 @@
 		{"id": "boss_truc_tuong", "type": "enemy", "enemy": "truc_tuong", "camp": "arena", "persistent": true, "boss": true, "pos": [0, -338], "yaw": 0, "if": ["flag:chimes_solved"]},
 
 		{"id": "shrine_village", "type": "shrine", "pos": [8, 30], "yaw": 200},
+		{"id": "trial_gate_village", "type": "trial_gate", "pos": [14, 36.5], "yaw": 250, "if": ["quest_done:mq02_lang_quen"]},
 		{"id": "shrine_bamboo", "type": "shrine", "pos": [18, -190], "yaw": 250},
 		{"id": "shrine_arena", "type": "shrine", "pos": [9, -300], "yaw": 200},
 		{"id": "chest_dock", "type": "chest", "pos": [-27, 61], "yaw": 60, "loot": [["banh_ngai", 1], ["coins", 10]]},

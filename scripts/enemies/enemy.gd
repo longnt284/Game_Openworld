@@ -353,6 +353,10 @@ func _deliver(area: Area3D, attack: Dictionary) -> void:
 	var result: Dictionary = entity.take_damage(damage)
 	if result.get("hit", false):
 		visual.hitstop(damage.hitstop * 0.8)
+		if data.has("lifesteal") and state != "dead":
+			# Hấp Huyết elites drink back part of the blow.
+			health = minf(max_health, health + float(result.get("amount", damage.amount)) * float(data["lifesteal"]))
+			emit_signal("health_changed", self, health, max_health)
 
 func on_parried(_player: Node) -> void:
 	if state == "dead":

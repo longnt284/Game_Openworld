@@ -1,0 +1,56 @@
+{
+	"currency": {"id": "ngoc_gio", "name": "Ngọc Gió"},
+	"shards": {"id": "manh_ky_ngo", "name": "Mảnh Kỳ Ngộ"},
+	"welcome": 1600,
+	"rarity": {
+		"r": {"name": "Thường", "attack": 0.0, "affixes": 1, "color": "5fa8ff"},
+		"sr": {"name": "Hiếm", "attack": 0.10, "affixes": 2, "color": "b48cff"},
+		"ssr": {"name": "Cực phẩm", "attack": 0.20, "affixes": 3, "color": "ffd36a"}
+	},
+	"banners": {
+		"ngu_hanh": {
+			"name": "Kỳ Ngộ — Ngũ Hành Kiếm",
+			"description": "Kiếm nổi bật: Lôi Minh Kiếm (Cực phẩm). Tỉ lệ ra kiếm nổi bật khi trúng Cực phẩm là 50%; nếu trượt, lần Cực phẩm kế tiếp chắc chắn là kiếm nổi bật.",
+			"cost": 160, "cost10": 1600,
+			"rates": {"ssr": 0.015, "sr": 0.10, "r": 0.885},
+			"pity": {"soft_from": 60, "soft_step": 0.06, "hard": 70, "sr_every": 10},
+			"featured": {"ssr": {"type": "weapon", "base": "sword_thunder"}, "rate_up": 0.5},
+			"pool": {
+				"ssr": [
+					{"type": "weapon", "base": "sword_thunder"},
+					{"type": "weapon", "base": "sword_water"},
+					{"type": "weapon", "base": "sword_flame"},
+					{"type": "weapon", "base": "sword_frost"},
+					{"type": "skin", "id": "lam_an_tuyet_y"},
+					{"type": "skin", "id": "kiem_tu_dien"}
+				],
+				"sr": [
+					{"type": "weapon", "base": "sword_water"},
+					{"type": "weapon", "base": "sword_thunder"},
+					{"type": "weapon", "base": "sword_flame"},
+					{"type": "weapon", "base": "sword_frost"},
+					{"type": "weapon", "base": "sword_wind"},
+					{"type": "skin", "id": "lam_an_huyet_phong"},
+					{"type": "skin", "id": "lam_an_mac_truc"},
+					{"type": "skin", "id": "kiem_hoang_kim"}
+				],
+				"r": [
+					{"type": "shards", "amount": 6},
+					{"type": "shards", "amount": 6},
+					{"type": "weapon", "base": "sword_bamboo"},
+					{"type": "weapon", "base": "sword_wind"}
+				]
+			}
+		}
+	},
+	"chests": {
+		"trial": {"name": "Rương Ải Vô Tận", "rates": {"ssr": 0.02, "sr": 0.15, "r": 0.83}, "pool": "ngu_hanh"},
+		"boss_tier": {"name": "Rương Cảnh Giới", "rates": {"ssr": 0.05, "sr": 0.30, "r": 0.65}, "pool": "ngu_hanh"},
+		"elite": {"name": "Rương Tinh Anh", "rates": {"ssr": 0.01, "sr": 0.10, "r": 0.89}, "pool": "ngu_hanh"}
+	},
+	"duplicates": {"skin": 40},
+	"exchange": [
+		{"id": "featured", "cost": 300, "label": "Lôi Minh Kiếm (Cực phẩm)", "reward": {"type": "weapon", "base": "sword_thunder", "rarity": "ssr"}},
+		{"id": "huyet_phong", "cost": 150, "label": "Trang phục Huyết Phong", "reward": {"type": "skin", "id": "lam_an_huyet_phong"}}
+	]
+}

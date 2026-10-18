@@ -29,6 +29,9 @@ var checkpoint_id: String = ""
 var checkpoints: Array = []
 var discovered: Array = []
 var play_time: float = 0.0
+## Runtime bonuses from the equipped armory weapon and Endless Trial blessings (PlayerStats);
+## never saved, recomputed by main. Empty means neutral: story numbers stay exact.
+var stats: Dictionary = {}
 var tracked_quest: String = ""
 
 func has_flag(key: String) -> bool:
@@ -76,7 +79,10 @@ static func default_skills() -> Dictionary:
 	return result
 
 func attack_power() -> float:
-	return float(ContentDB.weapon(sword).get("attack", 10)) + (level - 1) * 1.5
+	return (float(ContentDB.weapon(sword).get("attack", 10)) + (level - 1) * 1.5) * (1.0 + stat("attack_bonus"))
+
+func stat(id: String) -> float:
+	return float(stats.get(id, 0.0))
 
 func xp_for_next() -> int:
 	return XP_CURVE[mini(level, XP_CURVE.size() - 1)] if level < XP_CURVE.size() else XP_CURVE[-1] + 600 * (level - XP_CURVE.size() + 1)
@@ -124,12 +130,16 @@ func grant_sword(id: String) -> bool:
 	var fresh: bool = not swords.has(id)
 	if fresh:
 		swords.append(id)
-		var style: String = StyleBook.style_of(id)
-		if style != StyleBook.DEFAULT_STYLE:
-			for slot: String in ["e", "q"]:
-				unlock_skill(String(StyleBook.form(style, slot).get("skill", "")))
+		learn_style(id)
 		changed.emit("sword", id)
 	return fresh
+
+func learn_style(id: String) -> void:
+	## Holding a sword of an elemental style (story or armory) teaches that style's E and Q forms.
+	var style: String = StyleBook.style_of(id)
+	if style != StyleBook.DEFAULT_STYLE:
+		for slot: String in ["e", "q"]:
+			unlock_skill(String(StyleBook.form(style, slot).get("skill", "")))
 
 func equip_sword(id: String, uid: int = -1) -> void:
 	if not swords.has(id) and uid < 0:

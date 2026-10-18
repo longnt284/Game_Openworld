@@ -282,7 +282,14 @@ func flat_at(x: float, z: float) -> Dictionary:
 	return {}
 
 func inside_bounds(x: float, z: float) -> bool:
-	return bounds.has_point(Vector2(x, z))
+	return bounds.has_point(Vector2(x, z)) or in_pocket(x, z)
+
+func in_pocket(x: float, z: float) -> bool:
+	## Pockets are flats beyond the valley walls (the Endless Trial arena), reached only by teleport.
+	for flat: Dictionary in flats:
+		if flat.get("pocket", false) and Vector2(x - float(flat["x"]), z - float(flat["z"])).length() < float(flat["r"]):
+			return true
+	return false
 
 func is_clear(x: float, z: float, margin: float = 1.5) -> bool:
 	if not bounds.grow(-2.0).has_point(Vector2(x, z)):

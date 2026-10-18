@@ -25,6 +25,14 @@ var panel_body: Control
 var current_panel: String = ""
 var rebinding: String = ""
 var rebind_buttons: Dictionary = {}
+var close_button: Button
+var resume_button: Button
+var leave_trial_button: Button
+## Retention panel state: Trial blessing offer, last Kỳ Ngộ results and an inline notice.
+var trial_choices: Array = []
+var last_pull: Array = []
+var reveal: bool = false
+var panel_note: String = ""
 
 func setup(owner_main: Node) -> void:
 	main = owner_main
@@ -71,8 +79,8 @@ func _build_title() -> void:
 	box.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	box.offset_left = 90
 	box.offset_right = 620
-	box.offset_top = -230
-	box.offset_bottom = 260
+	box.offset_top = -330
+	box.offset_bottom = 360
 	title_screen.add_child(box)
 	box.add_child(UiTheme.title("Vân Khê", 74, UiTheme.CREAM))
 	box.add_child(UiTheme.title("Dư Âm Gió", 34, UiTheme.JADE_LIGHT))
@@ -92,6 +100,9 @@ func _build_title() -> void:
 	box.add_child(continue_button)
 	new_game_button = UiTheme.button("Hành trình mới", func() -> void: emit_signal("new_game_requested"), 300)
 	box.add_child(new_game_button)
+	box.add_child(UiTheme.button("Kỳ Ngộ", func() -> void: open_panel("gacha"), 300))
+	box.add_child(UiTheme.button("Nhiệm vụ ngày", func() -> void: open_panel("daily"), 300))
+	box.add_child(UiTheme.button("Kho kiếm & trang phục", func() -> void: open_panel("armory"), 300))
 	box.add_child(UiTheme.button("Thiết lập", func() -> void: open_panel("settings"), 300))
 	box.add_child(UiTheme.button("Ghi công", func() -> void: open_panel("credits"), 300))
 	if not OS.has_feature("web"):
@@ -119,32 +130,45 @@ func _build_pause() -> void:
 	pause_panel = PanelContainer.new()
 	root.add_child(pause_panel)
 	pause_panel.set_anchors_preset(Control.PRESET_CENTER)
-	pause_panel.offset_left = -190
-	pause_panel.offset_right = 190
-	pause_panel.offset_top = -280
-	pause_panel.offset_bottom = 280
+	pause_panel.offset_left = -350
+	pause_panel.offset_right = 350
+	pause_panel.offset_top = -270
+	pause_panel.offset_bottom = 270
 	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 12)
 	pause_panel.add_child(box)
 	var heading: Label = UiTheme.title("Tạm dừng", 30)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(heading)
+	var grid: GridContainer = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	box.add_child(grid)
 	for entry: Array in [["Tiếp tục", func() -> void: emit_signal("resume_requested")], ["Bản đồ  (M)", func() -> void: open_panel("map")],
 			["Nhật ký  (J)", func() -> void: open_panel("journal")], ["Túi đồ & tu luyện  (I)", func() -> void: open_panel("inventory")],
+			["Kho kiếm & trang phục", func() -> void: open_panel("armory")], ["Kỳ Ngộ", func() -> void: open_panel("gacha")],
+			["Nhiệm vụ ngày", func() -> void: open_panel("daily")], ["Cảnh giới thế giới", func() -> void: open_panel("tier")],
 			["Thiết lập", func() -> void: open_panel("settings")], ["Về Miếu Gió gần nhất", func() -> void: emit_signal("checkpoint_requested")],
 			["Lưu hành trình  (F5)", func() -> void: emit_signal("save_requested")], ["Tải lần lưu gần nhất  (F9)", func() -> void: emit_signal("load_requested")],
 			["Về màn hình chính", func() -> void: emit_signal("title_requested")], ["Thoát game", func() -> void: emit_signal("quit_requested")]]:
 		if entry[0] == "Thoát game" and OS.has_feature("web"):
 			continue
-		box.add_child(UiTheme.button(entry[0], entry[1], 320))
+		var button: Button = UiTheme.button(entry[0], entry[1], 320)
+		if resume_button == null:
+			resume_button = button
+		grid.add_child(button)
+	leave_trial_button = UiTheme.button("Rời Ải Vô Tận (nhận thưởng)", func() -> void: main.leave_trial(), 660)
+	box.add_child(leave_trial_button)
 	pause_panel.visible = false
 
 func set_paused(value: bool) -> void:
 	pause_panel.visible = value and current_panel == ""
+	leave_trial_button.visible = main.trial != null and main.trial.active
 	if value and pause_panel.visible:
-		(pause_panel.get_child(0).get_child(1) as Button).grab_focus()
+		resume_button.grab_focus()
 	if not value:
-		close_panel()
+		close_panel(true)
 
 # ------------------------------------------------------------------ panels
 
@@ -164,7 +188,8 @@ func _build_panel_host() -> void:
 	panel_title = UiTheme.title("", 30)
 	panel_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(panel_title)
-	header.add_child(UiTheme.button("Đóng  (Esc)", close_panel, 150))
+	close_button = UiTheme.button("Đóng  (Esc)", close_panel, 150)
+	header.add_child(close_button)
 	panel_body = MarginContainer.new()
 	panel_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(panel_body)
@@ -174,9 +199,12 @@ func panel_open() -> bool:
 	return panel_host.visible
 
 func open_panel(name: String) -> void:
+	if current_panel != name:
+		panel_note = ""
 	current_panel = name
 	pause_panel.visible = false
 	panel_host.visible = true
+	close_button.visible = name != "trial_pick"
 	for child: Node in panel_body.get_children():
 		child.queue_free()
 	match name:
@@ -195,8 +223,26 @@ func open_panel(name: String) -> void:
 		"credits":
 			panel_title.text = "Ghi công & giấy phép"
 			panel_body.add_child(_credits_view())
+		"gacha":
+			panel_title.text = "Kỳ Ngộ"
+			panel_body.add_child(RetentionPanels.gacha(self))
+		"armory":
+			panel_title.text = "Kho kiếm & trang phục"
+			panel_body.add_child(RetentionPanels.armory(self))
+		"daily":
+			panel_title.text = "Nhiệm vụ ngày & điểm danh"
+			panel_body.add_child(RetentionPanels.daily(self))
+		"tier":
+			panel_title.text = "Cảnh giới thế giới"
+			panel_body.add_child(RetentionPanels.tier(self))
+		"trial_pick":
+			panel_title.text = "Ải Vô Tận"
+			panel_body.add_child(RetentionPanels.trial_pick(self))
 
-func close_panel() -> void:
+func close_panel(force: bool = false) -> void:
+	## The Trial blessing picker cannot be dismissed: a blessing must be chosen.
+	if current_panel == "trial_pick" and not force:
+		return
 	rebinding = ""
 	if not panel_host.visible:
 		return
@@ -204,7 +250,7 @@ func close_panel() -> void:
 	current_panel = ""
 	if get_tree().paused and not title_screen.visible:
 		pause_panel.visible = true
-		(pause_panel.get_child(0).get_child(1) as Button).grab_focus()
+		resume_button.grab_focus()
 
 func refresh_panel() -> void:
 	if panel_host.visible:

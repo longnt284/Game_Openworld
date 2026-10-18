@@ -107,7 +107,7 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "settings", "credits"]
+	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "settings", "credits", "gacha", "armory", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -217,7 +217,38 @@ func _run() -> void:
 				await shot("map")
 				game.menus.close_panel()
 				game.set_paused(false)
-			"journal", "inventory", "settings", "credits":
+			"gacha":
+				# A seeded ten-pull so the result cards show.
+				game.profile.add_currency(Gacha.currency(), 1600)
+				game.open_panel("gacha")
+				game.menus.last_pull = game.gacha_pull(10)
+				game.menus.refresh_panel()
+				await frames(40)
+				await shot("gacha")
+				game.menus.close_panel()
+				game.set_paused(false)
+			"trial":
+				game.trial.start(game.player.global_position)
+				while game.trial.phase != "fighting" or game.trial.alive.size() < 3:
+					await frames(1)
+				var center: Vector3 = game.trial.center
+				game.player.teleport(center + Vector3(0, 0.5, 12))
+				game.player.face_direction(Vector3(0, 0, -1), true)
+				game.player.camera_rig.yaw = 0.0
+				game.player.camera_rig.pitch = -0.2
+				game.player.invulnerable = 999.0
+				await frames(60)
+				await shot("trial_wave")
+				for enemy: Enemy in game.trial.alive.duplicate():
+					enemy.take_damage(Combat.make_damage(game.player, {"poise": 0}, 99999.0, enemy.global_position))
+				while game.trial.phase != "picking":
+					await frames(1)
+				await frames(10)
+				await shot("trial_pick")
+				game.choose_trial_buff(game.menus.trial_choices[0])
+				game.trial.end_run("leave")
+				await frames(30)
+			"journal", "inventory", "settings", "credits", "armory", "daily", "tier":
 				game.open_panel(scene)
 				await frames(10)
 				await shot(scene)

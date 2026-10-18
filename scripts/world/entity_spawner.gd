@@ -96,6 +96,9 @@ func should_exist(data: Dictionary) -> bool:
 	if not main.quests.check(data.get("if", [])):
 		return false
 	if data["type"] == "enemy":
+		if main.state.world_tier > 0 and data.get("persistent", false):
+			# Each World Tier brings the story foes back once; beating them there is remembered per tier.
+			return not main.state.has_flag("tier_dead:%d:%s" % [main.state.world_tier, data["id"]])
 		if main.state.has_flag("dead:" + String(data["id"])):
 			return false
 		if main.state.camp_kills.has(data["id"]):
@@ -162,7 +165,7 @@ func _create(data: Dictionary) -> Node3D:
 			enemy.defeated.connect(main.on_enemy_defeated.bind(data))
 			main.on_enemy_spawned(enemy, data)
 			return enemy
-		"shrine", "chest", "echo", "diary", "chime", "memory_core", "seal_gate":
+		"shrine", "chest", "echo", "diary", "chime", "memory_core", "seal_gate", "trial_gate":
 			var item: Interactable = Interactable.new()
 			item.name = String(data["id"])
 			add_child(item)

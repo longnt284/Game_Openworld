@@ -15,6 +15,13 @@ const FILES: Dictionary = {
 	"weapons": "res://data/weapons.json",
 	"styles": "res://data/styles.json",
 	"elements": "res://data/elements.json",
+	"world_tiers": "res://data/world_tiers.json",
+	"elites": "res://data/elites.json",
+	"trial": "res://data/trial.json",
+	"gacha": "res://data/gacha.json",
+	"affixes": "res://data/affixes.json",
+	"skins": "res://data/skins.json",
+	"daily": "res://data/daily.json",
 }
 
 static var _cache: Dictionary = {}
@@ -52,6 +59,13 @@ static func element(id: String) -> Dictionary:
 
 static func status(id: String) -> Dictionary:
 	return ((get_data("elements") as Dictionary).get("statuses", {}) as Dictionary).get(id, {})
+
+static func tier(index: int) -> Dictionary:
+	var tiers: Array = (get_data("world_tiers") as Dictionary).get("tiers", [])
+	return tiers[clampi(index, 0, tiers.size() - 1)] if not tiers.is_empty() else {}
+
+static func skin(id: String) -> Dictionary:
+	return (get_data("skins") as Dictionary).get(id, {})
 
 static func dialogue_node(id: String) -> Dictionary:
 	return (get_data("dialogue") as Dictionary).get(id, {})

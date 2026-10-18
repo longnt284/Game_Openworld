@@ -148,6 +148,24 @@
 		{"model": "prayer_banner", "pos": [-12.0, -425.0], "yaw": 0},
 		{"model": "prayer_banner", "pos": [14.0, -425.0], "yaw": 180},
 		{"model": "lantern_stone", "pos": [-4.0, -420.0], "yaw": 0},
-		{"model": "lantern_stone", "pos": [8.0, -420.0], "yaw": 0}
+		{"model": "lantern_stone", "pos": [8.0, -420.0], "yaw": 0},
+		{"model": "lantern_stone", "pos": [9.8, 253.6], "yaw": 22},
+		{"model": "lantern_stone", "pos": [23.6, 239.8], "yaw": 68},
+		{"model": "lantern_stone", "pos": [23.6, 220.2], "yaw": 112},
+		{"model": "lantern_stone", "pos": [9.8, 206.4], "yaw": 158},
+		{"model": "lantern_stone", "pos": [-9.8, 206.4], "yaw": 202},
+		{"model": "lantern_stone", "pos": [-23.6, 220.2], "yaw": 248},
+		{"model": "lantern_stone", "pos": [-23.6, 239.8], "yaw": 292},
+		{"model": "lantern_stone", "pos": [-9.8, 253.6], "yaw": 338},
+		{"model": "prayer_banner", "pos": [0.0, 257.0], "yaw": 90},
+		{"model": "prayer_banner", "pos": [27.0, 230.0], "yaw": 180},
+		{"model": "prayer_banner", "pos": [0.0, 203.0], "yaw": 270},
+		{"model": "prayer_banner", "pos": [-27.0, 230.0], "yaw": 360},
+		{"model": "gate_tam_quan", "pos": [0, 201], "yaw": 0},
+		{"model": "stone_nghe", "pos": [-5, 203], "yaw": 180},
+		{"model": "stone_nghe", "pos": [5, 203], "yaw": 180},
+		{"model": "pagoda_bell_tower", "pos": [0, 262], "yaw": 180},
+		{"model": "incense_burner", "pos": [-8, 205], "yaw": 0},
+		{"model": "incense_burner", "pos": [8, 205], "yaw": 0}
 	]
 }

@@ -20,6 +20,7 @@ var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
 var props: PropPlacer
+var trial: TrialDirector
 var hud: GameHUD
 var menus: Menus
 var title_camera: Camera3D
@@ -42,6 +43,8 @@ var death_serial: int = 0
 var web: bool = OS.has_feature("web")
 var had_pointer: bool = false
 var announced_ready: bool = false
+## World Tier elites and reward-chest drops (not the gacha: that RNG lives in the profile).
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -76,7 +79,9 @@ func _ready() -> void:
 	menus.save_requested.connect(save_game)
 	menus.load_requested.connect(load_game)
 	menus.checkpoint_requested.connect(func() -> void:
-		if engaged > 0 or spawner.arena.fighting:
+		if trial and trial.active:
+			hud.show_message("Hãy rời Ải Vô Tận trước")
+		elif engaged > 0 or spawner.arena.fighting:
 			hud.show_message("Không thể về Miếu Gió khi đang giao chiến")
 		else:
 			respawn())
@@ -84,6 +89,13 @@ func _ready() -> void:
 	menus.settings_changed.connect(apply_settings)
 	menus.quit_requested.connect(quit_game)
 	state.changed.connect(_on_state_changed)
+	rng.randomize()
+	if not profile.welcomed:
+		# First run: enough Ngọc Gió for one ten-pull, so the Kỳ Ngộ banner can be tried at once.
+		profile.welcomed = true
+		profile.add_currency(Gacha.currency(), int(Gacha.data().get("welcome", 0)))
+	Missions.refresh(profile, Missions.today())
+	save_profile()
 	hud.set_tracker("Vân Khê", "", "Đang tải thung lũng…")
 	assets.request_all()
 
@@ -143,6 +155,11 @@ func _start_world() -> void:
 	add_child(spawner)
 	spawner.setup(self, assets, world, player)
 	spawner.arena.fight_started.connect(_on_fight_started)
+	trial = TrialDirector.new()
+	trial.name = "Trial"
+	add_child(trial)
+	trial.setup(self)
+	trial.run_finished.connect(_on_trial_finished)
 	MapView.prepare(world.layout)
 	ambient = AmbientFx.new()
 	ambient.name = "AmbientFx"
@@ -154,9 +171,13 @@ func _start_world() -> void:
 	player.hazard.connect(_on_hazard)
 	player.footstep.connect(_on_footstep)
 	player.attack_landed.connect(_on_attack_landed)
-	player.parried.connect(func(_enemy: Node) -> void: audio.play("parry", player.global_position + Vector3.UP, 2.0))
+	player.parried.connect(func(_enemy: Node) -> void:
+		audio.play("parry", player.global_position + Vector3.UP, 2.0)
+		_mission("parry"))
 	player.notice.connect(func(text: String) -> void: hud.show_message(text, 2.0))
 	player.skill_used.connect(_on_skill_used)
+	player.status_applied.connect(func(_status: String) -> void: _mission("status"))
+	_equip_visuals()
 	title_camera = Camera3D.new()
 	title_camera.far = 1500
 	title_camera.fov = 55
@@ -210,6 +231,8 @@ func _begin_play() -> void:
 
 func start_new_game() -> void:
 	death_serial += 1
+	_abort_trial()
+	_clear_reward_chests()
 	if spawner.arena.fighting:
 		spawner.arena.end_fight(false)
 	hud.hide_boss()
@@ -218,7 +241,7 @@ func start_new_game() -> void:
 	state.health = state.max_health()
 	chime_sequence.clear()
 	spawner.clear_all()
-	player.visual.attach_weapon(assets, state.sword)
+	_equip_visuals()
 	player.revive(_start_position())
 	player.face_direction(Vector3(0, 0, -1), true)
 	player.camera_rig.yaw = 0.0
@@ -237,6 +260,7 @@ func continue_game() -> void:
 
 func return_to_title() -> void:
 	death_serial += 1
+	_abort_trial()
 	set_paused(false)
 	show_title()
 
@@ -288,7 +312,7 @@ func _process(delta: float) -> void:
 	_update_focus()
 	_update_combat_state()
 	autosave_timer -= delta
-	if autosave_timer <= 0.0 and player.state == "move" and engaged == 0:
+	if autosave_timer <= 0.0 and player.state == "move" and engaged == 0 and not trial.active:
 		autosave_timer = 60.0 if web else 300.0
 		save_game(true)
 	hud_elapsed += delta
@@ -310,7 +334,8 @@ func _update_region() -> void:
 	var region: Dictionary = world.layout.region_at(player.global_position.z)
 	var id: String = String(region.get("id", ""))
 	if id != current_region:
-		var first: bool = current_region != "" and not state.has_flag("visited:" + id)
+		# The Trial pocket is not part of the journey: no discovery banner or visit flag.
+		var first: bool = current_region != "" and not state.has_flag("visited:" + id) and not trial.active
 		current_region = id
 		atmosphere.set_region(id)
 		ambient.set_region(id)
@@ -319,7 +344,7 @@ func _update_region() -> void:
 			state.set_flag("visited:" + id)
 			hud.show_banner(String(region.get("name", "")), "Vùng đất mới")
 			save_game(true)
-		elif current_region != "" and not state.has_flag("visited:" + id):
+		elif current_region != "" and not trial.active and not state.has_flag("visited:" + id):
 			state.set_flag("visited:" + id)
 	var river_distance: float = 999.0
 	for water: Dictionary in world.layout.waters:
@@ -363,13 +388,19 @@ func _update_combat_state() -> void:
 		var enemy: Enemy = node as Enemy
 		if enemy and enemy.state in ["alert", "chase", "attack", "recover", "hit", "stagger"] and enemy.global_position.distance_to(player.global_position) < 32.0:
 			engaged += 1
-	var boss_fight: bool = spawner.arena.fighting
+	var boss_fight: bool = spawner.arena.fighting or (trial.active and trial.boss != null)
 	audio.set_combat(2 if boss_fight else (1 if engaged > 0 else 0))
 	if engaged > 0 and not hinted.has("combat"):
 		hinted["combat"] = true
 		hud.show_hint("Chuột trái: đánh (3 đòn liên hoàn)  •  Giữ chuột trái: trọng kích\nShift: né  •  Chuột phải: đỡ — bấm đúng lúc đòn tới để phản đòn\n%s: khóa mục tiêu  •  %s: dùng thuốc" % [UserSettings.event_label("lock_on"), UserSettings.event_label("heal")], 12.0)
-	if not boss_fight and spawner.arena and state.has_flag("chimes_solved") and not state.has_flag("dead:boss_truc_tuong") and spawner.arena.contains(player.global_position):
+	if not spawner.arena.fighting and state.has_flag("chimes_solved") and boss_alive() and spawner.arena.contains(player.global_position):
 		spawner.arena.start_fight()
+
+func boss_alive() -> bool:
+	## The arena guardian, once per World Tier after the story fight.
+	if state.world_tier > 0:
+		return not state.has_flag("tier_dead:%d:boss_truc_tuong" % state.world_tier)
+	return not state.has_flag("dead:boss_truc_tuong")
 
 func _marker_world() -> Variant:
 	var tracked: String = state.tracked_quest
@@ -398,7 +429,10 @@ func _refresh_hud() -> void:
 		hud.set_skill(slot, String(form.get("name", "")), level > 0, fill, level, StyleBook.color(style))
 	var region_name: String = String(world.layout.region_at(player.global_position.z).get("name", ""))
 	var tracked: String = state.tracked_quest
-	if tracked != "" and quests.is_active(tracked):
+	if trial.active:
+		hud.set_tracker(region_name, "Ải Vô Tận — Đợt %d" % maxi(trial.wave, 1), "Đã vượt %d đợt  •  Ngọc Gió tích lũy: %d  •  Kỷ lục: %d đợt" % [
+			trial.cleared, int(trial.earned.get("ngoc", 0)), int(profile.trial.get("best_wave", 0))])
+	elif tracked != "" and quests.is_active(tracked):
 		hud.set_tracker(region_name, String(quests.definition(tracked).get("title", "")), quests.objective_text(tracked))
 	elif state.has_flag("slice_complete"):
 		hud.set_tracker(region_name, "Hồi 3 — Đền Tịch Phong", "Đoạn chơi mẫu đã hoàn thành. Tự do khám phá thung lũng.")
@@ -443,7 +477,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact") and focus and player.state == "move":
 		get_viewport().set_input_as_handled()
 		# Conversations, visions and shrines lock the controls, so they wait until the fight is over.
-		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate"]):
+		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate", "trial_gate"]):
 			hud.show_message("Không thể làm việc này khi đang giao chiến")
 			return
 		if focus is Npc:
@@ -567,7 +601,7 @@ func run_action(action: String) -> void:
 		"sword":
 			state.grant_sword(parts[1])
 			state.equip_sword(parts[1])
-			player.visual.attach_weapon(assets, state.sword)
+			_equip_visuals()
 			audio.play("sword_draw")
 			hud.show_banner("Nhận " + String(ContentDB.weapon(state.sword).get("name", state.sword)), "Công lực tăng lên %d" % roundi(state.attack_power()))
 		"xp":
@@ -592,7 +626,9 @@ func _on_skill_used(skill: String, _cooldown: float) -> void:
 		return
 	var data: Dictionary = Combat.attack("player", String(found["form"]["attack"]))
 	audio.play(String(data.get("sfx", "wind_slash")), player.global_position, 0.0)
+	_mission("skill")
 	if found["slot"] == "x":
+		_mission("ult")
 		hud.show_banner(StyleBook.skill_name(skill), String(ContentDB.style(found["style"]).get("name", "")))
 
 func _check_echo_skill(announce: bool) -> void:
@@ -649,6 +685,8 @@ func _on_quest_started(id: String) -> void:
 func _on_quest_completed(id: String) -> void:
 	if id == "mq04_vuot_khe":
 		state.set_flag("slice_complete")
+		state.max_tier = maxi(state.max_tier, 1)
+		hud.show_message("Đã mở Cảnh giới thế giới và Ải Vô Tận đầy đủ (menu tạm dừng)", 5.0)
 
 func _on_state_changed(kind: String, _key: String) -> void:
 	if kind in ["item", "coins"]:
@@ -711,6 +749,17 @@ func on_interact(item: Interactable) -> void:
 				if is_instance_valid(item):
 					item.refresh()
 				_epilogue())
+		"trial_gate":
+			if not trial.unlocked():
+				hud.show_message("Bia đá im lặng. Có lẽ nó chờ một lữ khách đã quen thung lũng hơn.")
+				return
+			audio.play("seal_hum", item.global_position)
+			hud.fade_to(0.7, 0.2)
+			trial.start(player.global_position)
+			hud.fade_to(0.0, 0.8)
+			hud.show_hint("Ải Vô Tận: đánh bại từng đợt, chọn phúc lành sau mỗi đợt.\nGục ngã hay rời Ải (menu tạm dừng) đều nhận đủ phần thưởng đã tích lũy.", 8.0)
+		"reward_chest":
+			open_reward_chest(item)
 		"seal_gate":
 			audio.play("seal_hum", item.global_position)
 			show_vision("Cổng phong ấn", ["Bùa phong ấn đỏ rực chắn lối lên Đền Tịch Phong. Gió va vào đó rồi dội ngược lại.",
@@ -767,6 +816,12 @@ func _on_fight_started() -> void:
 		hud.show_boss(boss.display_name(), String(boss.data.get("title", "")), boss.health / boss.max_health)
 
 func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
+	if state.world_tier > 0 and data.has("enemy"):
+		# World Tier: valley foes come back stronger; some are elites with affixes.
+		var tier: Dictionary = ContentDB.tier(state.world_tier)
+		EnemyScaler.apply(enemy, float(tier.get("hp", 1.0)), float(tier.get("damage", 1.0)), float(tier.get("xp", 1.0)), float(tier.get("coins", 1.0)))
+		if not enemy.boss and rng.randf() < float(tier.get("elite", 0.0)):
+			EnemyScaler.make_elite(enemy, EnemyScaler.roll_affixes(int(tier.get("elite_affixes", 1)), rng))
 	if data.get("boss", false):
 		enemy.health_changed.connect(func(target: Enemy, current: float, maximum: float) -> void:
 			if spawner.arena.fighting:
@@ -781,10 +836,16 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 
 func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	var id: String = String(data["id"])
-	if data.get("persistent", false):
+	var tiered: bool = state.world_tier > 0 and data.get("persistent", false)
+	if tiered:
+		state.set_flag("tier_dead:%d:%s" % [state.world_tier, id])
+	elif data.get("persistent", false):
 		state.set_flag("dead:" + id)
 	else:
 		state.record_camp_kill(id)
+	_mission("kill")
+	if enemy.data.has("elite") and rng.randf() < float(ContentDB.get_data("elites").get("base", {}).get("chest_chance", 0.2)):
+		spawn_reward_chest("elite", enemy.global_position)
 	audio.play("enemy_down", enemy.global_position)
 	_add_xp(int(enemy.data.get("xp", 10)))
 	var drops: Array = []
@@ -810,7 +871,17 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 		spawner.arena.end_fight(true)
 		hud.hide_boss()
 		audio.play("victory")
-		hud.show_banner("Đã đánh bại Trúc Tướng", "Lõi phong ấn lộ ra giữa đấu trường")
+		if tiered:
+			var tier: Dictionary = ContentDB.tier(state.world_tier)
+			var ngoc: int = int(tier.get("ngoc_boss", 0))
+			profile.add_currency(Gacha.currency(), ngoc)
+			var tiers: int = (ContentDB.get_data("world_tiers").get("tiers", []) as Array).size()
+			state.max_tier = maxi(state.max_tier, mini(state.world_tier + 1, tiers - 1))
+			spawn_reward_chest("boss_tier", enemy.global_position + Vector3(0, 0, 2.0))
+			hud.show_banner("Trúc Tướng gục ngã — %s" % tier.get("name", ""), "+%d Ngọc Gió  •  Rương Cảnh Giới xuất hiện" % ngoc)
+			save_profile()
+		else:
+			hud.show_banner("Đã đánh bại Trúc Tướng", "Lõi phong ấn lộ ra giữa đấu trường")
 		save_game(true)
 
 func _reset_enemies(include_engaged: bool) -> void:
@@ -825,6 +896,15 @@ func _reset_enemies(include_engaged: bool) -> void:
 func _on_player_died() -> void:
 	audio.play("death")
 	audio.set_combat(0)
+	if trial.active:
+		# Falling in the Trial ends the run; the banked rewards are paid at the gate.
+		hud.fade_to(1.0, 1.0, "Kết thúc Ải Vô Tận", "Vượt %d đợt. Phần thưởng đã tích lũy được giữ nguyên." % trial.cleared)
+		death_serial += 1
+		var run_serial: int = death_serial
+		get_tree().create_timer(2.6).timeout.connect(func() -> void:
+			if run_serial == death_serial and playing and trial.active:
+				trial.end_run("death"))
+		return
 	hud.fade_to(1.0, 1.2, "Gục ngã", "Lâm An sẽ tỉnh lại ở Miếu Gió gần nhất. Hành trang, nhiệm vụ và kinh nghiệm được giữ nguyên;\nquái trong trại và kẻ gác đấu trường sẽ hồi phục.")
 	death_serial += 1
 	var serial: int = death_serial
@@ -947,6 +1027,10 @@ func _apply_chunk_quality(chunk: WorldChunk, preset: Dictionary) -> void:
 func save_game(silent: bool = false) -> bool:
 	if not initialized or not playing or player.is_dead():
 		return false
+	if trial.active:
+		if not silent:
+			hud.show_message("Không thể lưu khi đang ở Ải Vô Tận")
+		return false
 	state.health = player.health
 	var data: Dictionary = {
 		"version": SaveStore.SCHEMA_VERSION, "seed": settings.world_seed, "position": SaveStore.to_array(player.global_position),
@@ -955,6 +1039,7 @@ func save_game(silent: bool = false) -> bool:
 	}
 	var error: Error = SaveStore.write_save(data, save_path)
 	if error == OK:
+		save_profile()
 		if not silent:
 			hud.show_message("Đã lưu hành trình")
 		else:
@@ -976,6 +1061,8 @@ func load_game() -> bool:
 		hud.show_message("Chưa có bản lưu hợp lệ")
 		return false
 	death_serial += 1
+	_abort_trial()
+	_clear_reward_chests()
 	hud.fade_to(0.0, 0.4)
 	if int(data["seed"]) != settings.world_seed:
 		# The valley is authored for the default seed; props, water and the map are not rebuilt.
@@ -989,9 +1076,9 @@ func load_game() -> bool:
 		spawner.arena.end_fight(false)
 	spawner.arena.set_closed(not state.has_flag("chimes_solved"))
 	hud.hide_boss()
-	player.visual.attach_weapon(assets, state.sword)
+	_equip_visuals()
 	var location: Vector3 = SaveStore.to_vector(data["position"])
-	if not world.layout.inside_bounds(location.x, location.z) or not world.layout.water_at(location.x, location.z).is_empty() or world.layout.in_chasm(location.x, location.z):
+	if not world.layout.inside_bounds(location.x, location.z) or world.layout.in_pocket(location.x, location.z) or not world.layout.water_at(location.x, location.z).is_empty() or world.layout.in_chasm(location.x, location.z):
 		location = _checkpoint_position()
 	location.y = maxf(location.y, world.height_at(location.x, location.z) + 0.2)
 	var saved_health: float = state.health
@@ -1005,3 +1092,176 @@ func load_game() -> bool:
 		set_paused(false)
 	hud.show_message("Đã tải hành trình")
 	return true
+
+# ------------------------------------------------------------------ retention: trial, tiers, gacha, armory, missions
+
+func refresh_stats() -> void:
+	## Bonuses from the equipped armory weapon and this run's Trial blessings (neutral otherwise).
+	var item: Dictionary = profile.weapon(state.equipped_uid) if state.equipped_uid >= 0 else {}
+	state.stats = PlayerStats.compute(item, trial.buff_stats() if trial and trial.active else {})
+
+func _equip_visuals() -> void:
+	## Re-attaches the equipped sword with its skins and stats. An armory weapon from another
+	## profile falls back to the best story sword of this save.
+	if state.equipped_uid >= 0 and profile.weapon(state.equipped_uid).is_empty():
+		state.equip_sword(String(state.swords[-1]))
+	player.visual.attach_weapon(assets, state.sword)
+	_apply_skins()
+	refresh_stats()
+
+func _apply_skins() -> void:
+	var outfit: Dictionary = ContentDB.skin(String(profile.equipped_skins.get("player", "")))
+	player.visual.apply_tint(outfit.get("tint", {}))
+	var blade: Dictionary = ContentDB.skin(String(profile.equipped_skins.get("weapon", "")))
+	player.visual.apply_weapon_glow(Color(String(blade["glow"])) if blade.has("glow") else null)
+
+func equip_story_sword(id: String) -> void:
+	if not playing or player.state != "move":
+		return
+	state.equip_sword(id)
+	_equip_visuals()
+	audio.play("sword_draw")
+
+func equip_armory(uid: int) -> void:
+	var item: Dictionary = profile.weapon(uid)
+	if item.is_empty() or not playing or player.state != "move":
+		return
+	var base: String = String(item["base"])
+	state.learn_style(base)
+	state.equip_sword(base, uid)
+	_equip_visuals()
+	audio.play("sword_draw")
+
+func equip_skin(target: String, id: String) -> void:
+	if id != "" and not profile.skins.has(id):
+		return
+	profile.equipped_skins[target] = id
+	if player:
+		_apply_skins()
+	save_profile()
+
+func tier_cap() -> int:
+	## Highest World Tier this save may choose; none before the story slice is complete.
+	if not state.has_flag(String(ContentDB.get_data("world_tiers").get("unlock_flag", "slice_complete"))):
+		return 0
+	var tiers: int = (ContentDB.get_data("world_tiers").get("tiers", []) as Array).size()
+	return clampi(maxi(state.max_tier, 1), 1, tiers - 1)
+
+func set_world_tier(tier: int) -> bool:
+	if tier < 0 or tier > tier_cap() or tier == state.world_tier:
+		return false
+	if trial.active or engaged > 0 or spawner.arena.fighting:
+		hud.show_message("Không thể đổi cảnh giới khi đang giao chiến")
+		return false
+	state.world_tier = tier
+	_reset_enemies(true)
+	spawner.clear_all()
+	state.reset_camps()
+	spawner.arena.set_closed(not state.has_flag("chimes_solved"))
+	var data: Dictionary = ContentDB.tier(tier)
+	hud.show_banner("Cảnh giới: " + String(data.get("name", "")), String(data.get("description", "")))
+	audio.play("temple_bell")
+	save_game(true)
+	return true
+
+func _abort_trial() -> void:
+	if trial and trial.active:
+		trial.end_run("abort")
+
+func leave_trial() -> void:
+	if trial.active:
+		set_paused(false)
+		trial.end_run("leave")
+
+func on_trial_kill(enemy: Enemy) -> void:
+	audio.play("enemy_down", enemy.global_position)
+	_add_xp(int(enemy.data.get("xp", 10)) / 2)
+	_mission("kill")
+
+func on_trial_wave(wave: int) -> void:
+	audio.play("quest_complete", null, -4.0)
+	hud.show_message("Vượt đợt %d" % wave)
+	profile.trial["best_wave"] = maxi(int(profile.trial.get("best_wave", 0)), wave)
+	_mission("trial_wave")
+
+func grant_story_sword(id: String, reason: String) -> void:
+	if state.grant_sword(id):
+		audio.play("sword_draw")
+		hud.show_banner("Nhận " + String(ContentDB.weapon(id).get("name", id)), reason + "  •  Trang bị trong Kho kiếm")
+
+func open_trial_pick(choices: Array) -> void:
+	menus.trial_choices = choices
+	open_panel("trial_pick")
+
+func choose_trial_buff(buff: Dictionary) -> void:
+	menus.close_panel(true)
+	set_paused(false)
+	audio.ui("ui_confirm")
+	hud.show_message("Phúc lành: %s — %s" % [buff.get("name", ""), buff.get("desc", "")])
+	trial.choose(buff)
+
+func _on_trial_finished(summary: Dictionary) -> void:
+	profile.add_currency(Gacha.currency(), int(summary.get("ngoc", 0)))
+	state.add_item("coins", int(summary.get("coins", 0)))
+	_add_xp(int(summary.get("xp", 0)))
+	profile.trial["runs"] = int(profile.trial.get("runs", 0)) + 1
+	profile.trial["best_wave"] = maxi(int(profile.trial.get("best_wave", 0)), int(summary.get("wave", 0)))
+	save_profile()
+	if summary.get("reason", "") == "abort":
+		return
+	var point: Vector3 = trial.return_point
+	if player.is_dead():
+		player.revive(point)
+	else:
+		player.teleport(point)
+		player.heal(player.max_health())
+	hud.fade_to(0.0, 0.8)
+	hud.show_banner("Rời Ải Vô Tận", "Vượt %d đợt  •  +%d Ngọc Gió  •  +%d Đồng" % [int(summary["wave"]), int(summary.get("ngoc", 0)), int(summary.get("coins", 0))], 5.0)
+	save_game(true)
+
+func spawn_reward_chest(table: String, at: Vector3, parent: Node = null) -> Interactable:
+	## A gacha chest whose rarity is rolled now, so it glows in that colour until opened.
+	var rarity: String = Gacha.chest_rarity(profile, table)
+	var chest: Interactable = Interactable.new()
+	chest.name = "reward_%d" % Time.get_ticks_usec()
+	(parent if parent else self).add_child(chest)
+	chest.setup({"id": chest.name, "type": "reward_chest", "table": table, "rarity": rarity,
+		"title": String(Gacha.data().get("chests", {}).get(table, {}).get("name", "rương thưởng")).to_lower()}, assets, self)
+	chest.add_to_group("reward_chest")
+	chest.global_position = Vector3(at.x, world.height_at(at.x, at.z), at.z)
+	Vfx.pillar(self, chest.global_position, PlayerStats.rarity_color(rarity), 8.0, 0.9, 0.6)
+	audio.play("glint", chest.global_position)
+	return chest
+
+func open_reward_chest(chest: Interactable, silent: bool = false) -> Dictionary:
+	if chest.opened:
+		return {}
+	chest.opened = true
+	chest.open_lid()
+	if chest.wisps:
+		chest.wisps.emitting = false
+	var rarity: String = String(chest.entity.get("rarity", "r"))
+	var result: Dictionary = Gacha.open_chest(profile, String(chest.entity.get("table", "trial")), rarity)
+	_mission("chest")
+	save_profile()
+	if not silent and not result.is_empty():
+		audio.play("chest_open", chest.global_position)
+		Vfx.pillar(self, chest.global_position, PlayerStats.rarity_color(rarity), 10.0, 1.1, 0.9)
+		hud.show_banner(String(result.get("label", "")), "%s  •  %s" % [PlayerStats.rarity_data(rarity).get("name", ""), String(chest.entity.get("title", "")).capitalize()], 4.5)
+	return result
+
+func _clear_reward_chests() -> void:
+	for node: Node in get_tree().get_nodes_in_group("reward_chest"):
+		if node.get_parent() == self:
+			node.queue_free()
+
+func gacha_pull(count: int) -> Array:
+	var results: Array = Gacha.pull(profile, "ngu_hanh", count)
+	if not results.is_empty():
+		save_profile()
+	return results
+
+func _mission(event: String, amount: int = 1) -> void:
+	Missions.refresh(profile, Missions.today())
+	for name: String in Missions.notify(profile, event, amount):
+		hud.show_message("Hoàn thành nhiệm vụ ngày: %s (nhận thưởng ở Nhiệm vụ ngày)" % name, 4.0)

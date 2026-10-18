@@ -187,6 +187,38 @@ func _bind_trail() -> void:
 	var element: String = String(data.get("element", ""))
 	trail.bind(weapon, StyleBook.element_color(element) if element != "" else Color(0.62, 0.95, 0.88))
 
+func apply_tint(tints: Dictionary) -> void:
+	## Recolours palette materials by name ({"VK_robe": "a8323a", ...}); {} restores the model's own.
+	for mesh: MeshInstance3D in meshes:
+		if mesh.mesh == null or mesh.get_parent() == null or _in_weapon(mesh):
+			continue
+		for surface: int in range(mesh.mesh.get_surface_count()):
+			mesh.set_surface_override_material(surface, null)
+			var material: Material = mesh.mesh.surface_get_material(surface)
+			if material is ShaderMaterial and tints.has(material.resource_name):
+				var copy: ShaderMaterial = (material as ShaderMaterial).duplicate() as ShaderMaterial
+				copy.set_shader_parameter("albedo", Color(String(tints[material.resource_name])))
+				mesh.set_surface_override_material(surface, copy)
+
+func apply_weapon_glow(color: Variant) -> void:
+	## Weapon skins recolour the blade's glowing parts; null keeps the model's colours.
+	if weapon == null:
+		return
+	for node: Node in weapon.find_children("*", "MeshInstance3D", true, false):
+		var mesh: MeshInstance3D = node as MeshInstance3D
+		for surface: int in range(mesh.mesh.get_surface_count()):
+			mesh.set_surface_override_material(surface, null)
+			var material: ShaderMaterial = mesh.mesh.surface_get_material(surface) as ShaderMaterial
+			if color == null or material == null or float(material.get_shader_parameter("emission_energy")) <= 0.0:
+				continue
+			var copy: ShaderMaterial = material.duplicate() as ShaderMaterial
+			copy.set_shader_parameter("albedo", color)
+			copy.set_shader_parameter("emission_color", color)
+			mesh.set_surface_override_material(surface, copy)
+
+func _in_weapon(node: Node) -> bool:
+	return weapon != null and weapon.is_ancestor_of(node)
+
 func set_sheathed(sheathed: bool) -> void:
 	if weapon == null or sheath_socket == null or sword_socket == null:
 		return
