@@ -62,15 +62,7 @@ func place(position_value: Vector3, yaw_degrees: float) -> void:
 	visual.rotation.y = home_yaw
 
 func _apply_tint(tints: Dictionary) -> void:
-	for mesh: MeshInstance3D in visual.meshes:
-		if mesh.mesh == null:
-			continue
-		for surface: int in range(mesh.mesh.get_surface_count()):
-			var material: Material = mesh.mesh.surface_get_material(surface)
-			if material and tints.has(material.resource_name):
-				var copy: ShaderMaterial = (material as ShaderMaterial).duplicate() as ShaderMaterial
-				copy.set_shader_parameter("albedo", Color(String(tints[material.resource_name])))
-				mesh.set_surface_override_material(surface, copy)
+	visual.apply_tint(tints)
 
 func _make_ghost() -> void:
 	var ghost: StandardMaterial3D = StandardMaterial3D.new()

@@ -55,7 +55,7 @@ func _physics_attack(delta: float) -> void:
 			attack_hits = {}
 			visual.play_loop("charge", 0.05)
 		return
-	var speed: float = float(data.get("charge_speed", 13.0))
+	var speed: float = float(data.get("charge_speed", 13.0)) * speed_scale
 	velocity.x = charge_direction.x * speed
 	velocity.z = charge_direction.z * speed
 	charge_distance += speed * delta

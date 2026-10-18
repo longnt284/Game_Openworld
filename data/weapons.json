@@ -1,0 +1,9 @@
+{
+	"sword_old": {"name": "Kiếm Cũ", "attack": 10, "style": "phong", "element": "", "rarity": "story", "description": "Thanh kiếm cũ theo Lâm An từ quê nhà. Lưỡi mẻ nhưng còn bén."},
+	"sword_bamboo": {"name": "Thanh Trúc Kiếm", "attack": 16, "style": "phong", "element": "", "rarity": "story", "description": "Chú Bảy rèn bằng thép tôi đá gió, chuôi bọc trúc già."},
+	"sword_wind": {"name": "Phong Ngân Kiếm", "attack": 24, "style": "phong", "element": "wind", "status_chance": 0.15, "rarity": "story", "description": "Ngọc phong ấn nung chảy vào lưỡi kiếm. Mỗi nhát chém kéo theo một làn gió."},
+	"sword_water": {"name": "Thủy Nguyệt Kiếm", "attack": 26, "style": "thuy", "element": "water", "status_chance": 0.2, "rarity": "element", "description": "Lưỡi kiếm trong như mặt hồ đêm trăng. Đòn chém để lại vệt nước.", "model": "sword_water"},
+	"sword_thunder": {"name": "Lôi Minh Kiếm", "attack": 26, "style": "loi", "element": "thunder", "status_chance": 0.2, "rarity": "element", "description": "Rèn trong cơn giông trên đỉnh núi. Lưỡi kiếm luôn rít tiếng sấm nhỏ.", "model": "sword_thunder"},
+	"sword_flame": {"name": "Xích Viêm Kiếm", "attack": 27, "style": "viem", "element": "flame", "status_chance": 0.2, "rarity": "element", "description": "Thép đỏ không bao giờ nguội hẳn. Chuôi kiếm ấm như than hồng.", "model": "sword_flame"},
+	"sword_frost": {"name": "Hàn Sương Kiếm", "attack": 26, "style": "bang", "element": "frost", "status_chance": 0.2, "rarity": "element", "description": "Sương giá đọng trên lưỡi kiếm cả giữa trưa hè.", "model": "sword_frost"}
+}

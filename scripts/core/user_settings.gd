@@ -4,19 +4,25 @@ extends RefCounted
 
 const PATH: String = "user://settings.cfg"
 const REBINDABLE: PackedStringArray = [
-	"move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "block", "skill_1", "skill_2",
+	"move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "block", "skill_1", "skill_2", "skill_ult",
 	"interact", "heal", "lock_on", "open_map", "open_journal", "open_inventory",
 ]
 const ACTION_NAMES: Dictionary = {
 	"move_forward": "Đi tới", "move_back": "Lùi", "move_left": "Sang trái", "move_right": "Sang phải", "jump": "Nhảy / Khinh công",
-	"sprint": "Né / Chạy nhanh", "attack": "Đánh (giữ: trọng kích)", "block": "Đỡ / Phản đòn", "skill_1": "Phong Trảm", "skill_2": "Toàn Phong",
+	"sprint": "Né / Chạy nhanh", "attack": "Đánh (giữ: trọng kích)", "block": "Đỡ / Phản đòn", "skill_1": "Chiêu thức 1", "skill_2": "Chiêu thức 2",
+	"skill_ult": "Tuyệt kỹ (đủ nộ khí)",
 	"interact": "Tương tác", "heal": "Dùng thuốc", "lock_on": "Khóa mục tiêu", "open_map": "Bản đồ", "open_journal": "Nhật ký",
 	"open_inventory": "Túi đồ",
 }
+## Distances in metres. density thins grass, flowers and ground cover only (trees never move);
+## view_radius is the streamed area in chunks around the player; ambient is the particle budget.
 const QUALITY: Dictionary = {
-	"low": {"shadow": 0.0, "msaa": Viewport.MSAA_DISABLED, "scale": 0.8, "tree_distance": 48.0, "grass": 26.0, "glow": false, "label": "Thấp"},
-	"medium": {"shadow": 55.0, "msaa": Viewport.MSAA_2X, "scale": 1.0, "tree_distance": 72.0, "grass": 46.0, "glow": true, "label": "Trung bình"},
-	"high": {"shadow": 90.0, "msaa": Viewport.MSAA_4X, "scale": 1.0, "tree_distance": 96.0, "grass": 60.0, "glow": true, "label": "Cao"},
+	"low": {"shadow": 0.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_DISABLED, "scale": 0.85, "view_radius": 2, "tree_distance": 60.0, "bamboo": 48.0,
+		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "label": "Thấp"},
+	"medium": {"shadow": 70.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_2X, "scale": 1.0, "view_radius": 2, "tree_distance": 82.0, "bamboo": 64.0,
+		"grass": 44.0, "clutter": 36.0, "rock": 90.0, "density": 1.0, "glow": true, "ambient": 0.5, "label": "Trung bình"},
+	"high": {"shadow": 120.0, "shadow_atlas": 4096, "msaa": Viewport.MSAA_4X, "scale": 1.0, "view_radius": 3, "tree_distance": 120.0, "bamboo": 90.0,
+		"grass": 62.0, "clutter": 50.0, "rock": 120.0, "density": 1.4, "glow": true, "ambient": 1.0, "label": "Cao"},
 }
 
 var mouse_sensitivity: float = 0.0025
@@ -34,6 +40,9 @@ var bindings: Dictionary = {}
 func load_file(path: String = PATH) -> void:
 	var config: ConfigFile = ConfigFile.new()
 	if config.load(path) != OK:
+		if OS.has_feature("web"):
+			# First visit in a browser: software or integrated GPUs are common there.
+			quality = "low"
 		return
 	mouse_sensitivity = clampf(float(config.get_value("controls", "mouse_sensitivity", mouse_sensitivity)), 0.0005, 0.01)
 	invert_y = bool(config.get_value("controls", "invert_y", invert_y))

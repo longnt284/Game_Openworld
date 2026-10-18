@@ -7,6 +7,7 @@ extends Node3D
 const DRAW_DISTANCE: Dictionary = {
 	"house_small": 220.0, "house_long": 220.0, "house_teal": 220.0, "smithy": 200.0, "gate_village": 220.0, "watchtower": 260.0,
 	"seal_gate": 300.0, "bridge_wood": 200.0, "dock": 200.0, "rock_cliff": 220.0, "ruins_wall": 140.0, "ruins_pillar": 160.0,
+	"gate_tam_quan": 320.0, "pagoda_bell_tower": 360.0, "prayer_banner": 140.0, "lantern_string": 110.0, "flower_pot": 60.0, "basket_produce": 50.0,
 }
 
 var placed: Array[Node3D] = []

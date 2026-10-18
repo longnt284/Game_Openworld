@@ -17,6 +17,7 @@ var main: Node
 var root: Control
 var title_screen: Control
 var continue_button: Button
+var new_game_button: Button
 var pause_panel: PanelContainer
 var panel_host: PanelContainer
 var panel_title: Label
@@ -24,6 +25,14 @@ var panel_body: Control
 var current_panel: String = ""
 var rebinding: String = ""
 var rebind_buttons: Dictionary = {}
+var close_button: Button
+var resume_button: Button
+var leave_trial_button: Button
+## Retention panel state: Trial blessing offer, last Kỳ Ngộ results and an inline notice.
+var trial_choices: Array = []
+var last_pull: Array = []
+var reveal: bool = false
+var panel_note: String = ""
 
 func setup(owner_main: Node) -> void:
 	main = owner_main
@@ -70,8 +79,8 @@ func _build_title() -> void:
 	box.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	box.offset_left = 90
 	box.offset_right = 620
-	box.offset_top = -230
-	box.offset_bottom = 260
+	box.offset_top = -330
+	box.offset_bottom = 360
 	title_screen.add_child(box)
 	box.add_child(UiTheme.title("Vân Khê", 74, UiTheme.CREAM))
 	box.add_child(UiTheme.title("Dư Âm Gió", 34, UiTheme.JADE_LIGHT))
@@ -79,15 +88,25 @@ func _build_title() -> void:
 	tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tagline.custom_minimum_size.x = 480
 	box.add_child(tagline)
+	if OS.has_feature("web") and not OS.is_userfs_persistent():
+		var storage: Label = UiTheme.label("Trình duyệt đang chặn lưu trữ (chế độ ẩn danh?): hành trình sẽ mất khi đóng thẻ.", 15, UiTheme.VERMILION)
+		storage.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		storage.custom_minimum_size.x = 480
+		box.add_child(storage)
 	var spacer: Control = Control.new()
 	spacer.custom_minimum_size.y = 26
 	box.add_child(spacer)
 	continue_button = UiTheme.button("Tiếp tục hành trình", func() -> void: emit_signal("continue_requested"), 300)
 	box.add_child(continue_button)
-	box.add_child(UiTheme.button("Hành trình mới", func() -> void: emit_signal("new_game_requested"), 300))
+	new_game_button = UiTheme.button("Hành trình mới", func() -> void: emit_signal("new_game_requested"), 300)
+	box.add_child(new_game_button)
+	box.add_child(UiTheme.button("Kỳ Ngộ", func() -> void: open_panel("gacha"), 300))
+	box.add_child(UiTheme.button("Nhiệm vụ ngày", func() -> void: open_panel("daily"), 300))
+	box.add_child(UiTheme.button("Kho kiếm & trang phục", func() -> void: open_panel("armory"), 300))
 	box.add_child(UiTheme.button("Thiết lập", func() -> void: open_panel("settings"), 300))
 	box.add_child(UiTheme.button("Ghi công", func() -> void: open_panel("credits"), 300))
-	box.add_child(UiTheme.button("Thoát game", func() -> void: emit_signal("quit_requested"), 300))
+	if not OS.has_feature("web"):
+		box.add_child(UiTheme.button("Thoát game", func() -> void: emit_signal("quit_requested"), 300))
 	var credit: Label = UiTheme.label("Chương I — đoạn chơi mẫu  •  Game của Nguyễn Thành Long", 13, UiTheme.MUTED)
 	credit.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	credit.offset_left = 90
@@ -100,7 +119,7 @@ func _build_title() -> void:
 func show_title(has_save: bool) -> void:
 	title_screen.visible = true
 	continue_button.disabled = not has_save
-	(continue_button if has_save else continue_button.get_parent().get_child(5)).call_deferred("grab_focus")
+	(continue_button if has_save else new_game_button).call_deferred("grab_focus")
 
 func hide_title() -> void:
 	title_screen.visible = false
@@ -111,30 +130,45 @@ func _build_pause() -> void:
 	pause_panel = PanelContainer.new()
 	root.add_child(pause_panel)
 	pause_panel.set_anchors_preset(Control.PRESET_CENTER)
-	pause_panel.offset_left = -190
-	pause_panel.offset_right = 190
-	pause_panel.offset_top = -280
-	pause_panel.offset_bottom = 280
+	pause_panel.offset_left = -350
+	pause_panel.offset_right = 350
+	pause_panel.offset_top = -270
+	pause_panel.offset_bottom = 270
 	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 12)
 	pause_panel.add_child(box)
 	var heading: Label = UiTheme.title("Tạm dừng", 30)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(heading)
+	var grid: GridContainer = GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	box.add_child(grid)
 	for entry: Array in [["Tiếp tục", func() -> void: emit_signal("resume_requested")], ["Bản đồ  (M)", func() -> void: open_panel("map")],
 			["Nhật ký  (J)", func() -> void: open_panel("journal")], ["Túi đồ & tu luyện  (I)", func() -> void: open_panel("inventory")],
+			["Kho kiếm & trang phục", func() -> void: open_panel("armory")], ["Kỳ Ngộ", func() -> void: open_panel("gacha")],
+			["Nhiệm vụ ngày", func() -> void: open_panel("daily")], ["Cảnh giới thế giới", func() -> void: open_panel("tier")],
 			["Thiết lập", func() -> void: open_panel("settings")], ["Về Miếu Gió gần nhất", func() -> void: emit_signal("checkpoint_requested")],
 			["Lưu hành trình  (F5)", func() -> void: emit_signal("save_requested")], ["Tải lần lưu gần nhất  (F9)", func() -> void: emit_signal("load_requested")],
 			["Về màn hình chính", func() -> void: emit_signal("title_requested")], ["Thoát game", func() -> void: emit_signal("quit_requested")]]:
-		box.add_child(UiTheme.button(entry[0], entry[1], 320))
+		if entry[0] == "Thoát game" and OS.has_feature("web"):
+			continue
+		var button: Button = UiTheme.button(entry[0], entry[1], 320)
+		if resume_button == null:
+			resume_button = button
+		grid.add_child(button)
+	leave_trial_button = UiTheme.button("Rời Ải Vô Tận (nhận thưởng)", func() -> void: main.leave_trial(), 660)
+	box.add_child(leave_trial_button)
 	pause_panel.visible = false
 
 func set_paused(value: bool) -> void:
 	pause_panel.visible = value and current_panel == ""
+	leave_trial_button.visible = main.trial != null and main.trial.active
 	if value and pause_panel.visible:
-		(pause_panel.get_child(0).get_child(1) as Button).grab_focus()
+		resume_button.grab_focus()
 	if not value:
-		close_panel()
+		close_panel(true)
 
 # ------------------------------------------------------------------ panels
 
@@ -154,7 +188,8 @@ func _build_panel_host() -> void:
 	panel_title = UiTheme.title("", 30)
 	panel_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(panel_title)
-	header.add_child(UiTheme.button("Đóng  (Esc)", close_panel, 150))
+	close_button = UiTheme.button("Đóng  (Esc)", close_panel, 150)
+	header.add_child(close_button)
 	panel_body = MarginContainer.new()
 	panel_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(panel_body)
@@ -164,9 +199,12 @@ func panel_open() -> bool:
 	return panel_host.visible
 
 func open_panel(name: String) -> void:
+	if current_panel != name:
+		panel_note = ""
 	current_panel = name
 	pause_panel.visible = false
 	panel_host.visible = true
+	close_button.visible = name != "trial_pick"
 	for child: Node in panel_body.get_children():
 		child.queue_free()
 	match name:
@@ -185,8 +223,26 @@ func open_panel(name: String) -> void:
 		"credits":
 			panel_title.text = "Ghi công & giấy phép"
 			panel_body.add_child(_credits_view())
+		"gacha":
+			panel_title.text = "Kỳ Ngộ"
+			panel_body.add_child(RetentionPanels.gacha(self))
+		"armory":
+			panel_title.text = "Kho kiếm & trang phục"
+			panel_body.add_child(RetentionPanels.armory(self))
+		"daily":
+			panel_title.text = "Nhiệm vụ ngày & điểm danh"
+			panel_body.add_child(RetentionPanels.daily(self))
+		"tier":
+			panel_title.text = "Cảnh giới thế giới"
+			panel_body.add_child(RetentionPanels.tier(self))
+		"trial_pick":
+			panel_title.text = "Ải Vô Tận"
+			panel_body.add_child(RetentionPanels.trial_pick(self))
 
-func close_panel() -> void:
+func close_panel(force: bool = false) -> void:
+	## The Trial blessing picker cannot be dismissed: a blessing must be chosen.
+	if current_panel == "trial_pick" and not force:
+		return
 	rebinding = ""
 	if not panel_host.visible:
 		return
@@ -194,7 +250,7 @@ func close_panel() -> void:
 	current_panel = ""
 	if get_tree().paused and not title_screen.visible:
 		pause_panel.visible = true
-		(pause_panel.get_child(0).get_child(1) as Button).grab_focus()
+		resume_button.grab_focus()
 
 func refresh_panel() -> void:
 	if panel_host.visible:
@@ -353,30 +409,60 @@ func _inventory_view() -> Control:
 	right.add_child(UiTheme.label("Lâm An — Cấp %d" % state.level, 20, UiTheme.GOLD, true))
 	right.add_child(UiTheme.label("Kinh nghiệm: %d / %d   •   Điểm tu luyện: %d" % [state.xp, state.xp_for_next(), state.skill_points], 16))
 	right.add_child(UiTheme.label("Khí huyết tối đa: %d   •   Công lực: %d" % [roundi(state.max_health()), roundi(state.attack_power())], 16))
-	right.add_child(UiTheme.label("Kiếm: %s" % GameState.SWORDS[state.sword]["name"], 16, UiTheme.JADE_LIGHT, true))
+	var style: String = StyleBook.style_of(state.sword)
+	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ContentDB.style(style).get("name", "")], 16, UiTheme.JADE_LIGHT, true))
 	right.add_child(UiTheme.label("Tơ ký ức đã kết: %d" % state.count("to_ky_uc"), 16, UiTheme.CREAM))
 	var spacer: Control = Control.new()
 	spacer.custom_minimum_size.y = 10
 	right.add_child(spacer)
 	right.add_child(UiTheme.label("Võ học", 20, UiTheme.GOLD, true))
-	var skills: Array = [["gust", "Phong Trảm", "Chém ra lưỡi gió xuyên địch. Mỗi bậc: +25% sát thương, -15% hồi chiêu."],
-		["cyclone", "Toàn Phong", "Xoáy kiếm trên không, hút và chém liên tục quanh mình. Mỗi bậc: +25% sát thương, -15% hồi chiêu."],
-		["khinh_cong", "Khinh công", "Nhảy trên không (Space) và lướt gió (giữ Space). Mỗi bậc giảm thể lực tiêu hao."]]
-	for skill: Array in skills:
-		var row: HBoxContainer = HBoxContainer.new()
-		var level: int = state.skill_level(skill[0])
-		var text: Label = UiTheme.label("%s — %s\n%s" % [skill[1], ("bậc %d/3" % level) if level > 0 else "chưa lĩnh hội", skill[2]], 15)
-		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(text)
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	right.add_child(scroll)
+	var list: VBoxContainer = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	# The equipped sword's style first, then any other style with a learned form.
+	var shown: Array = [style]
+	for other: String in StyleBook.styles():
+		if other != style and ["e", "q"].any(func(slot: String) -> bool: return state.skill_level(String(StyleBook.form(other, slot).get("skill", ""))) > 0):
+			shown.append(other)
+	for shown_style: String in shown:
+		list.add_child(UiTheme.label(String(ContentDB.style(shown_style).get("name", "")), 16, StyleBook.color(shown_style), true))
+		for slot: String in StyleBook.SLOTS:
+			var form: Dictionary = StyleBook.form(shown_style, slot)
+			_skill_row(list, String(form["skill"]), "%s [%s]" % [form.get("name", ""), UserSettings.event_label(StyleBook.SLOT_ACTIONS[slot])],
+				String(form.get("description", "")) + ("  Tốn đầy nộ khí." if slot == "x" else "  Mỗi bậc: +25% sát thương, -15% hồi chiêu."),
+				String(StyleBook.form(shown_style, "q").get("skill", "")) if slot == "x" else "")
+	_skill_row(list, "khinh_cong", "Khinh công", "Nhảy trên không (Space) và lướt gió (giữ Space). Mỗi bậc giảm thể lực tiêu hao.", "")
+	return split
+
+func _skill_row(list: VBoxContainer, skill: String, title: String, description: String, ultimate_needs: String) -> void:
+	## One cultivation line. Ultimates (ultimate_needs = the style's Q skill) are learned with points.
+	var state: GameState = main.state
+	var row: HBoxContainer = HBoxContainer.new()
+	var level: int = state.skill_level(skill)
+	var text: Label = UiTheme.label("%s — %s\n%s" % [title, ("bậc %d/3" % level) if level > 0 else "chưa lĩnh hội", description], 15)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(text)
+	if ultimate_needs != "" and level == 0:
+		var learn: Button = UiTheme.button("Lĩnh hội (%d điểm)" % StyleBook.ULT_COST, func() -> void:
+			if state.learn_ultimate(skill, ultimate_needs):
+				main.unlock_skill(skill)
+			refresh_panel(), 170)
+		learn.disabled = state.skill_level(ultimate_needs) <= 0 or state.skill_points < StyleBook.ULT_COST
+		row.add_child(learn)
+	else:
 		var upgrade: Button = UiTheme.button("Nâng bậc", func() -> void:
-			if state.upgrade_skill(skill[0]):
-				main.on_skill_upgraded(skill[0])
+			if state.upgrade_skill(skill):
+				main.on_skill_upgraded(skill)
 			refresh_panel(), 130)
 		upgrade.disabled = level == 0 or level >= 3 or state.skill_points <= 0
 		row.add_child(upgrade)
-		right.add_child(row)
-	return split
+	list.add_child(row)
 
 # ------------------------------------------------------------------ settings
 
@@ -439,6 +525,9 @@ func _settings_view() -> Control:
 	video.add_child(quality_row)
 	video.add_child(_check_row("Toàn màn hình", settings.fullscreen, func(value: bool) -> void:
 		settings.fullscreen = value
+		if OS.has_feature("web"):
+			# Browsers only allow fullscreen inside the click that asks for it.
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if value else DisplayServer.WINDOW_MODE_WINDOWED)
 		_changed()))
 	video.add_child(_check_row("Hiện số sát thương", settings.damage_numbers, func(value: bool) -> void:
 		settings.damage_numbers = value

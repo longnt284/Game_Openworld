@@ -6,7 +6,7 @@ extends RefCounted
 const TOON_SHADER: Shader = preload("res://shaders/toon.gdshader")
 const OUTLINE_SHADER: Shader = preload("res://shaders/outline.gdshader")
 const WATER_SHADER: Shader = preload("res://shaders/water.gdshader")
-const FOLIAGE: PackedStringArray = ["tree", "pine", "maple", "bamboo", "grass", "foliage"]
+const FOLIAGE: PackedStringArray = ["tree", "pine", "maple", "bamboo", "grass", "foliage", "bush", "flower", "fern", "reed", "blossom"]
 
 static var _noise: NoiseTexture2D
 static var _cache: Dictionary = {}
@@ -38,7 +38,7 @@ static func flat_material(color: Color) -> ShaderMaterial:
 
 static func terrain_material() -> ShaderMaterial:
 	return make(Color.WHITE, {"use_vertex_color": true, "rim_strength": 0.0, "paint_strength": 0.09, "paint_scale": 0.05,
-		"shade_tint": Color(0.66, 0.72, 0.86), "shade_softness": 0.12})
+		"shade_tint": Color(0.62, 0.7, 0.88), "shade_softness": 0.1, "ground_detail": 0.7, "dapple": 0.85})
 
 static func outline_material() -> ShaderMaterial:
 	if _outline == null:
@@ -52,10 +52,10 @@ static func water_material() -> ShaderMaterial:
 	material.set_shader_parameter("flow_noise", noise_texture())
 	return material
 
-static func convert_material(material: Material, outline: bool, foliage: bool) -> Material:
+static func convert_material(material: Material, outline: bool, foliage: bool, ground_cover: bool = false) -> Material:
 	if material == null or material is ShaderMaterial:
 		return material
-	var key: String = "%d:%s:%s" % [material.get_instance_id(), outline, foliage]
+	var key: String = "%d:%s:%s:%s" % [material.get_instance_id(), outline, foliage, ground_cover]
 	if _cache.has(key):
 		return _cache[key]
 	var color: Color = Color.WHITE
@@ -63,16 +63,29 @@ static func convert_material(material: Material, outline: bool, foliage: bool) -
 	if material is BaseMaterial3D:
 		var base: BaseMaterial3D = material as BaseMaterial3D
 		color = base.albedo_color
+		# Blender "VK_vcol" materials arrive with vertex colours enabled (Godot strips the suffix).
+		if base.vertex_color_use_as_albedo:
+			options["use_vertex_color"] = true
+			options["vertex_color_linear"] = true
 		if base.emission_enabled:
 			options["emission_color"] = base.emission
 			options["emission_energy"] = base.emission_energy_multiplier * 1.2
 		if base.metallic > 0.3:
 			options["rim_strength"] = 0.35
+			options["spec_strength"] = 0.5
+			options["spec_size"] = 0.08
+		if material.resource_name.contains("hair"):
+			# Anime hair sheen: a thin hard highlight band.
+			options["spec_strength"] = 0.22
+			options["spec_size"] = 0.06
 	if foliage:
 		options["sway"] = 1.0
 		options["rim_strength"] = 0.05
 		options["double_sided_light"] = true
 		options["shade_tint"] = Color(0.62, 0.74, 0.8)
+	if ground_cover:
+		options["normal_up"] = 0.85
+		options["double_sided_light"] = false
 	var converted: ShaderMaterial = make(color, options)
 	converted.resource_name = material.resource_name
 	if outline:
@@ -80,7 +93,7 @@ static func convert_material(material: Material, outline: bool, foliage: bool) -
 	_cache[key] = converted
 	return converted
 
-static func apply_to_scene(root: Node, outline: bool = false, foliage: bool = false) -> void:
+static func apply_to_scene(root: Node, outline: bool = false, foliage: bool = false, ground_cover: bool = false) -> void:
 	## Rewrites surface materials on the shared mesh resources (once per mesh).
 	for node: Node in _walk(root):
 		if node is MeshInstance3D:
@@ -88,12 +101,18 @@ static func apply_to_scene(root: Node, outline: bool = false, foliage: bool = fa
 			var mesh: Mesh = instance.mesh
 			if mesh == null:
 				continue
-			var tag: String = "toon_%s_%s" % [outline, foliage]
+			var tag: String = "toon_%s_%s_%s" % [outline, foliage, ground_cover]
 			if mesh.has_meta(tag):
 				continue
 			for surface: int in range(mesh.get_surface_count()):
-				mesh.surface_set_material(surface, convert_material(mesh.surface_get_material(surface), outline, foliage))
+				mesh.surface_set_material(surface, convert_material(mesh.surface_get_material(surface), outline, foliage, ground_cover))
 			mesh.set_meta(tag, true)
+
+static func is_ground_cover(key: String) -> bool:
+	for word: String in ["grass", "flower_patch", "fern", "reed"]:
+		if key.contains(word):
+			return true
+	return false
 
 static func is_foliage(key: String) -> bool:
 	for word: String in FOLIAGE:

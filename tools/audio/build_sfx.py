@@ -1,6 +1,6 @@
 """Build sound effects and ambience loops.
 
-python3 tools/audio/build_sfx.py <kenney_dir>
+python3 tools/audio/build_sfx.py <kenney_dir>   (or --elemental to rebuild only the elemental clips)
 - Synthesises whooshes, wind skills, impacts, creature sounds and ambience loops with numpy/scipy
   (original work for this project).
 - Copies selected CC0 clips from Kenney's "RPG Audio", "Impact Sounds" and "Interface Sounds" packs
@@ -154,6 +154,51 @@ def effects():
     write(SFX / "seal_hum.ogg", (sine(110, 1.5) * 0.4 + sine(165, 1.5) * 0.3) * env(1.5, 0.4, 0.8) * (0.8 + 0.2 * np.sin(2 * np.pi * 4 * t(1.5))))
 
 
+def elemental():
+    """Sounds for the four elemental styles and the ultimate release (own RNG, so the clips above stay stable)."""
+    global RNG
+    saved, RNG = RNG, np.random.default_rng(2840)
+    # Water: a wet swish over a bubbling low band; swirl spins it into a draining vortex.
+    wash = bandpass(RNG.standard_normal(int(0.6 * RATE)), 250, 2400) * env(0.6, 0.03, 0.5) * (0.7 + 0.3 * np.sin(2 * np.pi * 23 * t(0.6)))
+    write(SFX / "water_slash.ogg", whoosh(0.6, 400, 1800, 0.35) * 0.8 + wash * 0.6)
+    swirl_len = 1.4
+    gurgle = bandpass(RNG.standard_normal(int(swirl_len * RATE)), 120, 900) * (0.6 + 0.4 * np.sin(2 * np.pi * np.linspace(3, 11, int(swirl_len * RATE)) * t(swirl_len)))
+    write(SFX / "water_swirl.ogg", (gurgle + 0.5 * swept_noise(swirl_len, 1600, 300, 0.4)) * env(swirl_len, 0.2, 0.7))
+    # Thunder: a crackling zip for the dash, a branching snap-and-rumble for the chain.
+    crackle = RNG.standard_normal(int(0.45 * RATE)) * (RNG.random(int(0.45 * RATE)) > 0.93)
+    write(SFX / "thunder_dash.ogg", whoosh(0.45, 1200, 4800, 0.3) * 0.7 + bandpass(crackle, 1500, 9000) * env(0.45, 0.005, 0.4) * 1.4)
+    chain_len = 1.1
+    snaps = np.zeros(int(chain_len * RATE))
+    for k in range(4):
+        start = int(k * 0.12 * RATE)
+        snap = bandpass(RNG.standard_normal(int(0.09 * RATE)), 2000, 10000) * env(0.09, 0.001, 0.08, 3.0)
+        snaps[start:start + len(snap)] += snap * (1.0 - 0.15 * k)
+    rumble = lowpass(RNG.standard_normal(int(chain_len * RATE)), 180) * env(chain_len, 0.05, 0.9, 2.5)
+    write(SFX / "thunder_chain.ogg", snaps + rumble * 0.8)
+    # Flame: a roaring ignition with crackle.
+    burst_len = 0.9
+    roar = lowpass(RNG.standard_normal(int(burst_len * RATE)), 900) * env(burst_len, 0.02, 0.7)
+    pops = bandpass(RNG.standard_normal(int(burst_len * RATE)) * (RNG.random(int(burst_len * RATE)) > 0.97), 900, 5000)
+    write(SFX / "flame_burst.ogg", roar + 0.6 * swept_noise(burst_len, 300, 1400, 0.45) * env(burst_len, 0.01, 0.7) + pops * env(burst_len, 0.01, 0.8))
+    # Frost: a glassy chime over cold hiss; shatter is a burst of high tinkles.
+    chime = sum(sine(f, 0.8) * env(0.8, 0.002, 0.75, 3.0) * g for f, g in ((2093, 0.5), (3136, 0.3), (4186, 0.2)))
+    write(SFX / "frost_cast.ogg", chime + 0.4 * swept_noise(0.8, 3000, 7000, 0.3) * env(0.8, 0.05, 0.6))
+    shatter = np.zeros(int(1.0 * RATE))
+    for _ in range(24):
+        start = RNG.integers(0, int(0.35 * RATE))
+        ping = sine(RNG.uniform(2500, 7000), 0.25) * env(0.25, 0.001, 0.24, 4.0) * RNG.uniform(0.2, 0.5)
+        shatter[start:start + len(ping)] += ping
+    crash = bandpass(RNG.standard_normal(int(1.0 * RATE)), 1500, 9000) * env(1.0, 0.001, 0.6, 4.0)
+    write(SFX / "frost_shatter.ogg", shatter + crash * 0.7)
+    # Ultimate release: rising charge into a deep boom and a bright tail.
+    rise_len, boom_len = 0.6, 1.6
+    rise = swept_noise(rise_len, 200, 3000, 0.3) * np.linspace(0.1, 1.0, int(rise_len * RATE)) ** 2
+    boom = 0.9 * sine(np.linspace(80, 30, int(boom_len * RATE)), boom_len) * env(boom_len, 0.002, 1.5) + 0.7 * lowpass(RNG.standard_normal(int(boom_len * RATE)), 700) * env(boom_len, 0.002, 1.2, 3.0)
+    tail = (sine(1318, boom_len) * 0.15 + sine(1975, boom_len) * 0.1) * env(boom_len, 0.01, 1.4, 2.0)
+    write(SFX / "ult_release.ogg", np.concatenate([rise, boom + tail]))
+    RNG = saved
+
+
 # ---------------------------------------------------------------- ambience
 
 def loopable(x, fade=1.5):
@@ -240,7 +285,11 @@ def copy_kenney(base):
 if __name__ == "__main__":
     SFX.mkdir(parents=True, exist_ok=True)
     AMBIENCE.mkdir(parents=True, exist_ok=True)
+    if sys.argv[1:] == ["--elemental"]:
+        elemental()
+        sys.exit()
     if len(sys.argv) > 1:
         copy_kenney(Path(sys.argv[1]))
     effects()
     ambience()
+    elemental()

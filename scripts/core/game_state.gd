@@ -6,11 +6,6 @@ extends RefCounted
 signal changed(kind: String, key: String)
 
 const XP_CURVE: Array[int] = [0, 100, 260, 480, 760, 1100, 1500, 1960, 2480, 3060]
-const SWORDS: Dictionary = {
-	"sword_old": {"name": "Kiếm Cũ", "attack": 10},
-	"sword_bamboo": {"name": "Thanh Trúc Kiếm", "attack": 16},
-	"sword_wind": {"name": "Phong Ngân Kiếm", "attack": 24},
-}
 
 var flags: Dictionary = {}
 var camp_kills: Dictionary = {}
@@ -19,14 +14,24 @@ var quests: Dictionary = {}
 var level: int = 1
 var xp: int = 0
 var skill_points: int = 0
-var skills: Dictionary = {"gust": 0, "cyclone": 0, "khinh_cong": 0}
+var skills: Dictionary = GameState.default_skills()
+## Equipped sword (base id from data/weapons.json) and every base sword owned in this save.
 var sword: String = "sword_old"
+var swords: Array = ["sword_old"]
+## Armory weapon (PlayerProfile.armory uid) equipped over the base sword, or -1.
+var equipped_uid: int = -1
+## Post-story difficulty loop: 0 is the story; higher tiers respawn stronger camps and bosses.
+var world_tier: int = 0
+var max_tier: int = 0
 var coins: int = 0
 var health: float = -1.0
 var checkpoint_id: String = ""
 var checkpoints: Array = []
 var discovered: Array = []
 var play_time: float = 0.0
+## Runtime bonuses from the equipped armory weapon and Endless Trial blessings (PlayerStats);
+## never saved, recomputed by main. Empty means neutral: story numbers stay exact.
+var stats: Dictionary = {}
 var tracked_quest: String = ""
 
 func has_flag(key: String) -> bool:
@@ -66,8 +71,18 @@ func remove_item(item: String, amount: int = 1) -> bool:
 func max_health() -> float:
 	return 120.0 + (level - 1) * 14.0
 
+static func default_skills() -> Dictionary:
+	## Every sword form (data/styles.json) plus khinh công, all unlearned.
+	var result: Dictionary = {"khinh_cong": 0}
+	for skill: String in StyleBook.all_skill_ids():
+		result[skill] = 0
+	return result
+
 func attack_power() -> float:
-	return float(SWORDS[sword]["attack"]) + (level - 1) * 1.5
+	return (float(ContentDB.weapon(sword).get("attack", 10)) + (level - 1) * 1.5) * (1.0 + stat("attack_bonus"))
+
+func stat(id: String) -> float:
+	return float(stats.get(id, 0.0))
 
 func xp_for_next() -> int:
 	return XP_CURVE[mini(level, XP_CURVE.size() - 1)] if level < XP_CURVE.size() else XP_CURVE[-1] + 600 * (level - XP_CURVE.size() + 1)
@@ -99,6 +114,40 @@ func upgrade_skill(skill: String) -> bool:
 	changed.emit("skill", skill)
 	return true
 
+func learn_ultimate(skill: String, requires: String) -> bool:
+	## Ultimates are learned with cultivation points once the style's Q form is known.
+	if skill_level(skill) > 0 or skill_level(requires) <= 0 or skill_points < StyleBook.ULT_COST:
+		return false
+	skill_points -= StyleBook.ULT_COST
+	skills[skill] = 1
+	changed.emit("skill", skill)
+	return true
+
+func grant_sword(id: String) -> bool:
+	## Adds a base sword; the first sword of an elemental style also teaches its E and Q forms.
+	if ContentDB.weapon(id).is_empty():
+		return false
+	var fresh: bool = not swords.has(id)
+	if fresh:
+		swords.append(id)
+		learn_style(id)
+		changed.emit("sword", id)
+	return fresh
+
+func learn_style(id: String) -> void:
+	## Holding a sword of an elemental style (story or armory) teaches that style's E and Q forms.
+	var style: String = StyleBook.style_of(id)
+	if style != StyleBook.DEFAULT_STYLE:
+		for slot: String in ["e", "q"]:
+			unlock_skill(String(StyleBook.form(style, slot).get("skill", "")))
+
+func equip_sword(id: String, uid: int = -1) -> void:
+	if not swords.has(id) and uid < 0:
+		return
+	sword = id
+	equipped_uid = uid
+	changed.emit("equip", id)
+
 func record_camp_kill(entity_id: String) -> void:
 	camp_kills[entity_id] = true
 
@@ -123,6 +172,7 @@ func to_dict() -> Dictionary:
 	return {
 		"flags": flags.duplicate(true), "camp_kills": camp_kills.duplicate(), "inventory": inventory.duplicate(), "quests": quests.duplicate(true),
 		"level": level, "xp": xp, "skill_points": skill_points, "skills": skills.duplicate(), "sword": sword, "coins": coins,
+		"swords": swords.duplicate(), "equipped_uid": equipped_uid, "world_tier": world_tier, "max_tier": max_tier,
 		"health": health, "checkpoint_id": checkpoint_id, "checkpoints": checkpoints.duplicate(), "discovered": discovered.duplicate(),
 		"play_time": play_time, "tracked_quest": tracked_quest,
 	}
@@ -137,12 +187,23 @@ func from_dict(data: Dictionary) -> void:
 	level = int(data.get("level", 1))
 	xp = int(data.get("xp", 0))
 	skill_points = int(data.get("skill_points", 0))
-	skills = {"gust": 0, "cyclone": 0, "khinh_cong": 0}
+	skills = GameState.default_skills()
 	for skill: String in (data.get("skills", {}) as Dictionary):
 		skills[skill] = int(data["skills"][skill])
 	sword = String(data.get("sword", "sword_old"))
-	if not SWORDS.has(sword):
+	if ContentDB.weapon(sword).is_empty():
 		sword = "sword_old"
+	swords = []
+	for owned: Variant in data.get("swords", ["sword_old"]):
+		if owned is String and not ContentDB.weapon(owned).is_empty() and not swords.has(owned):
+			swords.append(owned)
+	if not swords.has("sword_old"):
+		swords.insert(0, "sword_old")
+	equipped_uid = int(data.get("equipped_uid", -1))
+	if equipped_uid < 0 and not swords.has(sword):
+		swords.append(sword)
+	world_tier = maxi(0, int(data.get("world_tier", 0)))
+	max_tier = maxi(world_tier, int(data.get("max_tier", 0)))
 	coins = int(data.get("coins", 0))
 	health = float(data.get("health", -1.0))
 	checkpoint_id = String(data.get("checkpoint_id", ""))

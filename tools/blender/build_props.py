@@ -16,6 +16,9 @@ from mathutils import Vector  # noqa: E402
 
 import vk_lib as vk  # noqa: E402
 
+# Props are vertex-coloured: one material per building instead of ten (fewer draw calls).
+vk.DEFAULT_VCOL = True
+
 RNG = random.Random(284)
 
 
@@ -115,81 +118,7 @@ def hanging_lantern(b, x, y, z, color="vermilion"):
     b.segment((x, y, z - 0.24), (x, y, z - 0.45), 0.02, 0.0, mat=color, segments=4)
 
 
-# ---------------------------------------------------------------- flora
-
-def tree_pine():
-    b = vk.MeshBuilder("TreePine")
-    b.cylinder(0.24, 3.6, (0, 0, 1.8), mat="wood_dark", top=0.13, segments=8)
-    tiers = [(1.75, 2.3, 2.3, "jade_dark"), (1.42, 2.1, 3.3, "bamboo_dark"), (1.08, 1.9, 4.25, "jade_dark"), (0.7, 1.6, 5.1, "bamboo_dark")]
-    for radius, depth, z, mat in tiers:
-        b.cone(radius, depth, (0, 0, z), mat=mat, segments=9)
-        b.cone(radius * 0.92, depth * 0.3, (0, 0, z - depth * 0.42), (180, 0, 0), mat=mat, segments=9)
-    return b
-
-
-def tree_maple():
-    b = vk.MeshBuilder("TreeMaple")
-    b.cylinder(0.26, 2.6, (0, 0, 1.3), mat="wood", top=0.17, segments=8)
-    b.segment((0, 0, 2.2), (0.9, 0.2, 3.3), 0.11, 0.06, mat="wood", segments=6)
-    b.segment((0, 0, 2.4), (-0.8, -0.4, 3.4), 0.1, 0.06, mat="wood", segments=6)
-    blobs = [((0, 0, 3.6), 1.55, "vermilion"), ((1.0, 0.3, 3.4), 1.05, "gold"), ((-0.9, -0.4, 3.5), 1.1, "vermilion_dark"),
-             ((0.2, -0.8, 4.1), 1.0, "vermilion"), ((-0.3, 0.7, 4.3), 0.95, "gold"), ((0.3, 0.1, 4.7), 0.9, "vermilion")]
-    for (x, y, z), r, mat in blobs:
-        b.sphere(r, (x, y, z), scale=(1, 1, 0.78), mat=mat, segments=9, rings=6)
-    return b
-
-
-def bamboo_cluster():
-    b = vk.MeshBuilder("Bamboo")
-    rng = random.Random(7)
-    for k in range(7):
-        angle = k * 2.4
-        x, y = math.cos(angle) * (0.15 + 0.12 * k), math.sin(angle) * (0.15 + 0.1 * k)
-        height = rng.uniform(6.0, 9.0)
-        lean = Vector((rng.uniform(-0.08, 0.08), rng.uniform(-0.08, 0.08), 1)).normalized()
-        segments = int(height / 0.9)
-        mat = "bamboo" if k % 3 else "bamboo_light"
-        for s in range(segments):
-            start = Vector((x, y, 0)) + lean * (s * height / segments)
-            end = Vector((x, y, 0)) + lean * ((s + 1) * height / segments - 0.04)
-            b.segment(start, end, 0.055 - s * 0.002, 0.052 - s * 0.002, mat=mat, segments=6)
-            b.torus(0.056 - s * 0.002, 0.012, end + lean * 0.02, (math.degrees(math.atan2(lean.y, lean.z)) * -1, math.degrees(math.atan2(lean.x, lean.z)), 0),
-                    mat="bamboo_dark", segments=6, ring=3)
-        top = Vector((x, y, 0)) + lean * height
-        for leaf in range(5):
-            a = leaf * 1.3 + k
-            tip = top + Vector((math.cos(a) * 0.9, math.sin(a) * 0.9, -0.5 - leaf * 0.25))
-            mid = top.lerp(tip, 0.5) + Vector((0, 0, 0.15))
-            b.strip([top - lean * leaf * 0.5, mid - lean * leaf * 0.5, tip - lean * leaf * 0.5], [0.18, 0.32, 0.02], normal=(0, 0, 1),
-                    mat="bamboo_dark" if leaf % 2 else "jade", thickness=0.008)
-    return b
-
-
-def grass_tuft():
-    b = vk.MeshBuilder("Grass")
-    rng = random.Random(3)
-    for k in range(9):
-        a = k * 0.7
-        r = rng.uniform(0.0, 0.18)
-        base = Vector((math.cos(a) * r, math.sin(a) * r, 0))
-        tip = base + Vector((math.cos(a) * 0.12, math.sin(a) * 0.12, rng.uniform(0.35, 0.6)))
-        b.strip([base, base.lerp(tip, 0.5) + Vector((0, 0, 0.02)), tip], [0.07, 0.05, 0.0], normal=(math.cos(a + 1.57), math.sin(a + 1.57), 0),
-                mat="bamboo_light" if k % 3 else "bamboo", thickness=0.004)
-    for k in range(2):
-        a = k * 3.0 + 0.5
-        b.sphere(0.04, (math.cos(a) * 0.15, math.sin(a) * 0.15, 0.42), mat="cream" if k else "gold", segments=6, rings=4)
-    return b
-
-
-def rock_moss():
-    b = vk.MeshBuilder("Rock")
-    rng = random.Random(5)
-
-    def lumpy(co):
-        return co * (1.0 + rng.uniform(-0.08, 0.08))
-    b.sphere(0.8, (0, 0, 0.35), scale=(1.25, 0.95, 0.7), mat="stone", segments=9, rings=6, shape=lumpy)
-    b.sphere(0.55, (0.1, 0.05, 0.72), scale=(1.1, 0.9, 0.35), mat="moss", segments=8, rings=5, shape=lumpy)
-    return b
+# Flora (trees, bamboo, grass, rocks and ground cover) lives in build_flora.py.
 
 
 # ---------------------------------------------------------------- buildings
@@ -659,16 +588,185 @@ def memory_stone():
     vk.collider_cylinder("Body", 0.5, 1.6, (0, 0, 0.8))
 
 
+# ---------------------------------------------------------------- temple and village dressing
+
+def gate_tam_quan():
+    """Three-bay temple gate (tam quan): vermilion pillars, a tall central roof over two lower wings."""
+    b = vk.MeshBuilder("TamQuan")
+    b.box((9.4, 2.4, 0.3), (0, 0, 0.15), mat="stone", bevel=0.05)
+    for x in (-4.2, -1.6, 1.6, 4.2):
+        tall = abs(x) < 2.0
+        height = 5.2 if tall else 3.8
+        b.cylinder(0.22, height, (x, 0, 0.3 + height / 2), mat="vermilion", segments=10)
+        b.box((0.7, 0.7, 0.32), (x, 0, 0.46), mat="stone_light", bevel=0.05)
+    b.box((3.6, 0.36, 0.38), (0, 0, 4.9), mat="vermilion_dark", bevel=0.04)
+    b.box((1.6, 0.12, 0.7), (0, -0.22, 4.3), mat="gold", bevel=0.03)
+    b.box((1.3, 0.14, 0.5), (0, -0.25, 4.3), mat="ink")
+    for side in (-1, 1):
+        b.box((2.8, 0.32, 0.3), (side * 2.9, 0, 3.7), mat="vermilion_dark", bevel=0.03)
+        roof(b, 3.4, 2.6, 4.0, 0.7, center=(side * 2.9, 0), upturn=0.35)
+    roof(b, 4.4, 3.2, 5.45, 1.0, center=(0, 0), upturn=0.5)
+    b.build()
+    for x in (-4.2, -1.6, 1.6, 4.2):
+        vk.collider_cylinder(f"Pillar{x}", 0.3, 5.0, (x, 0, 2.6))
+
+
+def pagoda_bell_tower():
+    """Three-tier pagoda with a bronze bell under the lowest roof."""
+    b = vk.MeshBuilder("Pagoda")
+    b.box((4.6, 4.6, 0.5), (0, 0, 0.25), mat="stone", bevel=0.06)
+    z = 0.5
+    for tier, (width, height) in enumerate([(3.4, 2.6), (2.7, 2.0), (2.1, 1.7)]):
+        for x in (-width / 2 + 0.15, width / 2 - 0.15):
+            for y in (-width / 2 + 0.15, width / 2 - 0.15):
+                b.cylinder(0.12, height, (x, y, z + height / 2), mat="vermilion", segments=8)
+        b.box((width, width, 0.14), (0, 0, z + height - 0.07), mat="wood_dark")
+        if tier > 0:
+            b.box((width - 0.4, width - 0.4, height * 0.8), (0, 0, z + height * 0.45), mat="cream")
+        roof(b, width + 1.3, width + 1.3, z + height, 0.55 + tier * 0.05, upturn=0.45)
+        z += height + 0.55
+    b.cylinder(0.05, 1.2, (0, 0, z + 0.4), mat="gold", top=0.0, segments=6)
+    b.cylinder(0.55, 0.9, (0, 0, 1.9), mat="bronze", top=0.38, segments=14)
+    b.sphere(0.4, (0, 0, 2.38), scale=(1, 1, 0.5), mat="bronze", segments=12, rings=6)
+    b.build()
+    vk.collider_box("Base", (3.6, 3.6, 3.2), (0, 0, 1.8))
+
+
+def incense_burner():
+    b = vk.MeshBuilder("Incense")
+    b.box((1.4, 1.4, 0.3), (0, 0, 0.15), mat="stone", bevel=0.04)
+    for k in range(3):
+        a = k * math.tau / 3
+        b.segment((math.cos(a) * 0.35, math.sin(a) * 0.35, 0.3), (math.cos(a) * 0.42, math.sin(a) * 0.42, 0.62), 0.07, 0.05, mat="bronze", segments=6)
+    b.sphere(0.5, (0, 0, 0.92), scale=(1, 1, 0.62), mat="bronze", segments=14, rings=8)
+    b.torus(0.48, 0.05, (0, 0, 1.18), mat="gold", segments=16, ring=5)
+    for side in (-1, 1):
+        b.torus(0.12, 0.03, (side * 0.52, 0, 1.15), (90, 0, 0), mat="bronze", segments=10, ring=4)
+    b.cylinder(0.32, 0.18, (0, 0, 1.3), mat="bronze", top=0.12, segments=12)
+    b.sphere(0.08, (0, 0, 1.45), mat="gold", segments=8, rings=4)
+    for k in range(3):
+        b.cylinder(0.012, 0.35, (0.08 * (k - 1), 0.05, 1.32), mat="wood_dark", segments=4)
+    b.build()
+    vk.collider_cylinder("Body", 0.6, 1.4, (0, 0, 0.7))
+
+
+def stone_nghe():
+    """Guardian lion (nghê) on a plinth, seated and facing forward (-Y)."""
+    b = vk.MeshBuilder("Nghe")
+    b.box((1.0, 1.4, 0.7), (0, 0, 0.35), mat="stone_dark", bevel=0.05)
+    b.sphere(0.55, (0, 0.15, 1.15), scale=(0.75, 1.0, 0.95), mat="stone_light", segments=12, rings=8)
+    b.sphere(0.48, (0, -0.42, 1.75), scale=(1.0, 0.9, 0.95), mat="stone_light", segments=12, rings=8)
+    b.sphere(0.36, (0, -0.48, 1.62), scale=(1.5, 0.8, 1.2), mat="stone", segments=10, rings=6)
+    for side in (-1, 1):
+        b.sphere(0.1, (side * 0.18, -0.85, 1.82), mat="ink", segments=6, rings=4)
+        b.segment((side * 0.22, -0.45, 0.72), (side * 0.22, -0.55, 1.15), 0.12, 0.1, mat="stone_light", segments=8)
+        for curl in range(3):
+            b.sphere(0.12, (side * 0.38, -0.25 + curl * 0.18, 2.0 - curl * 0.12), mat="stone", segments=6, rings=4)
+    b.sphere(0.16, (0, -0.95, 1.6), scale=(1.6, 0.8, 0.8), mat="stone_dark", segments=8, rings=5)
+    b.segment((0, 0.65, 1.0), (0, 0.95, 1.7), 0.08, 0.14, mat="stone", segments=6)
+    b.build()
+    vk.collider_box("Body", (1.0, 1.4, 2.2), (0, 0, 1.1))
+
+
+def prayer_banner():
+    """Tall pole with a long vertical cloth banner (sways in the wind in game)."""
+    b = vk.MeshBuilder("Banner")
+    b.cylinder(0.08, 6.0, (0, 0, 3.0), mat="wood_dark", segments=8)
+    b.sphere(0.12, (0, 0, 6.05), mat="gold", segments=8, rings=4)
+    b.cylinder(0.04, 1.3, (0.6, 0, 5.7), (0, 90, 0), mat="wood_dark", segments=6)
+    b.box((1.1, 0.04, 3.6), (0.62, 0, 3.85), mat="banner_red")
+    b.box((0.9, 0.05, 3.2), (0.62, -0.01, 3.9), mat="banner_cream")
+    for k in range(5):
+        b.box((0.5, 0.06, 0.08), (0.62, -0.02, 5.0 - k * 0.55), mat="ink")
+    b.box((1.1, 0.06, 0.12), (0.62, 0, 2.05), mat="gold")
+    b.build()
+    vk.collider_cylinder("Pole", 0.15, 6.0, (0, 0, 3.0))
+
+
+def rice_rack():
+    """A-frame drying rack hung with golden rice sheaves."""
+    b = vk.MeshBuilder("RiceRack")
+    for x in (-1.8, 1.8):
+        b.segment((x, -0.7, 0), (x, 0, 2.2), 0.06, mat="wood", segments=6)
+        b.segment((x, 0.7, 0), (x, 0, 2.2), 0.06, mat="wood", segments=6)
+    for z in (1.0, 1.6, 2.15):
+        b.cylinder(0.045, 4.0, (0, 0, z), (0, 90, 0), mat="wood_dark", segments=6)
+    for row, z in enumerate((1.0, 1.6)):
+        for k in range(9):
+            x = -1.6 + k * 0.4
+            b.cone(0.16, 0.7, (x, 0, z - 0.32), (180, 0, 0), mat="hay" if (k + row) % 2 else "hay_dark", segments=6)
+    b.build()
+    vk.collider_box("Body", (3.8, 1.2, 2.2), (0, 0, 1.1))
+
+
+def haystack():
+    b = vk.MeshBuilder("Haystack")
+    b.cylinder(1.2, 1.4, (0, 0, 0.7), mat="hay", top=1.05, segments=12)
+    b.cone(1.15, 1.6, (0, 0, 2.2), mat="hay", segments=12)
+    b.torus(1.08, 0.06, (0, 0, 1.35), mat="hay_dark", segments=16, ring=4)
+    b.cylinder(0.06, 0.8, (0, 0, 3.1), mat="wood_dark", segments=6)
+    b.build()
+    vk.collider_cylinder("Body", 1.2, 2.6, (0, 0, 1.3))
+
+
+def lantern_string():
+    """Two posts with a sagging cord of red lanterns (spans about 8 m)."""
+    b = vk.MeshBuilder("LanternString")
+    for x in (-4.0, 4.0):
+        b.cylinder(0.08, 3.6, (x, 0, 1.8), mat="wood_dark", segments=8)
+    points = []
+    for k in range(13):
+        u = k / 12
+        points.append((-4.0 + 8.0 * u, 0, 3.5 - math.sin(u * math.pi) * 0.7))
+    for a, c in zip(points, points[1:]):
+        b.segment(a, c, 0.015, mat="ink", segments=4)
+    for k in range(1, 6):
+        u = k / 6
+        hanging_lantern(b, -4.0 + 8.0 * u, 0, 3.5 - math.sin(u * math.pi) * 0.7 - 0.55, "vermilion" if k % 2 else "gold")
+    b.build()
+    for x in (-4.0, 4.0):
+        vk.collider_cylinder(f"Post{x}", 0.12, 3.6, (x, 0, 1.8))
+
+
+def flower_pot():
+    """Terracotta pot with a leafy shrub and blooms (doorsteps and stalls)."""
+    rng = random.Random(101)
+    b = vk.MeshBuilder("FlowerPot")
+    b.cylinder(0.32, 0.5, (0, 0, 0.25), mat="pot", top=0.4, segments=12)
+    b.torus(0.4, 0.04, (0, 0, 0.5), mat="pot_dark", segments=14, ring=4)
+    for k in range(5):
+        a = k * 1.26
+        b.sphere(0.24, (math.cos(a) * 0.15, math.sin(a) * 0.15, 0.72 + rng.uniform(0, 0.12)), scale=(1, 1, 0.85), mat="leaf", segments=8, rings=5)
+    for k in range(7):
+        a = k * 0.9
+        b.sphere(0.06, (math.cos(a) * 0.26, math.sin(a) * 0.26, 0.86 + rng.uniform(0, 0.1)), mat="petal_white" if k % 2 else "blossom", segments=6, rings=4)
+    return b
+
+
+def basket_produce():
+    """Woven basket heaped with oranges and greens."""
+    rng = random.Random(103)
+    b = vk.MeshBuilder("Basket")
+    b.cylinder(0.42, 0.36, (0, 0, 0.18), mat="wood_light", top=0.5, segments=12)
+    b.torus(0.5, 0.04, (0, 0, 0.36), mat="wood", segments=14, ring=4)
+    for k in range(10):
+        a = k * 2.4
+        r = rng.uniform(0.0, 0.33)
+        b.sphere(0.11, (math.cos(a) * r, math.sin(a) * r, 0.42 + rng.uniform(0, 0.08)), mat="fruit_orange" if k % 3 else "fruit_green", segments=8, rings=5)
+    return b
+
+
 ASSETS = {
-    "tree_pine": tree_pine, "tree_maple": tree_maple, "bamboo_cluster": bamboo_cluster, "grass_tuft": grass_tuft, "rock_moss": rock_moss,
     "house_small": house_small, "house_long": house_long, "house_teal": house_teal, "smithy": smithy, "gate_village": gate_village,
     "shrine_wind": shrine_wind, "bridge_wood": bridge_wood, "dock": dock, "boat": boat, "lantern_stone": lantern_stone,
     "lantern_post": lantern_post, "signboard": signboard, "table": table, "bench": bench, "chest": chest, "stele": stele,
     "ruins_pillar": ruins_pillar, "ruins_wall": ruins_wall, "well": well, "barrel": barrel, "crate": crate, "fence_bamboo": fence_bamboo,
     "market_stall": market_stall, "watchtower": watchtower, "wind_chime_post": wind_chime_post, "seal_gate": seal_gate,
     "campfire": campfire, "tent": tent, "steps_stone": steps_stone, "rock_cliff": rock_cliff, "memory_stone": memory_stone,
+    "gate_tam_quan": gate_tam_quan, "pagoda_bell_tower": pagoda_bell_tower, "incense_burner": incense_burner, "stone_nghe": stone_nghe,
+    "prayer_banner": prayer_banner, "rice_rack": rice_rack, "haystack": haystack, "lantern_string": lantern_string,
+    "flower_pot": flower_pot, "basket_produce": basket_produce,
 }
-FLORA = {"tree_pine", "tree_maple", "bamboo_cluster", "grass_tuft", "rock_moss"}
 
 
 def main(names, preview):
@@ -683,7 +781,7 @@ def main(names, preview):
         original_models = vk.MODELS
         vk.MODELS = out_dir
         vk.ART = original_art / "env"
-        info = vk.save_and_export(name, extra={"kind": "flora" if name in FLORA else "prop"})
+        info = vk.save_and_export(name, extra={"kind": "prop"})
         vk.MODELS, vk.ART = original_models, original_art
         vk.write_manifest_entry(info, "env")
         if preview:

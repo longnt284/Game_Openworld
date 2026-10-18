@@ -17,8 +17,12 @@ import vk_lib as vk  # noqa: E402
 
 CHARACTERS = {
     "lam_an": {
-        "role": "player", "scale": 1.0, "hair_style": "hero", "outer": "jade", "inner": "cream", "trim": "white", "sash": "vermilion",
-        "pants": "cloth_dark", "boots": "leather", "extras": ["tails", "pauldron", "scarf", "sheath"], "brow_tilt": 10,
+        # Concept sheet: teal split robe with cream cloud trim, red sash with tassel and jade bead, black-and-gold
+        # pauldron on the left shoulder, long white scarf, red hair ribbon, amber eyes, knee boots ringed in gold.
+        "role": "player", "scale": 1.0, "hair_style": "hero", "outer": "robe", "inner": "cream", "trim": "robe_trim", "sash": "sash",
+        "tie": "ribbon", "ribbon_tails": True, "pants": "cloth_dark", "boots": "boot", "boot_top": 0.47, "boot_rings": "gold",
+        "pauldron": "pauldron_dark", "scarf": "scarf_white", "long_scarf": True, "tassel": True, "iris": "iris_amber",
+        "extras": ["tails", "pauldron", "scarf", "sheath"], "brow_tilt": 10, "sheath_tassel": True,
     },
     "tieu_mac": {
         "role": "npc", "scale": 0.95, "hair_style": "short", "hair": "hair_brown", "outer": "cloth_blue", "inner": "cream", "trim": "cream",
@@ -54,7 +58,7 @@ CHARACTERS = {
         "role": "guardian", "scale": 1.55, "width": 1.25, "belly": 1.15, "hair_style": "none", "skin": "stone_dark", "outer": "bamboo_dark",
         "sleeve": "bamboo_dark", "inner": "cream", "trim": "gold", "sash": "vermilion", "tails": "bamboo", "pants": "cloth_dark", "boots": "wood_dark",
         "bracer": "bamboo_dark", "extras": ["tails", "mask", "armor"], "mask": "mask", "mask_mark": "seal", "eye_glow": "spirit",
-        "tail_length": 0.5,
+        "tail_length": 0.5, "conical_helmet": True,
     },
 }
 

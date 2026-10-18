@@ -21,6 +21,7 @@ var health_bar: ProgressBar
 var stamina_bar: ProgressBar
 var level_label: Label
 var heal_label: Label
+## slot (e, q, x) -> {"panel", "key", "name", "bar", "action"}
 var skill_boxes: Dictionary = {}
 var boss_box: VBoxContainer
 var boss_name: Label
@@ -122,24 +123,25 @@ func _build_skills() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_END
 	_anchored(row, Control.PRESET_BOTTOM_RIGHT, Vector2(-330, -112), Vector2(-28, -24))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for skill: Array in [["gust", "Phong Trảm", "skill_1"], ["cyclone", "Toàn Phong", "skill_2"]]:
+	row.offset_left = -560
+	for slot: String in StyleBook.SLOTS:
 		var panel: PanelContainer = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(132, 80)
+		panel.custom_minimum_size = Vector2(140, 80)
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var inner: VBoxContainer = VBoxContainer.new()
 		inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(inner)
-		var key: Label = UiTheme.label(skill[2], 22, UiTheme.GOLD, true)
+		var key: Label = UiTheme.label("", 22, UiTheme.GOLD, true)
 		key.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		inner.add_child(key)
-		var name_label: Label = UiTheme.label(skill[1], 13, UiTheme.CREAM)
+		var name_label: Label = UiTheme.label("", 13, UiTheme.CREAM)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		inner.add_child(name_label)
-		var cooldown: ProgressBar = UiTheme.bar(UiTheme.JADE_LIGHT, Vector2(100, 5))
+		var cooldown: ProgressBar = UiTheme.bar(UiTheme.GOLD if slot == "x" else UiTheme.JADE_LIGHT, Vector2(108, 5))
 		cooldown.max_value = 1.0
 		inner.add_child(cooldown)
 		row.add_child(panel)
-		skill_boxes[skill[0]] = {"panel": panel, "key": key, "name": name_label, "bar": cooldown, "action": skill[2]}
+		skill_boxes[slot] = {"panel": panel, "key": key, "name": name_label, "bar": cooldown, "action": StyleBook.SLOT_ACTIONS[slot]}
 
 func _build_center() -> void:
 	prompt = _anchored(UiTheme.label("", 20, UiTheme.CREAM, true), Control.PRESET_CENTER_BOTTOM, Vector2(-320, -170), Vector2(320, -136))
@@ -248,12 +250,15 @@ func set_level(level: int, xp: int, next_xp: int, skill_points: int) -> void:
 func set_heal_count(text: String) -> void:
 	heal_label.text = text
 
-func set_skill(skill: String, unlocked: bool, ratio: float, level: int) -> void:
-	var box: Dictionary = skill_boxes[skill]
+func set_skill(slot: String, title: String, unlocked: bool, fill: float, level: int, tint: Color) -> void:
+	## fill: 1 when ready (cooldown done, or a full charge meter on the ultimate slot).
+	var box: Dictionary = skill_boxes[slot]
+	var ready: bool = unlocked and fill >= 0.999
 	(box["panel"] as Control).modulate = Color(1, 1, 1, 1.0 if unlocked else 0.35)
-	(box["bar"] as ProgressBar).value = 1.0 - ratio
+	(box["bar"] as ProgressBar).value = fill
 	(box["key"] as Label).text = UserSettings.event_label(box["action"]) if unlocked else "—"
-	(box["name"] as Label).text = String({"gust": "Phong Trảm", "cyclone": "Toàn Phong"}[skill]) + ((" %s" % ["I", "II", "III"][clampi(level - 1, 0, 2)]) if unlocked else "")
+	(box["key"] as Label).modulate = tint.lightened(0.25) if ready else Color(1, 1, 1)
+	(box["name"] as Label).text = title + ((" %s" % ["I", "II", "III"][clampi(level - 1, 0, 2)]) if unlocked and slot != "x" else "")
 
 func set_tracker(region: String, title: String, text: String) -> void:
 	region_label.text = region

@@ -1,4 +1,4 @@
-# Kết quả kiểm tra — 14/10/2026
+# Kết quả kiểm tra — 18/10/2026
 
 Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** trong môi trường phát triển.
 
@@ -13,10 +13,16 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 | Bộ test | Lệnh | Kết quả |
 |---|---|---|
 | Import asset | `godot --headless --path . --editor --import` | Thành công |
-| Smoke test (bản nền, giữ nguyên độ bao phủ) | `tests/smoke_test.gd` | **29/29 PASS** |
-| Gameplay test (chơi trọn đoạn mẫu) | `tests/gameplay_test.gd` | **44/44 PASS** |
+| Smoke test (bản nền + thực vật, vùng cấm, preset) | `tests/smoke_test.gd` | **35/35 PASS** |
+| Gameplay test (chơi trọn đoạn mẫu) | `tests/gameplay_test.gd` | **48/48 PASS** |
+| Combat test (15 thức của 5 hệ, trạng thái, nộ khí) | `tests/combat_test.gd` | **53/53 PASS** |
+| Progression test (save v3, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới) | `tests/progression_test.gd` | **49/49 PASS** |
 
-`./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` chạy cả ba bước. CI GitHub Actions chạy trên `windows-latest`.
+Tổng **185/185 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả bốn bộ. CI GitHub Actions chạy trên `windows-latest`.
+
+**Combat test:** mỗi thức E/Q/X của 5 hệ khởi động, gây sát thương và gây đúng trạng thái; thiêu đốt gây sát thương theo thời gian không làm khựng; lạnh cóng làm chậm, 3 lớp thành đóng băng, boss không bị đóng băng; mục tiêu ướt chỉ nhận thêm sát thương sấm; tuyệt kỹ bị từ chối khi nộ khí chưa đầy và tiêu hết khi dùng; Phong Trảm vẫn bằng công lực × 1,6 như bản trước.
+
+**Progression test:** 200.000 lượt quay có tỉ lệ Cực phẩm 2,44% so với tỉ lệ tổng hợp công khai 2,43%; không chuỗi nào vượt lượt bảo hiểm 70; mỗi 10 lượt có Hiếm; trượt 50/50 thì lần sau chắc chắn ra kiếm nổi bật; thiếu Ngọc bị từ chối không đổi gì; bảo hiểm và kho kiếm còn nguyên sau khi tải lại hồ sơ; trang phục trùng đổi thành Mảnh; chỉ số phụ không trùng, đúng khoảng, đúng số dòng theo độ hiếm; nhiệm vụ ngày làm mới theo ngày, thưởng nhận một lần, điểm danh đứt chuỗi khi bỏ ngày. Cảnh thật: cổng Ải đưa vào đấu trường, đợt 1 có 3 địch, không lưu được trong lượt, xong đợt thì dừng ở bảng phúc lành mà Esc không đóng được, Kiếm Phong tăng đúng 15% đòn thường, Trúc Tướng đợt 5 có máu theo hệ số đợt, gục ngã thì về cổng, nhận thưởng và không ghi cờ cốt truyện; cảnh giới 1 Trúc Tướng có 1,7 lần máu, hạ xong ghi `tier_dead:1:` và mở cảnh giới 2; tinh anh có nhãn và không sửa dữ liệu dùng chung.
 
 **Smoke test:** nạp GLB, giới hạn pool vùng, va chạm mặt đất, tọa độ âm, seed tái lập, mép vùng khớp, di chuyển/nhảy/tiếp đất, HUD/menu trong viewport, tạm dừng, dịch chuyển xa và tái sử dụng node, checkpoint, lưu/tải qua luồng chính, backup, file hỏng, schema sai, tọa độ NaN/không phải số.
 
@@ -30,7 +36,7 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 
 ## Kiểm tra hình ảnh — đã chạy (renderer phần mềm)
 
-`tests/render_preview.gd` chụp các cảnh thật trong game ở 1280 × 720: bến sông, làng, hội thoại, giao tranh, Trúc Hải, Khe Gió, đấu trường, boss, bản đồ, nhật ký, túi đồ, thiết lập, ghi công, màn hình chính. Cảnh "moves" tua từng đòn tới giữa khung gây sát thương (lấy từ `data/anim_timings.json`) và chụp nhìn ngang. Đã kiểm tra bằng mắt: vật liệu toon, bóng, viền, vũ khí gắn tay, tư thế đòn khớp khung sát thương, chữ tiếng Việt đủ dấu, UI nằm trong khung hình.
+`tests/render_preview.gd` chụp các cảnh thật trong game (1920 × 1080, giao diện cơ sở 1280 × 720): bến sông, làng, hội thoại, giao tranh, Trúc Hải, Khe Gió, đấu trường, boss, bản đồ, nhật ký, túi đồ, thiết lập, ghi công, Kỳ Ngộ, kho kiếm, nhiệm vụ ngày, cảnh giới, Ải Vô Tận và bảng phúc lành. Cảnh "moves" tua từng đòn tới giữa khung gây sát thương (lấy từ `data/anim_timings.json`) và chụp nhìn ngang; một ảnh riêng chạy đòn thật ở tốc độ chậm để kiểm tra vệt kiếm. Đã kiểm tra bằng mắt: vật liệu toon, bóng, viền, vũ khí gắn tay, tư thế đòn khớp khung sát thương, chữ tiếng Việt đủ dấu, UI nằm trong khung hình.
 
 | | |
 |---|---|
@@ -39,8 +45,17 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 | ![Trúc Hải](screenshots/bamboo.jpg) | ![Khe Gió](screenshots/gorge.jpg) |
 | ![Trúc Tướng](screenshots/boss_slam.jpg) | ![Bản đồ](screenshots/map.jpg) |
 | ![Nhật ký](screenshots/journal.jpg) | ![Túi đồ](screenshots/inventory.jpg) |
+| ![Kỳ Ngộ](screenshots/gacha.jpg) | ![Kho kiếm & trang phục](screenshots/armory.jpg) |
+| ![Ải Vô Tận](screenshots/trial_wave.jpg) | ![Chọn phúc lành](screenshots/trial_pick.jpg) |
+| ![Nhiệm vụ ngày](screenshots/daily.jpg) | ![Cảnh giới thế giới](screenshots/tier.jpg) |
 
-![Tám đòn của Lâm An ở giữa khung gây sát thương: chuỗi 3 đòn, trọng kích, Phong Trảm, Toàn Phong, phản đòn, né](screenshots/moves.jpg)
+![Mười đòn của Lâm An ở giữa khung gây sát thương: chuỗi 3 đòn, trọng kích, Phong Trảm, Toàn Phong, phản đòn, né, lướt chém, tuyệt kỹ](screenshots/moves.jpg)
+
+## Bản Web — đã build, đã chạy trong Chromium, đã deploy preview
+
+- `tools/run.sh web` (cũng là lệnh build của Vercel qua `vercel.json`) tạo `build/web` **51 MB** trước nén: `index.wasm` 39,5 MB, `index.pck` 12,7 MB, `index.js` 0,3 MB. Bản không luồng nên không cần header COOP/COEP.
+- `tools/run.sh websmoke`: Playwright + Chromium (SwiftShader) mở bản build, tới màn hình chính sau ~5–7 s, vào chơi và đi bộ; **PASS**, không có `pageerror` hay `SCRIPT ERROR`. Cảnh báo duy nhất: navmesh làm tròn `agent_radius` (không ảnh hưởng).
+- Vercel (project `game-openworld`) tự build mỗi lần push nhánh; các bản preview của nhánh đều ở trạng thái READY. Preview đang bật Vercel Authentication nên chỉ tài khoản trong team xem được.
 
 ## Hiệu năng — chưa đo được trên GPU thật
 

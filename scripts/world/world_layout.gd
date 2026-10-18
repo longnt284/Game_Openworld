@@ -8,6 +8,16 @@ const PATH: String = "res://data/world/layout.json"
 const PATH_BLEND: float = 5.0
 const BANK: float = 6.0
 const EDGE_CAP: float = 70.0
+const KEEPOUT_CELL: float = 32.0
+## Footprints flora keeps clear of (metres); unlisted props use DEFAULT_PROP_KEEPOUT.
+const PROP_KEEPOUT: Dictionary = {
+	"house_small": 5.5, "house_teal": 5.5, "house_long": 7.5, "smithy": 6.0, "gate_village": 4.5, "shrine_wind": 3.5, "watchtower": 4.0,
+	"bridge_wood": 6.0, "dock": 6.0, "market_stall": 3.0, "tent": 3.0, "well": 2.2, "ruins_wall": 3.5, "seal_gate": 5.0, "rock_cliff": 4.0,
+	"boat": 0.0, "gate_tam_quan": 5.0, "pagoda_bell_tower": 4.5, "rice_rack": 2.5, "haystack": 2.0, "lantern_string": 1.0,
+	"flower_pot": 0.8, "basket_produce": 0.8, "prayer_banner": 1.0,
+}
+const DEFAULT_PROP_KEEPOUT: float = 1.6
+const ENTITY_KEEPOUT: Dictionary = {"npc": 2.5, "shrine": 3.0, "chest": 2.5, "echo": 2.5, "diary": 2.5, "chime": 2.5, "memory_core": 3.0, "seal_gate": 4.0, "enemy": 1.5}
 
 var source: Dictionary = {}
 var noise: FastNoiseLite = FastNoiseLite.new()
@@ -24,11 +34,45 @@ var chasms: Array = []
 var ridges: Array = []
 var biomes: Dictionary = {}
 var clearings: Array = []
+## Flora rules from data/world/flora.json; kind order seeds each kind's own RNG.
+var flora: Dictionary = {}
+var flora_kinds: Array = []
+var cluster: FastNoiseLite = FastNoiseLite.new()
+## KEEPOUT_CELL grid cell -> [[centre, radius, colliders_only], ...]
+var keepouts: Dictionary = {}
 
 static func load_default(world_seed: int) -> WorldLayout:
+	## Main thread only: reads ContentDB, which is not thread-safe. The result is then immutable.
 	var file: FileAccess = FileAccess.open(PATH, FileAccess.READ)
 	var parsed: Variant = JSON.parse_string(file.get_as_text()) if file else null
-	return WorldLayout.new(parsed if parsed is Dictionary else {}, world_seed)
+	var layout: WorldLayout = WorldLayout.new(parsed if parsed is Dictionary else {}, world_seed)
+	layout.load_flora(ContentDB.get_data("flora"), ContentDB.get_data("entities"), ContentDB.get_data("props"))
+	return layout
+
+func load_flora(rules: Dictionary, entities: Dictionary, props: Dictionary) -> void:
+	flora = rules.get("kinds", {})
+	flora_kinds = flora.keys()
+	for entity: Dictionary in entities.get("entities", []):
+		var radius: float = float(ENTITY_KEEPOUT.get(String(entity.get("type", "")), 0.0))
+		if radius <= 0.0:
+			continue
+		var spots: Array = [entity["pos"]] if entity.has("pos") else (entity.get("positions", []) as Array).map(func(rule: Dictionary) -> Array: return rule["pos"])
+		for spot: Array in spots:
+			_add_keepout(Vector2(float(spot[0]), float(spot[1])), radius, entity["type"] == "enemy")
+	for prop: Dictionary in props.get("props", []):
+		var radius: float = float(PROP_KEEPOUT.get(String(prop["model"]), DEFAULT_PROP_KEEPOUT))
+		if radius > 0.0:
+			_add_keepout(Vector2(float(prop["pos"][0]), float(prop["pos"][1])), radius, false)
+
+func _add_keepout(center: Vector2, radius: float, colliders_only: bool) -> void:
+	var low: Vector2i = Vector2i(floori((center.x - radius) / KEEPOUT_CELL), floori((center.y - radius) / KEEPOUT_CELL))
+	var high: Vector2i = Vector2i(floori((center.x + radius) / KEEPOUT_CELL), floori((center.y + radius) / KEEPOUT_CELL))
+	for cz: int in range(low.y, high.y + 1):
+		for cx: int in range(low.x, high.x + 1):
+			var cell: Vector2i = Vector2i(cx, cz)
+			if not keepouts.has(cell):
+				keepouts[cell] = []
+			keepouts[cell].append([center, radius, colliders_only])
 
 func _init(data: Dictionary, world_seed: int) -> void:
 	source = data
@@ -39,6 +83,9 @@ func _init(data: Dictionary, world_seed: int) -> void:
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	detail.seed = world_seed + 17
 	detail.frequency = 0.09
+	# Groves and flower drifts: flora kinds sample this at offsets so they cluster apart.
+	cluster.seed = world_seed + 31
+	cluster.frequency = 0.035
 	var b: Dictionary = data.get("bounds", {"min_x": -132, "max_x": 132, "min_z": -462, "max_z": 100})
 	bounds = Rect2(float(b["min_x"]), float(b["min_z"]), float(b["max_x"]) - float(b["min_x"]), float(b["max_z"]) - float(b["min_z"]))
 	elevation = data.get("elevation", [[0, 0.0]])
@@ -235,7 +282,14 @@ func flat_at(x: float, z: float) -> Dictionary:
 	return {}
 
 func inside_bounds(x: float, z: float) -> bool:
-	return bounds.has_point(Vector2(x, z))
+	return bounds.has_point(Vector2(x, z)) or in_pocket(x, z)
+
+func in_pocket(x: float, z: float) -> bool:
+	## Pockets are flats beyond the valley walls (the Endless Trial arena), reached only by teleport.
+	for flat: Dictionary in flats:
+		if flat.get("pocket", false) and Vector2(x - float(flat["x"]), z - float(flat["z"])).length() < float(flat["r"]):
+			return true
+	return false
 
 func is_clear(x: float, z: float, margin: float = 1.5) -> bool:
 	if not bounds.grow(-2.0).has_point(Vector2(x, z)):
@@ -253,6 +307,54 @@ func is_clear(x: float, z: float, margin: float = 1.5) -> bool:
 			return false
 	for chasm: Dictionary in chasms:
 		if _box_weight(x, z, chasm, float(chasm["edge"]) + margin + 2.0) > 0.0:
+			return false
+	return true
+
+func biome_density(z: float) -> Dictionary:
+	return (biomes.get(region_at(z).get("id", ""), {}) as Dictionary).get("density", {})
+
+func cluster_gate(x: float, z: float, kind_index: int, band: Array) -> float:
+	## 0..2, averaging about 1: multiplies a kind's spawn chance so it gathers in drifts.
+	var value: float = cluster.get_noise_2d(x + kind_index * 97.0, z - kind_index * 61.0) * 0.5 + 0.5
+	return smoothstep(float(band[0]), float(band[1]), value) * 2.0
+
+func flora_clear(x: float, z: float, rule: Dictionary) -> bool:
+	## Like is_clear, per flora rule: soft kinds (grass, flowers) also grow on earthen flats and
+	## in clearings; near_water kinds only grow on the banks; everything avoids keep-outs.
+	var margin: float = float(rule.get("margin", 1.0))
+	var soft: bool = rule.get("soft", false)
+	if not bounds.grow(-2.0).has_point(Vector2(x, z)):
+		return false
+	if path_distance(x, z) < margin + (0.4 if soft else 0.8):
+		return false
+	for flat: Dictionary in flats:
+		if soft and flat.get("surface", "") != "stone":
+			continue
+		if Vector2(x - float(flat["x"]), z - float(flat["z"])).length() < float(flat["r"]) + margin:
+			return false
+	if not soft:
+		for clearing: Dictionary in clearings:
+			if Vector2(x - float(clearing["x"]), z - float(clearing["z"])).length() < float(clearing["r"]):
+				return false
+	var near: Array = rule.get("near_water", [])
+	var banked: bool = near.is_empty()
+	for water: Dictionary in waters:
+		var edge: float = _line_query(water, x, z).x - float(water["width"]) * 0.5
+		if near.is_empty():
+			if edge < margin + 1.5:
+				return false
+		elif edge >= float(near[0]) and edge <= float(near[1]):
+			banked = true
+	if not banked:
+		return false
+	for chasm: Dictionary in chasms:
+		if _box_weight(x, z, chasm, float(chasm["edge"]) + margin + 2.0) > 0.0:
+			return false
+	var collider: bool = rule.has("collider") or rule.has("rock_collider")
+	for keepout: Array in keepouts.get(Vector2i(floori(x / KEEPOUT_CELL), floori(z / KEEPOUT_CELL)), []):
+		if keepout[2] and not collider:
+			continue
+		if Vector2(x, z).distance_to(keepout[0]) < float(keepout[1]) + margin * 0.5:
 			return false
 	return true
 
@@ -281,7 +383,9 @@ func ground_color(x: float, z: float, h: float, slope: float) -> Color:
 		base = base.lerp(Color("c9b38a"), 1.0 - smoothstep(0.0, 1.2, path_gap) * 0.9)
 	var flat: Dictionary = flat_at(x, z)
 	if flat.get("surface", "") == "stone":
-		base = base.lerp(Color("b8b2a0"), 0.75 - variation * 0.2)
+		# Packed sandy earth with tufts of grass surviving at the edges of trodden ground.
+		var patch: float = smoothstep(0.55, 0.7, cluster.get_noise_2d(x * 2.0, z * 2.0) * 0.5 + 0.5)
+		base = base.lerp(Color("d2b886"), (0.85 - variation * 0.15) * (1.0 - patch * 0.7))
 	for water: Dictionary in waters:
 		var hit: Vector3 = _line_query(water, x, z)
 		var half: float = float(water["width"]) * 0.5

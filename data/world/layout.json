@@ -4,10 +4,11 @@
 	"noise_amplitude": [[110, 1.4], [30, 1.4], [-60, 4.0], [-120, 3.0], [-340, 3.0], [-400, 6.0]],
 	"edge_rise": {"start_x": 92, "power": 1.6, "scale": 0.15, "north_z": -448, "south_z": 98},
 	"regions": [
-		{"id": "ben_van_khe", "name": "Bến Vân Khê", "max_z": 200, "min_z": -45, "music": "village", "ambience": "village", "grass": ["5f9446", "9db85c"], "fog": "c9d6c0"},
-		{"id": "doi_gio", "name": "Đồi Gió", "max_z": -45, "min_z": -115, "music": "explore", "ambience": "wind", "grass": ["5d8c48", "93ad5c"], "fog": "c6d3c4"},
-		{"id": "truc_hai", "name": "Trúc Hải", "max_z": -115, "min_z": -358, "music": "bamboo", "ambience": "forest", "grass": ["3f7f4c", "77a85c"], "fog": "b7d3c6"},
-		{"id": "den_tich_phong", "name": "Đền Tịch Phong", "max_z": -358, "min_z": -600, "music": "temple", "ambience": "wind", "grass": ["687f5c", "939f7c"], "fog": "c8cdd2"}
+		{"id": "ben_van_khe", "name": "Bến Vân Khê", "max_z": 200, "min_z": -45, "music": "village", "ambience": "village", "grass": ["6c9848", "b3c46a"], "fog": "c9d6c0"},
+		{"id": "doi_gio", "name": "Đồi Gió", "max_z": -45, "min_z": -115, "music": "explore", "ambience": "wind", "grass": ["68944a", "a9bd66"], "fog": "c6d3c4"},
+		{"id": "truc_hai", "name": "Trúc Hải", "max_z": -115, "min_z": -358, "music": "bamboo", "ambience": "forest", "grass": ["4d8a50", "8db563"], "fog": "b7d3c6"},
+		{"id": "den_tich_phong", "name": "Đền Tịch Phong", "max_z": -358, "min_z": -600, "music": "temple", "ambience": "wind", "grass": ["788f62", "a8b083"], "fog": "c8cdd2"},
+		{"id": "ao_canh", "name": "Ảo Cảnh Thí Luyện", "max_z": 400, "min_z": 200, "music": "combat", "ambience": "wind", "grass": ["6d8a78", "aebfa0"], "fog": "cfc4e2"}
 	],
 	"flats": [
 		{"id": "plaza", "x": 0, "z": 14, "r": 34, "blend": 14, "h": 0.25, "surface": "stone"},
@@ -25,7 +26,8 @@
 		{"id": "shrine_arena", "x": 9, "z": -300, "r": 4, "blend": 4},
 		{"id": "arena", "x": 0, "z": -334, "r": 24, "blend": 8, "surface": "stone"},
 		{"id": "seal_gate", "x": 2, "z": -372, "r": 8, "blend": 5},
-		{"id": "temple", "x": 0, "z": -440, "r": 26, "blend": 10, "surface": "stone"}
+		{"id": "temple", "x": 0, "z": -440, "r": 26, "blend": 10, "surface": "stone"},
+		{"id": "trial", "x": 0, "z": 230, "r": 24, "blend": 12, "surface": "stone", "pocket": true}
 	],
 	"paths": [
 		{"id": "dock_road", "width": 4.0, "points": [[-20, 70], [-16, 56], [-8, 45], [-2, 34], [0, 24]]},
@@ -49,10 +51,10 @@
 		{"id": "pass_east", "min_x": 13, "max_x": 160, "min_z": -384, "max_z": -360, "height": 26, "edge": 7}
 	],
 	"biomes": [
-		{"region": "ben_van_khe", "trees": {"maple": 3, "pine": 2}, "rocks": 2, "grass": 26, "bamboo": 0},
-		{"region": "doi_gio", "trees": {"pine": 6, "maple": 1}, "rocks": 4, "grass": 18, "bamboo": 1},
-		{"region": "truc_hai", "trees": {"pine": 1}, "rocks": 2, "grass": 16, "bamboo": 14},
-		{"region": "den_tich_phong", "trees": {"pine": 5}, "rocks": 5, "grass": 8, "bamboo": 0}
+		{"region": "ben_van_khe", "density": {"round": 2.2, "maple": 1.2, "blossom": 1.2, "pine": 0.8, "bamboo": 2.5, "rock": 2, "grass": 72, "flowers": 18, "fern": 2, "bush": 3.5, "bush_flower": 2.5, "reeds": 12, "pebbles": 5, "log": 0.2}},
+		{"region": "doi_gio", "density": {"pine": 4, "round": 2.5, "maple": 0.6, "blossom": 0.7, "bamboo": 1.5, "rock": 4, "grass": 82, "flowers": 24, "fern": 4, "bush": 4, "bush_flower": 1.5, "pebbles": 6, "log": 0.6, "mushroom": 1}},
+		{"region": "truc_hai", "density": {"bamboo": 24, "pine": 0.8, "round": 1.2, "rock": 3, "grass": 48, "flowers": 7, "fern": 18, "bush": 3, "bush_flower": 1, "reeds": 12, "pebbles": 5, "log": 1.2, "mushroom": 4}},
+		{"region": "den_tich_phong", "density": {"pine": 6, "blossom": 1.5, "round": 1, "bamboo": 1, "rock": 6, "grass": 42, "flowers": 9, "fern": 5, "bush": 3, "pebbles": 7, "log": 0.5, "mushroom": 1}}
 	],
 	"clearings": [
 		{"x": -20, "z": 66, "r": 12}, {"x": 8, "z": 30, "r": 6}, {"x": -5, "z": 47, "r": 9}, {"x": 47, "z": -219, "r": 10},

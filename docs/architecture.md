@@ -1,24 +1,25 @@
 # Kiến trúc
 
-Godot 4.7.2, GDScript có kiểu tĩnh, renderer GL Compatibility, bàn phím + chuột, mục tiêu Windows desktop. Không dùng autoload: `scenes/main.tscn` chỉ có node gốc `main.gd`, mọi hệ thống được tạo bằng code và nối với nhau ở đó. Nội dung (nhiệm vụ, hội thoại, vật phẩm, địch, bản đồ) nằm trong JSON dưới `data/`, code chỉ chứa luật.
+Godot 4.7.2, GDScript có kiểu tĩnh, renderer GL Compatibility (một renderer cho cả hai nền tảng), bàn phím + chuột, mục tiêu Windows desktop và trình duyệt (bản Web không luồng, host tĩnh trên Vercel). Không dùng autoload: `scenes/main.tscn` chỉ có node gốc `main.gd`, mọi hệ thống được tạo bằng code và nối với nhau ở đó. Nội dung (nhiệm vụ, hội thoại, vật phẩm, địch, bản đồ) nằm trong JSON dưới `data/`, code chỉ chứa luật.
 
 ## Thành phần
 
 | Nhóm | File | Trách nhiệm |
 |---|---|---|
 | Gốc | `scripts/main.gd` | Luồng màn hình chính → chơi; nối người chơi, thế giới, thực thể, nhiệm vụ, hội thoại, UI, âm thanh; phần thưởng, chết/hồi sinh, lưu/tải, thoát game |
-| Dữ liệu | `scripts/core/content_db.gd`, `game_state.gd`, `user_settings.gd` | Đọc JSON có cache; trạng thái người chơi (cờ, túi đồ, nhiệm vụ, cấp, kỹ năng, kiếm, checkpoint); thiết lập lưu riêng ở `user://settings.cfg` |
+| Dữ liệu | `scripts/core/content_db.gd`, `game_state.gd`, `user_settings.gd` | Đọc JSON có cache; trạng thái người chơi (cờ, túi đồ, nhiệm vụ, cấp, kỹ năng, kiếm, cảnh giới, checkpoint); thiết lập lưu riêng ở `user://settings.cfg`; preset chất lượng Thấp/Trung bình/Cao |
+| Hồ sơ & dài hạn | `scripts/core/player_profile.gd`, `player_stats.gd`, `gacha.gd`, `missions.gd` | Hồ sơ dùng chung mọi bản lưu (`user://profile.json`): tiền, bảo hiểm, kho kiếm, trang phục, kỷ lục Ải, nhiệm vụ ngày, trạng thái RNG; gộp chỉ số kiếm + phúc lành; quay Kỳ Ngộ và mở rương; nhiệm vụ ngày và điểm danh. Các hàm tĩnh, không chạm scene tree |
 | Người chơi | `scripts/player_controller.gd`, `scripts/player/camera_rig.gd` | Máy trạng thái loading/move/dodge/action/hit/dead/disabled, đệm phím, thể lực, khinh công, khóa mục tiêu; camera SpringArm có rung theo "trauma" |
-| Chiến đấu | `scripts/combat/combat.gd`, `projectile.gd`, `vfx.gd` | Bảng đòn đánh (gộp thời điểm từ `data/anim_timings.json`), quét cung bằng `PhysicsShapeQueryParameters3D`, gói sát thương, lớp va chạm, đạn gió, hiệu ứng |
+| Chiến đấu | `scripts/combat/combat.gd`, `style_book.gd`, `skill_runner.gd`, `area_effect.gd`, `status_effects.gd`, `projectile.gd`, `vfx.gd`, `sword_trail.gd` | Bảng đòn đánh từ `data/attacks.json` (gộp thời điểm từ `data/anim_timings.json`), quét cung bằng `PhysicsShapeQueryParameters3D`, gói sát thương mang nguyên tố và trạng thái; 5 hệ kiếm E/Q/X chạy theo trường `kind` (sweep, dash, projectile, chain, strikes, nova, field); trạng thái gió/ướt/tê/thiêu/lạnh/đóng băng; đạn, hiệu ứng, vệt kiếm |
 | Nhân vật | `scripts/characters/character_visual.gd` | Dựng `AnimationTree` (BlendSpace1D di chuyển, Transition trạng thái, OneShot đòn đánh), gắn vũ khí vào `BoneAttachment3D`, nháy trắng khi trúng đòn, hit-stop |
-| Địch | `scripts/enemies/enemy.gd`, `boar.gd`, `guardian.gd` | AI theo trạng thái, giới hạn số kẻ tấn công cùng lúc mỗi trại, NavigationAgent hoặc lái tránh vật cản, kéo về khi đi quá xa; heo húc; Trúc Tướng hai pha |
-| Thế giới | `scripts/world/world_layout.gd`, `scripts/world_manager.gd`, `scripts/world_chunk.gd` | Hàm độ cao/màu/vùng từ `layout.json`; stream vùng 32 m (5 × 5 quanh người chơi), tính mesh trên `WorkerThreadPool`, dựng node trên main thread |
-| Thực thể | `scripts/world/entity_spawner.gd`, `npc.gd`, `interactable.gd`, `arena.gd`, `prop_placer.gd`, `water_bodies.gd`, `backdrop.gd` | Sinh/hủy NPC, địch, vật tương tác theo khoảng cách và điều kiện; trigger, điểm khám phá, bake navmesh theo vùng giao tranh; đấu trường; đạo cụ; sông suối; núi nền |
+| Địch | `scripts/enemies/enemy.gd`, `boar.gd`, `guardian.gd`, `enemy_scaler.gd` | AI theo trạng thái, giới hạn số kẻ tấn công cùng lúc mỗi trại, NavigationAgent hoặc lái tránh vật cản, kéo về khi đi quá xa; heo húc; Trúc Tướng hai pha; tăng sức mạnh theo cảnh giới/đợt và biến thành tinh anh trên bản sao dữ liệu riêng |
+| Thế giới | `scripts/world/world_layout.gd`, `scripts/world_manager.gd`, `scripts/world_chunk.gd` | Hàm độ cao/màu/vùng từ `layout.json`; stream vùng 32 m (5 × 5 quanh người chơi, preset Cao 7 × 7), tính mesh và rải thực vật theo `data/world/flora.json` trên `WorkerThreadPool`, dựng node trên main thread |
+| Thực thể | `scripts/world/entity_spawner.gd`, `npc.gd`, `interactable.gd`, `arena.gd`, `prop_placer.gd`, `water_bodies.gd`, `backdrop.gd`, `trial_director.gd` | Sinh/hủy NPC, địch, vật tương tác theo khoảng cách và điều kiện (theo cảnh giới: `tier_dead:<cấp>:<id>`); trigger, điểm khám phá, bake navmesh theo vùng giao tranh; đấu trường; đạo cụ; sông suối; núi đá vôi nền; Ải Vô Tận (đợt, phúc lành, rương) |
 | Nhiệm vụ | `scripts/quests/quest_manager.gd` | Bắt đầu/tiến độ/hoàn thành theo sự kiện chuỗi (`talk:`, `reach:`, `kill:`, `interact:`, `camp_clear:`, `flag:`, `have:`…), điều kiện, điểm đánh dấu |
-| Giao diện | `scripts/game_hud.gd`, `scripts/ui/menus.gd`, `map_view.gd`, `ui_theme.gd` | HUD, hội thoại, thị kiến, la bàn mục tiêu; màn hình chính, tạm dừng, bản đồ, nhật ký, túi đồ, thiết lập, ghi công |
+| Giao diện | `scripts/game_hud.gd`, `scripts/ui/menus.gd`, `retention_panels.gd`, `map_view.gd`, `ui_theme.gd` | HUD (3 ô E/Q/X, nộ khí), hội thoại, thị kiến, la bàn mục tiêu; màn hình chính, tạm dừng, bản đồ, nhật ký, túi đồ, thiết lập, ghi công; Kỳ Ngộ, kho kiếm & trang phục, nhiệm vụ ngày, cảnh giới, chọn phúc lành |
 | Âm thanh | `scripts/audio/audio_director.gd` | Bus Music/SFX/Ambience/UI, chuyển nhạc theo vùng và mức chiến đấu, âm nền, tiếng sông theo khoảng cách, pool phát 2D/3D có biến thể |
-| Hình ảnh | `scripts/render/toon.gd`, `atmosphere.gd`, `shaders/*.gdshader` | Shader toon (bậc sáng, viền rim, nhiễu nét vẽ, cây đung đưa), outline đảo mặt, nước, bầu trời, tường gió; sương/nắng theo vùng |
-| Lưu game | `scripts/save_store.gd` | JSON schema v2, kiểm tra kiểu, migrate v1, ghi qua `.tmp`, giữ `.bak` |
+| Hình ảnh | `scripts/render/toon.gd`, `atmosphere.gd`, `ambient_fx.gd`, `shaders/*.gdshader` | Shader toon (bậc sáng, viền rim, nhiễu nét vẽ, màu đỉnh/instance, nắng lốm đốm dưới tán, cây đung đưa), outline đảo mặt, nước fresnel có bọt, trời mây cel, núi nền, tường gió; sương theo độ sâu/độ cao, glow, chỉnh màu; hạt bay theo vùng |
+| Lưu game | `scripts/save_store.gd` | JSON schema v3, kiểm tra kiểu, migrate v1/v2, ghi qua `.tmp`, giữ `.bak`; cùng cơ chế cho hồ sơ |
 
 ## Quy ước
 
@@ -31,12 +32,21 @@ Godot 4.7.2, GDScript có kiểu tĩnh, renderer GL Compatibility, bàn phím + 
 
 - Bản đồ hữu hạn, biên x ∈ [−132, 132], z ∈ [−462, 100]; ngoài biên là tường vô hình và núi nền.
 - Độ cao = đường cong theo z + nhiễu + nâng mép (bão hòa bằng `tanh`) + sống núi → làm phẳng khu đặt nhà/đấu trường → hạ đường đi → lòng sông → khe vực. Mép vùng khớp nhau vì mọi đỉnh lấy từ tọa độ thế giới.
-- `WorldChunk.compute()` là hàm tĩnh, không chạm scene tree, chạy trên `WorkerThreadPool` (tối đa 2 việc). `apply()` tạo mesh, collider, MultiMesh cây/cỏ/đá trên main thread. Người chơi đứng yên khi vùng dưới chân chưa sẵn sàng.
+- `WorldChunk.compute()` là hàm tĩnh, không chạm scene tree, chạy trên `WorkerThreadPool` (tối đa 2 việc; bản Web không luồng chạy tuần tự từng việc mỗi khung). Mỗi loài cây có RNG riêng nên đổi preset chỉ làm thưa cỏ hoa, cây có collider không dời chỗ; vùng cấm quanh NPC/rương/miếu/đạo cụ (`keepouts`). `apply()` tạo mesh, collider, MultiMesh cây/cỏ/đá trên main thread. Người chơi đứng yên khi vùng dưới chân chưa sẵn sàng.
 - Navmesh không phủ toàn bản đồ: mỗi khu giao tranh (`navzone`) được parse collider đã stream và bake bất đồng bộ khi người chơi đến gần 80 m.
 
 ## Lưu game
 
-`user://world_save.json`, schema v2: seed, vị trí, hướng, checkpoint, toàn bộ `GameState`. Giới hạn 1 MiB (thay cho 16 KB của bản nền — dữ liệu cờ/nhiệm vụ lớn hơn nhiều). Save v1 của bản nền được migrate (trạm đèn → Miếu Gió làng, gắn cờ `migrated_from_v1`), bản cũ giữ trong `.bak`. Tải save sửa lỗi vị trí nằm trong nước/vực/ngoài biên về checkpoint.
+`user://world_save.json`, schema v3: seed, vị trí, hướng, checkpoint, toàn bộ `GameState` (thêm danh sách kiếm, kiếm kho đang dùng, cảnh giới hiện tại/cao nhất). Giới hạn 1 MiB. Save v1 của bản nền và v2 đều được migrate, bản cũ giữ trong `.bak`. Tải save sửa lỗi vị trí nằm trong nước/vực/ngoài biên/đấu trường Ải về checkpoint. Trên web, `user://` là IndexedDB; game tự lưu mỗi 60 giây và khi mất focus.
+
+`user://profile.json` (hồ sơ v1) dùng chung cho mọi bản lưu vì Kỳ Ngộ mở được từ màn hình chính trước khi tải save. RNG của gacha lưu seed/state dạng chuỗi (số 64 bit), nên tải lại không quay lại được kết quả. Test luôn dùng `profile_path` riêng, không chạm hồ sơ thật.
+
+## Hệ thống dài hạn
+
+- **Chỉ số:** `PlayerStats.compute(kiếm kho, phúc lành)` → `GameState.stats`; rỗng là trung tính, nên số liệu cốt truyện giữ nguyên. Đọc trong `attack_power()`, `PlayerController.strike` (bạo kích, đòn thường, nguyên tố, tỉ lệ trạng thái, nộ khí), `_try_skill` (hồi chiêu), `take_damage` (giảm sát thương).
+- **Ải Vô Tận:** `TrialDirector` có `Arena` riêng tại "pocket" (0, 230) — một khu bằng phẳng ngoài tường biên (`WorldLayout.in_pocket`), chỉ tới được bằng dịch chuyển. Địch của Ải không nằm trong `EntitySpawner`, nên không ghi `dead:`/`camp_kills`. Chết trong Ải rẽ nhánh ở `_on_player_died`; lưu bị từ chối trong lượt.
+- **Cảnh giới:** `on_enemy_spawned` gọi `EnemyScaler` với hệ số từ `world_tiers.json`; boss dùng `boss_alive()` theo cấp.
+- **Gacha:** `Gacha.roll` là hàm thuần trên bản ghi bảo hiểm; tỉ lệ tổng hợp tính giải tích (`consolidated_ssr`) để công khai và để test 200.000 lượt đối chiếu.
 
 ## Mở rộng
 

@@ -8,6 +8,7 @@ extends CharacterBody3D
 signal defeated(enemy: Enemy)
 signal health_changed(enemy: Enemy, current: float, maximum: float)
 signal attack_started(enemy: Enemy, attack: String)
+signal status_damage(enemy: Enemy, amount: float, status: String)
 
 static var tokens: Dictionary = {}
 
@@ -39,6 +40,12 @@ var wander_target: Vector3
 var stagger_time: float = 0.0
 var facing: Vector3 = Vector3.FORWARD
 var speed_scale: float = 1.0
+## Speed before statuses: the guardian raises it in phase two; chill and soak slow it.
+var base_speed_scale: float = 1.0
+## Attack clock in animation seconds, so a slow mid-swing stretches the swing instead of rewinding it.
+var attack_clock: float = 0.0
+var statuses: StatusEffects = StatusEffects.new()
+var shown_status: String = ""
 var persistent: bool = false
 var boss: bool = false
 var invulnerable: bool = false
@@ -62,6 +69,8 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	health = max_health
 	max_poise = float(data.get("poise", 30))
 	poise = max_poise
+	statuses.resist = float(data.get("status_resist", 0.0))
+	statuses.no_freeze = bool(data.get("armor", false))
 	collision_layer = Combat.LAYER_ENEMY
 	collision_mask = Combat.LAYER_WORLD | Combat.LAYER_PLAYER | Combat.LAYER_ENEMY
 	var radius: float = float(data.get("radius", 0.4))
@@ -127,6 +136,9 @@ func _physics_process(delta: float) -> void:
 		state_time += delta
 		_physics_dead(delta)
 		return
+	_tick_statuses(delta)
+	if state == "dead":
+		return
 	# Hit-stop freezes the animation, so the attack clock and cooldown freeze with it.
 	if not visual.is_frozen():
 		state_time += delta
@@ -141,6 +153,30 @@ func _physics_process(delta: float) -> void:
 	_guard_edges()
 	move_and_slide()
 	_track_stuck(delta)
+
+func _tick_statuses(delta: float) -> void:
+	var effects: Dictionary = statuses.tick(delta)
+	speed_scale = base_speed_scale * statuses.speed_mult()
+	if float(effects["dot"]) > 0.0:
+		apply_dot(float(effects["dot"]), "burn")
+	if float(effects["stun"]) > 0.0 and state in ["idle", "alert", "chase", "recover", "return"] or (float(effects["stun"]) > 0.0 and state == "attack" and not boss):
+		_stagger(float(effects["stun"]))
+	var dominant: String = statuses.dominant()
+	if dominant != shown_status:
+		shown_status = dominant
+		visual.set_status_tint(Color(String(ContentDB.status(dominant).get("color", "ffffff"))) if dominant != "" else Color(0, 0, 0, 0))
+
+func apply_dot(amount: float, status: String) -> void:
+	## Quiet damage from a status: no flinch, flash or hit-stop.
+	if state == "dead" or invulnerable or amount <= 0.0:
+		return
+	health = maxf(0.0, health - amount)
+	emit_signal("health_changed", self, health, max_health)
+	emit_signal("status_damage", self, amount, status)
+	if health <= 0.0:
+		var damage: Combat.Damage = Combat.Damage.new()
+		damage.direction = -facing
+		_die(damage)
 
 func _think(delta: float) -> void:
 	match state:
@@ -265,6 +301,7 @@ func _begin_attack(name: String) -> void:
 	attack_data = Combat.attack(owner_key, name)
 	attack_hits = {}
 	attack_prev_u = -1.0
+	attack_clock = 0.0
 	telegraphed = false
 	state = "attack"
 	state_time = 0.0
@@ -272,7 +309,8 @@ func _begin_attack(name: String) -> void:
 	emit_signal("attack_started", self, name)
 
 func _physics_attack(delta: float) -> void:
-	var t: float = state_time * speed_scale
+	attack_clock += delta * speed_scale
+	var t: float = attack_clock
 	var hit_start: float = float(attack_data.get("hit_start", 0.6))
 	var hit_end: float = float(attack_data.get("hit_end", 0.7))
 	if t < hit_start - 0.15 and attack_data.get("track", true):
@@ -315,6 +353,10 @@ func _deliver(area: Area3D, attack: Dictionary) -> void:
 	var result: Dictionary = entity.take_damage(damage)
 	if result.get("hit", false):
 		visual.hitstop(damage.hitstop * 0.8)
+		if data.has("lifesteal") and state != "dead":
+			# Hấp Huyết elites drink back part of the blow.
+			health = minf(max_health, health + float(result.get("amount", damage.amount)) * float(data["lifesteal"]))
+			emit_signal("health_changed", self, health, max_health)
 
 func on_parried(_player: Node) -> void:
 	if state == "dead":
@@ -332,17 +374,27 @@ func _stagger(duration: float) -> void:
 func take_damage(damage: Combat.Damage) -> Dictionary:
 	if state == "dead" or invulnerable:
 		return {"hit": false}
-	var amount: float = damage.amount * (1.35 if state == "stagger" else 1.0)
+	var amount: float = damage.amount * (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
 	health = maxf(0.0, health - amount)
 	emit_signal("health_changed", self, health, max_health)
-	visual.flash()
-	visual.hitstop(damage.hitstop)
+	if damage.flinch:
+		visual.flash()
+		visual.hitstop(damage.hitstop)
 	if state in ["idle", "return"]:
 		_alert_camp()
 	if health <= 0.0:
 		_die(damage)
 		return {"hit": true, "amount": amount, "killed": true}
-	poise -= damage.poise
+	var started: String = _roll_status(damage)
+	if started == "freeze":
+		velocity = Vector3.ZERO
+		_stagger(statuses.stun_time("freeze"))
+		Vfx.shards(get_parent(), global_position, Color("dff8ff"), 7, float(data.get("radius", 0.5)) + 0.4, float(data.get("height", 1.8)) * 0.7, statuses.stun_time("freeze"))
+		return {"hit": true, "amount": amount, "status": started}
+	if not damage.flinch:
+		poise -= damage.poise * statuses.poise_mult()
+		return {"hit": true, "amount": amount, "status": started}
+	poise -= damage.poise * statuses.poise_mult()
 	if poise <= 0.0 and state != "stagger":
 		poise = max_poise
 		velocity = damage.direction * damage.knockback
@@ -354,10 +406,25 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		state = "hit"
 		state_time = 0.0
 		visual.play_action("hit")
-	return {"hit": true, "amount": amount}
+	return {"hit": true, "amount": amount, "status": started}
+
+func element_mult(element: String) -> float:
+	return float((data.get("resist", {}) as Dictionary).get(element, 1.0)) if element != "" else 1.0
+
+func _roll_status(damage: Combat.Damage) -> String:
+	var status: String = String(damage.status.get("id", ""))
+	if status == "":
+		return ""
+	if randf() >= float(damage.status.get("chance", 1.0)) * (1.0 - statuses.resist * 0.5):
+		return ""
+	return statuses.apply(status, int(damage.status.get("stacks", 1)), damage.status_power)
 
 func _die(damage: Combat.Damage) -> void:
 	_release_token()
+	statuses.clear()
+	if shown_status != "":
+		shown_status = ""
+		visual.set_status_tint(Color(0, 0, 0, 0))
 	state = "dead"
 	state_time = 0.0
 	velocity = damage.direction * 2.0

@@ -100,13 +100,14 @@ func _run() -> void:
 	game = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	game.skip_title = true
 	game.save_path = "user://render_preview_save.json"
+	game.profile_path = "user://render_preview_profile.json"
 	root.add_child(game)
 	while not game.initialized:
 		await frames(1)
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "settings", "credits"]
+	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "settings", "credits", "gacha", "armory", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -159,10 +160,23 @@ func _run() -> void:
 				# Pose each move at the middle of its damage window by seeking the clip directly,
 				# so the frame matches data/anim_timings.json regardless of the render frame rate.
 				var timings: Dictionary = ContentDB.get_data("timings").get("player", {})
+				# The sword trail needs real playback: slow time so a slow renderer still samples the swing.
+				Engine.time_scale = 0.05
+				p._start_action("attack_2")
+				for step: int in range(60):
+					await frames(1)
+					if p.visual.action_time >= float(timings.get("attack_2", {}).get("hit_end", 0.3)):
+						break
+				await shot("move_trail")
+				Engine.time_scale = 1.0
+				# Posed shots below freeze the player, so drop the ribbon left from the live swing.
+				p.visual.stop_action()
+				p.visual.trail.samples.clear()
+				p.visual.trail.strip.clear_surfaces()
 				p.process_mode = Node.PROCESS_MODE_DISABLED
 				p.visual.set_sheathed(false)
 				p.visual.tree.active = false
-				for move: String in ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "parry", "dodge"]:
+				for move: String in ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "parry", "dodge", "dash_slash", "ultimate"]:
 					var timing: Dictionary = timings.get(move, {})
 					var at: float = 0.1
 					if timing.has("hit_start"):
@@ -207,7 +221,38 @@ func _run() -> void:
 				await shot("map")
 				game.menus.close_panel()
 				game.set_paused(false)
-			"journal", "inventory", "settings", "credits":
+			"gacha":
+				# A seeded ten-pull so the result cards show.
+				game.profile.add_currency(Gacha.currency(), 1600)
+				game.open_panel("gacha")
+				game.menus.last_pull = game.gacha_pull(10)
+				game.menus.refresh_panel()
+				await frames(40)
+				await shot("gacha")
+				game.menus.close_panel()
+				game.set_paused(false)
+			"trial":
+				game.trial.start(game.player.global_position)
+				while game.trial.phase != "fighting" or game.trial.alive.size() < 3:
+					await frames(1)
+				var center: Vector3 = game.trial.center
+				game.player.teleport(center + Vector3(0, 0.5, 12))
+				game.player.face_direction(Vector3(0, 0, -1), true)
+				game.player.camera_rig.yaw = 0.0
+				game.player.camera_rig.pitch = -0.2
+				game.player.invulnerable = 999.0
+				await frames(60)
+				await shot("trial_wave")
+				for enemy: Enemy in game.trial.alive.duplicate():
+					enemy.take_damage(Combat.make_damage(game.player, {"poise": 0}, 99999.0, enemy.global_position))
+				while game.trial.phase != "picking":
+					await frames(1)
+				await frames(10)
+				await shot("trial_pick")
+				game.choose_trial_buff(game.menus.trial_choices[0])
+				game.trial.end_run("leave")
+				await frames(30)
+			"journal", "inventory", "settings", "credits", "armory", "daily", "tier":
 				game.open_panel(scene)
 				await frames(10)
 				await shot(scene)

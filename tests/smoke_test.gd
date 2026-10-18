@@ -33,6 +33,7 @@ func _run() -> void:
 	var game: Node3D = (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	game.skip_title = true
 	game.save_path = TEST_SAVE
+	game.profile_path = "user://smoke_test_profile.json"
 	root.add_child(game)
 	for attempt: int in range(900):
 		if game.initialized:
@@ -51,6 +52,7 @@ func _run() -> void:
 	check(world.coord_at(Vector3(-0.1, 0, -32.1)) == Vector2i(-1, -2), "Negative world coordinates map to correct chunks")
 	var second: WorldLayout = WorldLayout.load_default(game.settings.world_seed)
 	check(is_equal_approx(world.height_at(18, -73), second.height_at(18, -73)) and is_equal_approx(world.height_at(-61, -150), second.height_at(-61, -150)), "Seed reproduces terrain")
+	_check_flora(game, second)
 	var center: Vector2i = world.coord_at(player.global_position)
 	if not world.active.has(center) or not world.active.has(center + Vector2i(1, 0)):
 		check(false, "Chunks around the player are active")
@@ -119,7 +121,7 @@ func _run() -> void:
 	await frames(2)
 	await settle(game)
 	check(player.is_on_floor(), "Loaded game rebuilds playable terrain")
-	var data: Dictionary = {"version": 2, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "yaw": 0.0, "state": GameState.new().to_dict()}
+	var data: Dictionary = {"version": SaveStore.SCHEMA_VERSION, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "yaw": 0.0, "state": GameState.new().to_dict()}
 	check(SaveStore.write_save(data, TEST_SAVE) == OK, "Save writes successfully")
 	var restored: Dictionary = SaveStore.read_save(TEST_SAVE)
 	check(not restored.is_empty() and SaveStore.to_vector(restored["position"]) == Vector3(1, 2, 3), "Save restores position and schema")
@@ -143,3 +145,44 @@ func _run() -> void:
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)
+
+func _check_flora(game: Node, layout: WorldLayout) -> void:
+	var size: int = game.settings.chunk_size
+	var subdiv: int = game.settings.subdivisions
+	var seed: int = game.settings.world_seed
+	var coord: Vector2i = Vector2i(0, -3)
+	var full: Dictionary = WorldChunk.compute(coord, layout, size, subdiv, seed, 1.0)
+	var again: Dictionary = WorldChunk.compute(coord, layout, size, subdiv, seed, 1.0)
+	var half: Dictionary = WorldChunk.compute(coord, layout, size, subdiv, seed, 0.5)
+	var total: int = 0
+	var stable: bool = true
+	var colliders_kept: bool = true
+	for kind: String in full["flora"]:
+		total += (full["flora"][kind] as Array).size()
+		stable = stable and str(full["flora"][kind]) == str(again["flora"][kind])
+		var rule: Dictionary = layout.flora[kind]
+		if not rule.get("dense", false):
+			colliders_kept = colliders_kept and str(full["flora"][kind]) == str(half["flora"][kind])
+	check(total > 40, "Flora scatters densely in a forest chunk (%d instances)" % total)
+	check(stable, "Flora placement is deterministic per chunk")
+	check(colliders_kept, "Lower quality thins only ground cover; trees and rocks stay put")
+	var keepout_clear: bool = not layout.keepouts.is_empty()
+	for cell: Vector2i in layout.keepouts:
+		for keepout: Array in layout.keepouts[cell]:
+			if keepout[2]:
+				continue
+			var center: Vector2 = keepout[0]
+			var chunk: Vector2i = Vector2i(floori(center.x / size), floori(center.y / size))
+			var data: Dictionary = WorldChunk.compute(chunk, layout, size, subdiv, seed, 1.0)
+			for kind: String in data["flora"]:
+				for entry: Array in data["flora"][kind]:
+					var origin: Vector3 = (entry[0] as Transform3D).origin + Vector3(chunk.x * size, 0, chunk.y * size)
+					if Vector2(origin.x, origin.z).distance_to(center) < float(keepout[1]) * 0.5:
+						keepout_clear = false
+			break
+		break
+	check(keepout_clear, "Keep-outs around NPCs, chests and shrines stay free of flora")
+	var presets: Dictionary = UserSettings.QUALITY
+	check(presets.has("low") and presets.has("medium") and presets.has("high"), "Low, Medium and High quality presets exist")
+	check(float(presets["low"]["density"]) < float(presets["medium"]["density"]) and float(presets["medium"]["density"]) < float(presets["high"]["density"])
+		and int(presets["high"]["view_radius"]) >= int(presets["medium"]["view_radius"]), "Quality presets scale density and view distance")

@@ -3,7 +3,8 @@ extends Node3D
 ## Streams a bounded pool of terrain chunks around the player. Heights come from
 ## WorldLayout; chunk geometry is computed on WorkerThreadPool and applied here.
 
-const MAX_TASKS: int = 2
+## Without threads a task runs inline on the main thread, so build one chunk per frame there.
+var max_tasks: int = 1 if OS.has_feature("nothreads") else 2
 
 var settings: GameSettings
 var assets: AssetLibrary
@@ -16,6 +17,10 @@ var building: Dictionary = {}
 var center: Vector2i = Vector2i(2147483647, 2147483647)
 var last_build_ms: float = 0.0
 var ground_material: ShaderMaterial
+var part_transforms: Dictionary = {}
+## Thins grass, flowers and other dense ground cover (quality presets); trees never move.
+var density_scale: float = 1.0
+var last_compute_ms: float = 0.0
 
 func initialize(config: GameSettings, library: AssetLibrary, player: Node3D) -> void:
 	settings = config
@@ -23,10 +28,11 @@ func initialize(config: GameSettings, library: AssetLibrary, player: Node3D) -> 
 	target = player
 	layout = WorldLayout.load_default(settings.world_seed)
 	ground_material = Toon.terrain_material()
+	part_transforms = assets.part_transforms()
 	for index: int in range(settings.chunk_capacity()):
 		var chunk: WorldChunk = WorldChunk.new()
 		add_child(chunk)
-		chunk.initialize(settings, assets, ground_material)
+		chunk.initialize(settings, assets, ground_material, layout)
 		pool.append(chunk)
 	if OS.get_environment("NO_BOUNDS").is_empty():
 		_build_bounds()
@@ -66,6 +72,28 @@ func reset_seed(seed_value: int) -> void:
 	pending.clear()
 	center = Vector2i(2147483647, 2147483647)
 
+func configure(radius: int, density: float) -> void:
+	## Quality presets: streamed radius (chunks around the player) and ground-cover density.
+	## Changing either restreams the area around the player.
+	if radius == settings.view_radius and is_equal_approx(density, density_scale):
+		return
+	_wait_for_builds()
+	for chunk: WorldChunk in active.values():
+		chunk.deactivate()
+		pool.append(chunk)
+	active.clear()
+	pending.clear()
+	settings.view_radius = radius
+	density_scale = density
+	while pool.size() < settings.chunk_capacity():
+		var chunk: WorldChunk = WorldChunk.new()
+		add_child(chunk)
+		chunk.initialize(settings, assets, ground_material, layout)
+		pool.append(chunk)
+	while pool.size() > settings.chunk_capacity():
+		pool.pop_back().queue_free()
+	center = Vector2i(2147483647, 2147483647)
+
 func _wait_for_builds() -> void:
 	for coordinate: Vector2i in building.keys():
 		var job: Dictionary = building[coordinate]
@@ -84,7 +112,7 @@ func _process(_delta: float) -> void:
 	if next_center != center:
 		_recenter(next_center)
 	_collect_builds()
-	while not pending.is_empty() and not pool.is_empty() and building.size() < MAX_TASKS:
+	while not pending.is_empty() and not pool.is_empty() and building.size() < max_tasks:
 		var coordinate: Vector2i = pending.pop_front()
 		var chunk: WorldChunk = pool.pop_back()
 		var job: Dictionary = {"chunk": chunk, "result": {}, "layout": layout}
@@ -92,8 +120,12 @@ func _process(_delta: float) -> void:
 		var subdivisions: int = settings.subdivisions
 		var world_seed: int = settings.world_seed
 		var job_layout: WorldLayout = layout
+		var density: float = density_scale
+		var parts: Dictionary = part_transforms
 		job["task"] = WorkerThreadPool.add_task(func() -> void:
-			job["result"] = WorldChunk.compute(coordinate, job_layout, size, subdivisions, world_seed))
+			var started: int = Time.get_ticks_usec()
+			job["result"] = WorldChunk.compute(coordinate, job_layout, size, subdivisions, world_seed, density, parts)
+			job["compute_ms"] = (Time.get_ticks_usec() - started) / 1000.0)
 		building[coordinate] = job
 
 func _collect_builds() -> void:
@@ -109,9 +141,10 @@ func _collect_builds() -> void:
 			pool.append(chunk)
 			continue
 		var start: int = Time.get_ticks_usec()
-		chunk.apply(job["result"], settings.chunk_size)
+		chunk.apply(job["result"], settings.chunk_size, layout)
 		active[coordinate] = chunk
 		last_build_ms = (Time.get_ticks_usec() - start) / 1000.0
+		last_compute_ms = float(job.get("compute_ms", 0.0))
 
 func _in_range(coordinate: Vector2i) -> bool:
 	return absi(coordinate.x - center.x) <= settings.view_radius and absi(coordinate.y - center.y) <= settings.view_radius

@@ -165,6 +165,10 @@ def hair_hero(b, spec):
     for x in (-0.07, 0.0, 0.07):
         lock(b, (x, 0.08, 1.7), (x * 1.2, 0.14, 1.6), (x * 0.9, 0.12, 1.5), 0.045, mat)
     b.torus(0.028, 0.012, (0, 0.128, 1.672), (90 - 25, 0, 0), mat=spec.get("tie", "vermilion"), bone="head", segments=12, ring=6)
+    if spec.get("ribbon_tails"):
+        for side in (1, -1):
+            b.strip([(side * 0.02, 0.15, 1.67), (side * 0.045, 0.19, 1.6), (side * 0.06, 0.2, 1.52)], [0.022, 0.02, 0.016], normal=(1, 0, 0),
+                    mat=spec.get("tie", "vermilion"), bone={"ponytail": 0.7, "head": 0.3}, thickness=0.003)
     weights = [{"head": 1.0}, {"ponytail": 0.5, "head": 0.5}, {"ponytail": 1.0}, {"ponytail": 1.0}, {"ponytail": 1.0}, {"ponytail": 1.0}]
     center = (0, 0.05, 1.62)
     clump(b, [(0, 0.13, 1.675), (0, 0.17, 1.66), (0, 0.215, 1.58), (0, 0.23, 1.47), (0, 0.215, 1.37), (0, 0.19, 1.28)],
@@ -263,6 +267,11 @@ def helmet(b, spec):
     b.cylinder(0.22, 0.02, (0, 0.01, 1.63), mat=spec.get("plate_light", "bamboo"), bone="head", top=0.16, segments=18)
     b.cone(0.035, 0.12, (0, 0.0, 1.8), mat="gold", bone="head", segments=8)
     b.strip([(0, 0.0, 1.83), (0, 0.08, 1.8), (0, 0.18, 1.7), (0, 0.24, 1.58)], [0.05, 0.06, 0.05, 0.03], normal=(1, 0, 0), mat="vermilion", bone="head")
+    if spec.get("conical_helmet"):
+        # Woven bamboo nón over the helmet with a gold rim and spike (concept art).
+        b.cone(0.3, 0.17, (0, 0.01, 1.74), mat=plate, bone="head", segments=18, smooth=False)
+        b.torus(0.296, 0.008, (0, 0.01, 1.66), mat="gold", bone="head", segments=20, ring=4)
+        b.cone(0.022, 0.1, (0, 0.01, 1.87), mat="gold", bone="head", segments=8)
 
 
 def beard(b, spec):
@@ -321,6 +330,11 @@ def torso(b, spec):
         for dx, end in ((0.06, 0.78), (0.09, 0.82)):
             b.strip([(dx, -0.11, 1.02), (dx + 0.01, -0.115, 0.92), (dx + 0.02, -0.11, end)], [0.035, 0.03, 0.026], normal=(0, -1, 0), mat=sash,
                     bone={"hips": 0.6, "thigh.L": 0.4}, thickness=0.004)
+        if spec.get("tassel"):
+            # Jade pendant on a cord with a red tassel, hanging from the sash knot.
+            b.segment((0.04, -0.112, 1.0), (0.035, -0.118, 0.9), 0.004, mat="gold", bone={"hips": 0.7, "thigh.L": 0.3}, segments=4)
+            b.torus(0.018, 0.006, (0.035, -0.12, 0.89), (90, 0, 0), mat="jade_bead", bone={"hips": 0.6, "thigh.L": 0.4}, segments=10, ring=4)
+            b.cone(0.02, 0.1, (0.035, -0.12, 0.82), (180, 0, 0), mat="vermilion", bone={"hips": 0.5, "thigh.L": 0.5}, segments=6)
 
 
 def coat_tails(b, spec):
@@ -354,9 +368,12 @@ def legs(b, spec):
         b.segment((side * 0.09, 0, 0.95), (side * 0.096, 0, 0.5), 0.078, 0.06, mat=pants, bone="thigh." + s, segments=10)
         b.sphere(0.06, (side * 0.096, 0, 0.5), mat=pants, bone={"thigh." + s: 0.5, "shin." + s: 0.5}, segments=10, rings=6)
         b.segment((side * 0.096, 0, 0.5), (side * 0.099, 0, 0.3), 0.056, 0.048, mat=pants, bone="shin." + s, segments=10)
-        b.segment((side * 0.099, 0.004, 0.34), (side * 0.1, 0.004, 0.065), 0.057, 0.05, mat=boots, bone="shin." + s, segments=10)
-        for z in (0.29, 0.2):
-            b.torus(0.056, 0.007, (side * 0.0995, 0.004, z), mat=spec.get("wrap", "cream"), bone="shin." + s, segments=10, ring=4)
+        top = spec.get("boot_top", 0.34)
+        b.segment((side * 0.098, 0.004, top), (side * 0.1, 0.004, 0.065), 0.059, 0.05, mat=boots, bone="shin." + s, segments=10)
+        rings = (top - 0.05, top - 0.14) if spec.get("boot_rings") else (0.29, 0.2)
+        for z in rings:
+            b.torus(0.058 if spec.get("boot_rings") else 0.056, 0.007, (side * 0.0995, 0.004, z), mat=spec.get("boot_rings", spec.get("wrap", "cream")),
+                    bone="shin." + s, segments=10, ring=4)
         b.box((0.088, 0.2, 0.075), (side * 0.1, -0.045, 0.04), mat=boots, bone="foot." + s, bevel=0.018)
         b.box((0.092, 0.205, 0.016), (side * 0.1, -0.045, 0.006), mat="wood_dark", bone="foot." + s)
 
@@ -382,9 +399,12 @@ def arms(b, spec):
 
 
 def pauldron(b, spec):
-    b.sphere(1.0, (0.205, 0.0, 1.372), (0, -18, 0), scale=(0.085, 0.09, 0.055), mat=spec.get("pauldron", "jade_dark"), bone="upper_arm.L",
+    b.sphere(1.0, (0.21, 0.0, 1.372), (0, -20, 0), scale=(0.095, 0.1, 0.06), mat=spec.get("pauldron", "jade_dark"), bone="upper_arm.L",
              segments=12, rings=8, shape=lambda co: Vector((co.x, co.y, max(co.z, -0.01))))
-    b.torus(0.083, 0.007, (0.205, 0.0, 1.365), (0, -18, 0), mat="gold", bone="upper_arm.L", segments=14, ring=4)
+    b.torus(0.093, 0.009, (0.21, 0.0, 1.364), (0, -20, 0), mat="gold", bone="upper_arm.L", segments=14, ring=4)
+    # Gold cloud boss on the plate, as in the concept sheet.
+    b.torus(0.026, 0.007, (0.24, -0.02, 1.415), (0, -20, 0), mat="gold", bone="upper_arm.L", segments=10, ring=4)
+    b.sphere(0.012, (0.24, -0.02, 1.418), mat="gold", bone="upper_arm.L", segments=6, rings=4)
 
 
 def scarf(b, spec):
@@ -392,6 +412,10 @@ def scarf(b, spec):
     b.torus(0.07, 0.024, (0, 0.004, 1.405), mat=mat, bone={"chest": 0.6, "neck": 0.4}, segments=14, ring=6)
     b.strip([(0.02, 0.07, 1.4), (0.04, 0.15, 1.33), (0.05, 0.21, 1.24), (0.06, 0.24, 1.14)], [0.08, 0.075, 0.07, 0.06], normal=(-1, 0, 0),
             mat=mat, bone="scarf", thickness=0.008)
+    if spec.get("long_scarf"):
+        # Second, longer tail streaming behind the shoulders.
+        b.strip([(-0.03, 0.07, 1.4), (-0.06, 0.16, 1.36), (-0.09, 0.26, 1.27), (-0.12, 0.33, 1.13), (-0.14, 0.37, 0.98)],
+                [0.085, 0.085, 0.08, 0.07, 0.05], normal=(-1, 0, 0), mat=mat, bone="scarf", thickness=0.008)
 
 
 def sheath(b, spec):
@@ -400,6 +424,10 @@ def sheath(b, spec):
     b.segment(mouth, end, 0.024, 0.019, mat=spec.get("sheath", "wood_dark"), bone="hips", segments=8, flat=0.55)
     b.segment(mouth - direction * 0.005, mouth + direction * 0.05, 0.027, mat="gold", bone="hips", segments=8, flat=0.6)
     b.segment(end - direction * 0.06, end, 0.022, 0.016, mat="gold", bone="hips", segments=8, flat=0.6)
+    if spec.get("sheath_tassel"):
+        knot = mouth + direction * 0.12
+        b.sphere(0.012, tuple(knot + Vector((0.02, 0, -0.01))), mat="jade_bead", bone="hips", segments=6, rings=4)
+        b.cone(0.016, 0.09, tuple(knot + Vector((0.025, 0, -0.07))), (180, 0, 0), mat="vermilion", bone="hips", segments=6)
 
 
 def sheath_frame():

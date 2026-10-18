@@ -1,6 +1,6 @@
 # Tiến độ
 
-Cập nhật: 14/10/2026. Nhánh `claude/adoring-darwin-bwa9t8`. Đọc file này đầu mỗi phiên để biết đang ở đâu.
+Cập nhật: 18/10/2026. Nhánh `claude/busy-gates-bg5eb8`. Đọc file này đầu mỗi phiên để biết đang ở đâu.
 
 ## Tổng quan theo mốc
 
@@ -10,6 +10,10 @@ Cập nhật: 14/10/2026. Nhánh `claude/adoring-darwin-bwa9t8`. Đọc file nà
 | 2. Đoạn chơi mẫu 20–30 phút (Bến Vân Khê → Trúc Hải) | Xong về nội dung và test tự động; **chưa có người chơi thử thật** và **chưa đo hiệu năng trên GPU thật** |
 | 3. Hoàn thiện chương (Hồi 3, đủ nhiệm vụ, boss cuối) | Chưa bắt đầu |
 | 4. Đóng gói Windows | Đã có export preset, script tải template có kiểm tra SHA-512, bản build tạo được; **chưa chạy thử trên máy Windows** |
+| 5. Bản Web trên Vercel | Xong: preset Web không luồng, `tools/build_web.sh`, `vercel.json`; smoke test Chromium PASS; bản build 51 MB |
+| 6. Đồ họa theo concept | Xong: rừng dày (13 loài cây, cụm, vùng cấm), trời cel, núi đá vôi, nước, preset Thấp/Trung bình/Cao, 10 đạo cụ làng/đền, Lâm An và Trúc Tướng theo ảnh concept, hạt bay theo vùng, vệt kiếm |
+| 7. Ngũ hành kiếm quyết | Xong: 5 hệ × E/Q/X, 6 trạng thái, nộ khí, tuyệt kỹ, 4 kiếm nguyên tố, 2 clip mới, SFX |
+| 8. Chơi dài hạn | Xong: Ải Vô Tận, Cảnh giới 1–5 và tinh anh, Kỳ Ngộ (công khai tỉ lệ, bảo hiểm), rương thưởng, kiếm có chỉ số, trang phục, nhiệm vụ ngày, điểm danh 7 ngày; save v3 + hồ sơ dùng chung |
 
 ## Đã xong trong đoạn chơi mẫu
 
@@ -35,7 +39,7 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 
 ## Đang làm / làm tiếp ngay
 
-1. Người chơi thử thật đoạn mẫu trên Windows, ghi lại cảm giác điều khiển, độ khó, chỗ lạc đường.
+1. Chơi thử bản Web trên link preview Vercel và trên Windows: cảm giác điều khiển, độ khó các đợt Ải, nhịp Ngọc Gió (ước tính ~400–600 mỗi ngày chơi đều, tức một lượt ×10 sau 3–4 ngày), chỗ lạc đường.
 2. Đo hiệu năng 1080p Medium trên GPU thật bằng `./tools/run.ps1 -Mode preview` (làng đông, chuyển vùng, trận boss) và ghi vào `validation.md`.
 3. Chạy bản build `build/windows/VanKhe.exe` trên Windows sạch (không có Godot/Blender).
 
@@ -44,6 +48,8 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 - Nhạc soạn bằng code và render qua soundfont General MIDI: dùng được nhưng nên được người có chuyên môn nghe duyệt; coi là **bản tạm có thể thay**.
 - Chưa có lồng tiếng (đúng phạm vi chương đầu).
 - Model low-poly dựng bằng script, không texture vẽ tay; mặt/tóc còn đơn giản. Animation keyframe tay; các đòn chính nên được animator chỉnh lại.
+- Cân bằng Ải Vô Tận và Cảnh giới mới qua test tự động, chưa qua người chơi thật; số liệu nằm hết trong `data/*.json` để chỉnh nhanh.
+- Bản Web tải ~51 MB (wasm 39,5 MB, pck 12,7 MB) trước khi nén; Vercel nén khi truyền.
 - Chỉ có 2 loại địch thường + 1 miniboss (mục tiêu chương: 6 mẫu thuộc 4 nhóm — thiếu nhóm đánh xa và hộ vệ nặng).
 - Điều khiển chỉ hỗ trợ bàn phím + chuột; chưa hỗ trợ gamepad.
 - Hiệu năng chỉ đo được trên renderer phần mềm (llvmpipe) trong môi trường phát triển, không có ý nghĩa cho mục tiêu 60 FPS.

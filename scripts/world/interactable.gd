@@ -12,13 +12,16 @@ var lid: Node3D
 var wisps: CPUParticles3D
 var radius: float = 2.6
 var main: Node
+## Runtime reward chests are not world entities: they remember being opened themselves.
+var opened: bool = false
 
 func setup(data: Dictionary, assets: AssetLibrary, owner_main: Node) -> void:
 	entity = data
 	entity_id = String(data["id"])
 	kind = String(data["type"])
 	main = owner_main
-	var model_key: String = {"shrine": "shrine_wind", "chest": "chest", "chime": "wind_chime_post", "memory_core": "memory_stone", "seal_gate": "seal_gate"}.get(kind, "")
+	var model_key: String = {"shrine": "shrine_wind", "chest": "chest", "chime": "wind_chime_post", "memory_core": "memory_stone", "seal_gate": "seal_gate",
+		"trial_gate": "stele", "reward_chest": "chest"}.get(kind, "")
 	if model_key != "":
 		model = assets.instantiate("env/" + model_key)
 		add_child(model)
@@ -47,6 +50,14 @@ func setup(data: Dictionary, assets: AssetLibrary, owner_main: Node) -> void:
 		radius = 4.5
 	if kind == "chime":
 		radius = 2.4
+	if kind == "trial_gate":
+		Vfx.wisps(self, Color(0.78, 0.7, 1.0), 20, 1.0).position.y = 1.4
+		radius = 3.0
+	if kind == "reward_chest":
+		# The chest glows in its rarity colour until opened.
+		var tint: Color = PlayerStats.rarity_color(String(data.get("rarity", "r")))
+		wisps = Vfx.wisps(self, tint, 24, 0.7)
+		wisps.position.y = 0.8
 	add_to_group("interactable")
 	refresh()
 
@@ -75,10 +86,12 @@ func flag_key() -> String:
 	return {"chest": "opened:", "shrine": "lit:", "echo": "echo_seen:", "diary": "read:", "memory_core": "memory:"}.get(kind, "used:") + entity_id
 
 func is_used() -> bool:
+	if kind == "reward_chest":
+		return opened
 	return main.state.has_flag(flag_key())
 
 func refresh() -> void:
-	if kind == "chest" and lid:
+	if kind in ["chest", "reward_chest"] and lid:
 		lid.rotation.x = -1.9 if is_used() else 0.0
 	if kind == "shrine" and glow:
 		glow.visible = is_used()
@@ -88,7 +101,7 @@ func refresh() -> void:
 		glow.visible = not is_used()
 
 func can_interact() -> bool:
-	if kind in ["echo", "diary", "chest", "memory_core"] and is_used():
+	if kind in ["echo", "diary", "chest", "memory_core", "reward_chest"] and is_used():
 		return false
 	return true
 
@@ -108,6 +121,10 @@ func prompt() -> String:
 			return "Chạm vào ký ức"
 		"seal_gate":
 			return "Xem cổng phong ấn"
+		"trial_gate":
+			return "Bước vào Ải Vô Tận"
+		"reward_chest":
+			return "Mở " + String(entity.get("title", "rương thưởng"))
 	return "Tương tác"
 
 func interact() -> void:

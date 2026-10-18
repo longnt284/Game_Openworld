@@ -6,6 +6,8 @@ extends Node3D
 
 const LOOPING: PackedStringArray = ["idle", "walk", "run", "fall", "glide", "block", "talk", "work", "charge"]
 const STATES: PackedStringArray = ["ground", "jump", "fall", "glide", "block", "dead"]
+## Clips that sweep the blade and so draw the sword trail.
+const TRAIL_CLIPS: PackedStringArray = ["attack_1", "attack_2", "attack_3", "heavy", "skill_gust", "skill_cyclone", "dash_slash", "ultimate"]
 
 var model: Node3D
 var player: AnimationPlayer
@@ -23,9 +25,13 @@ var locomotion_speeds: Vector3 = Vector3(0.0, 1.8, 5.5)
 var hitstop_left: float = 0.0
 var flash_left: float = 0.0
 var flash_material: StandardMaterial3D
+## Elemental status glow kept on the meshes between hit flashes (null when none).
+var status_material: StandardMaterial3D
 var meshes: Array[MeshInstance3D] = []
 var base_speed: float = 1.0
 var has_tree: bool = false
+## Only the player opts in (enable_trail); enemies keep plain swings.
+var trail: SwordTrail
 
 func setup(assets: AssetLibrary, key: String, use_tree: bool = true) -> void:
 	model = assets.instantiate("characters/" + key)
@@ -132,6 +138,8 @@ func play_action(anim_name: String, speed: float = 1.0) -> void:
 	action_time = 0.0
 	action_length = animation_length(anim_name) / maxf(speed, 0.01)
 	base_speed = speed
+	if trail:
+		trail.emitting = TRAIL_CLIPS.has(anim_name)
 	if has_tree:
 		action_node.animation = anim_name
 		tree.set("parameters/speed/scale", speed)
@@ -141,6 +149,8 @@ func play_action(anim_name: String, speed: float = 1.0) -> void:
 
 func stop_action() -> void:
 	current_action = ""
+	if trail:
+		trail.emitting = false
 	if has_tree:
 		tree.set("parameters/action/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FADE_OUT)
 		tree.set("parameters/speed/scale", 1.0)
@@ -154,12 +164,60 @@ func attach_weapon(assets: AssetLibrary, key: String, sheathed: bool = false) ->
 	if weapon:
 		weapon.queue_free()
 	weapon_key = key
-	weapon = assets.instantiate("weapons/" + key)
+	# Swords name their model in data/weapons.json; a missing model falls back to the wind sword.
+	var model_key: String = "weapons/" + String(ContentDB.weapon(key).get("model", key))
+	weapon = assets.instantiate(model_key if assets.scenes.has(model_key) else "weapons/sword_wind")
 	var socket: Node3D = sheath_socket if sheathed and sheath_socket else sword_socket
 	if socket:
 		socket.add_child(weapon)
 	else:
 		add_child(weapon)
+	if trail:
+		_bind_trail()
+
+func enable_trail() -> void:
+	if trail == null:
+		trail = SwordTrail.new()
+		add_child(trail)
+	if weapon:
+		_bind_trail()
+
+func _bind_trail() -> void:
+	var data: Dictionary = ContentDB.weapon(weapon_key)
+	var element: String = String(data.get("element", ""))
+	trail.bind(weapon, StyleBook.element_color(element) if element != "" else Color(0.62, 0.95, 0.88))
+
+func apply_tint(tints: Dictionary) -> void:
+	## Recolours palette materials by name ({"VK_robe": "a8323a", ...}); {} restores the model's own.
+	for mesh: MeshInstance3D in meshes:
+		if mesh.mesh == null or mesh.get_parent() == null or _in_weapon(mesh):
+			continue
+		for surface: int in range(mesh.mesh.get_surface_count()):
+			mesh.set_surface_override_material(surface, null)
+			var material: Material = mesh.mesh.surface_get_material(surface)
+			if material is ShaderMaterial and tints.has(material.resource_name):
+				var copy: ShaderMaterial = (material as ShaderMaterial).duplicate() as ShaderMaterial
+				copy.set_shader_parameter("albedo", Color(String(tints[material.resource_name])))
+				mesh.set_surface_override_material(surface, copy)
+
+func apply_weapon_glow(color: Variant) -> void:
+	## Weapon skins recolour the blade's glowing parts; null keeps the model's colours.
+	if weapon == null:
+		return
+	for node: Node in weapon.find_children("*", "MeshInstance3D", true, false):
+		var mesh: MeshInstance3D = node as MeshInstance3D
+		for surface: int in range(mesh.mesh.get_surface_count()):
+			mesh.set_surface_override_material(surface, null)
+			var material: ShaderMaterial = mesh.mesh.surface_get_material(surface) as ShaderMaterial
+			if color == null or material == null or float(material.get_shader_parameter("emission_energy")) <= 0.0:
+				continue
+			var copy: ShaderMaterial = material.duplicate() as ShaderMaterial
+			copy.set_shader_parameter("albedo", color)
+			copy.set_shader_parameter("emission_color", color)
+			mesh.set_surface_override_material(surface, copy)
+
+func _in_weapon(node: Node) -> bool:
+	return weapon != null and weapon.is_ancestor_of(node)
 
 func set_sheathed(sheathed: bool) -> void:
 	if weapon == null or sheath_socket == null or sword_socket == null:
@@ -174,6 +232,20 @@ func flash(color: Color = Color(1.0, 0.92, 0.8), duration: float = 0.09) -> void
 	flash_material.albedo_color = color * 0.55
 	for mesh: MeshInstance3D in meshes:
 		mesh.material_overlay = flash_material
+
+func set_status_tint(color: Color) -> void:
+	if color.a <= 0.0:
+		status_material = null
+	else:
+		if status_material == null:
+			status_material = StandardMaterial3D.new()
+			status_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			status_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			status_material.rim_enabled = false
+		status_material.albedo_color = Color(color.r * 0.35, color.g * 0.35, color.b * 0.35)
+	if flash_left <= 0.0:
+		for mesh: MeshInstance3D in meshes:
+			mesh.material_overlay = status_material
 
 func hitstop(duration: float) -> void:
 	hitstop_left = maxf(hitstop_left, duration)
@@ -191,11 +263,13 @@ func _process(delta: float) -> void:
 		action_time += delta
 		if action_time >= action_length:
 			current_action = ""
+			if trail:
+				trail.emitting = false
 	if flash_left > 0.0:
 		flash_left -= delta
 		if flash_left <= 0.0:
 			for mesh: MeshInstance3D in meshes:
-				mesh.material_overlay = null
+				mesh.material_overlay = status_material
 
 func _set_playback_speed(factor: float) -> void:
 	if has_tree:

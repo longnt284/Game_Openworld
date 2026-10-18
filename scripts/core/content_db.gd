@@ -8,8 +8,20 @@ const FILES: Dictionary = {
 	"dialogue": "res://data/dialogue.json",
 	"entities": "res://data/world/entities.json",
 	"props": "res://data/world/props.json",
+	"flora": "res://data/world/flora.json",
 	"enemies": "res://data/enemies.json",
 	"timings": "res://data/anim_timings.json",
+	"attacks": "res://data/attacks.json",
+	"weapons": "res://data/weapons.json",
+	"styles": "res://data/styles.json",
+	"elements": "res://data/elements.json",
+	"world_tiers": "res://data/world_tiers.json",
+	"elites": "res://data/elites.json",
+	"trial": "res://data/trial.json",
+	"gacha": "res://data/gacha.json",
+	"affixes": "res://data/affixes.json",
+	"skins": "res://data/skins.json",
+	"daily": "res://data/daily.json",
 }
 
 static var _cache: Dictionary = {}
@@ -35,6 +47,25 @@ static func enemy(id: String) -> Dictionary:
 
 static func timing(owner: String, attack: String) -> Dictionary:
 	return ((get_data("timings") as Dictionary).get(owner, {}) as Dictionary).get(attack, {})
+
+static func weapon(id: String) -> Dictionary:
+	return (get_data("weapons") as Dictionary).get(id, {})
+
+static func style(id: String) -> Dictionary:
+	return (get_data("styles") as Dictionary).get(id, {})
+
+static func element(id: String) -> Dictionary:
+	return ((get_data("elements") as Dictionary).get("elements", {}) as Dictionary).get(id, {})
+
+static func status(id: String) -> Dictionary:
+	return ((get_data("elements") as Dictionary).get("statuses", {}) as Dictionary).get(id, {})
+
+static func tier(index: int) -> Dictionary:
+	var tiers: Array = (get_data("world_tiers") as Dictionary).get("tiers", [])
+	return tiers[clampi(index, 0, tiers.size() - 1)] if not tiers.is_empty() else {}
+
+static func skin(id: String) -> Dictionary:
+	return (get_data("skins") as Dictionary).get(id, {})
 
 static func dialogue_node(id: String) -> Dictionary:
 	return (get_data("dialogue") as Dictionary).get(id, {})

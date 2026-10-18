@@ -1,0 +1,17 @@
+{
+	"elements": {
+		"wind": {"name": "Phong", "color": "9ff5e0", "status": "gale"},
+		"water": {"name": "Thủy", "color": "5fb8ff", "status": "soak"},
+		"thunder": {"name": "Lôi", "color": "ffe066", "status": "shock"},
+		"flame": {"name": "Hỏa", "color": "ff7a3a", "status": "burn"},
+		"frost": {"name": "Băng", "color": "bfefff", "status": "chill"}
+	},
+	"statuses": {
+		"gale": {"name": "Gió cuốn", "duration": 2.0, "max_stacks": 1, "poise_taken": 1.3, "color": "9ff5e0"},
+		"soak": {"name": "Ướt", "duration": 6.0, "max_stacks": 2, "slow_per_stack": 0.08, "taken": {"thunder": 1.3}, "removes": ["burn"], "color": "5fb8ff"},
+		"shock": {"name": "Tê liệt", "duration": 3.0, "max_stacks": 3, "micro_stun": 0.22, "interval": 1.0, "color": "ffe066"},
+		"burn": {"name": "Thiêu đốt", "duration": 4.0, "max_stacks": 3, "dot": 0.12, "tick": 0.5, "color": "ff7a3a"},
+		"chill": {"name": "Lạnh cóng", "duration": 5.0, "max_stacks": 3, "slow_per_stack": 0.15, "at_max": "freeze", "color": "bfefff"},
+		"freeze": {"name": "Đóng băng", "duration": 1.8, "max_stacks": 1, "stun": true, "immune_after": 5.0, "taken": {"thunder": 1.25, "flame": 1.25}, "color": "dff8ff"}
+	}
+}

@@ -36,12 +36,97 @@ def grip(b, length, radius, mat, wrap=None):
             b.torus(radius + 0.002, 0.0035, (0, 0, -length * 0.4 + i * length * 0.2), mat=wrap, segments=8, ring=4)
 
 
+def tip_marker(z):
+    """Empty at the blade tip: Godot reads it as the "Tip" node for sword trails."""
+    tip = bpy.data.objects.new("Tip", None)
+    tip.location = (0, 0, z)
+    bpy.context.scene.collection.objects.link(tip)
+
+
+def tassel(b, mat, bead="jade_bead"):
+    b.sphere(0.012, (0, 0, -0.15), mat=bead, segments=6, rings=4)
+    b.cone(0.016, 0.1, (0, 0, -0.21), (180, 0, 0), mat=mat, segments=6)
+
+
 def sword_old():
+    """The concept's straight jian: gold guard with flared ends, brown wrapped grip, red tassel."""
     b = vk.MeshBuilder("Sword")
-    grip(b, 0.2, 0.016, "wood_dark", "cloth_dark")
-    b.sphere(0.022, (0, 0, -0.11), mat="bronze", segments=8, rings=6)
-    b.box((0.1, 0.034, 0.022), (0, 0, 0.11), mat="bronze", bevel=0.006)
+    grip(b, 0.2, 0.016, "leather", "gold")
+    b.sphere(0.022, (0, 0, -0.11), mat="gold", segments=8, rings=6)
+    b.box((0.06, 0.034, 0.026), (0, 0, 0.11), mat="gold", bevel=0.008)
+    for side in (1, -1):
+        b.cone(0.018, 0.05, (side * 0.045, 0, 0.115), (0, side * 90, 0), mat="gold", segments=6, scale=(1, 0.6, 1))
+        b.sphere(0.012, (side * 0.072, 0, 0.122), mat="gold", segments=6, rings=4)
     blade(b, 0.12, 0.78, 0.058, 0.01, "metal", fuller="metal_dark")
+    tassel(b, "vermilion")
+    tip_marker(0.9)
+    return b
+
+
+def sword_water():
+    """Thủy Nguyệt Kiếm: slender blade with a glowing wave fuller and a crescent-moon guard."""
+    b = vk.MeshBuilder("Sword")
+    grip(b, 0.22, 0.016, "navy", "steel_blue")
+    b.sphere(0.022, (0, 0, -0.125), mat="steel_frost", segments=10, rings=6)
+    b.torus(0.06, 0.012, (0, 0, 0.12), (90, 0, 0), mat="steel_blue", segments=16, ring=5)
+    b.sphere(0.016, (0, 0, 0.12), mat="water_glow", segments=8, rings=5)
+    blade(b, 0.135, 0.88, 0.054, 0.009, "steel_frost")
+    for k in range(6):
+        z = 0.2 + k * 0.11
+        b.box((0.012, 0.0105, 0.07), (0.006 * (1 if k % 2 else -1), 0, z), (0, 12 * (1 if k % 2 else -1), 0), mat="water_glow")
+    tassel(b, "jade_light", bead="water_glow")
+    tip_marker(1.01)
+    return b
+
+
+def sword_thunder():
+    """Lôi Minh Kiếm: dark blade split by a zig-zag of lightning, spiked violet-gold guard."""
+    b = vk.MeshBuilder("Sword")
+    grip(b, 0.22, 0.017, "ink", "violet")
+    b.sphere(0.022, (0, 0, -0.125), mat="gold", segments=10, rings=6)
+    b.box((0.05, 0.036, 0.03), (0, 0, 0.12), mat="violet", bevel=0.008)
+    for side in (1, -1):
+        b.cone(0.016, 0.09, (side * 0.06, 0, 0.14), (0, side * 60, 0), mat="gold", segments=5)
+    blade(b, 0.135, 0.86, 0.06, 0.011, "metal_dark")
+    x = 0.0
+    for k in range(7):
+        z = 0.18 + k * 0.1
+        nx = 0.01 * (1 if k % 2 else -1)
+        b.segment((x, 0, z), (nx, 0, z + 0.1), 0.006, mat="thunder_glow", segments=4)
+        x = nx
+    tassel(b, "thunder_glow", bead="violet")
+    tip_marker(0.995)
+    return b
+
+
+def sword_flame():
+    """Xích Viêm Kiếm: gently curved crimson blade with an ember edge and a flame guard."""
+    b = vk.MeshBuilder("Sword")
+    grip(b, 0.22, 0.017, "ember", "gold")
+    b.sphere(0.024, (0, 0, -0.125), mat="flame_glow", segments=10, rings=6)
+    b.box((0.05, 0.034, 0.03), (0, 0, 0.12), mat="gold", bevel=0.01)
+    for side, height in ((1, 0.1), (-1, 0.08), (0.5, 0.12), (-0.5, 0.1)):
+        b.cone(0.016, height, (side * 0.04, 0, 0.14 + height * 0.4), (0, side * 25, 0), mat="flame_glow" if abs(side) < 1 else "vermilion", segments=5)
+    blade(b, 0.135, 0.84, 0.062, 0.01, "vermilion_dark", curve=0.04)
+    b.box((0.008, 0.0108, 0.6), (0.027, 0, 0.45), mat="flame_glow")
+    tassel(b, "flame_glow", bead="gold")
+    tip_marker(0.975)
+    return b
+
+
+def sword_frost():
+    """Hàn Sương Kiếm: pale frost blade with an ice-crystal guard."""
+    b = vk.MeshBuilder("Sword")
+    grip(b, 0.22, 0.016, "white", "steel_blue")
+    b.sphere(0.022, (0, 0, -0.125), mat="frost_glow", segments=10, rings=6)
+    for k in range(6):
+        a = k * math.tau / 6
+        b.cone(0.012, 0.07, (math.cos(a) * 0.035, math.sin(a) * 0.012, 0.12), (0, math.degrees(math.atan2(math.cos(a), 0.0001)) * 0.0 + (90 if math.cos(a) > 0 else -90), 0),
+               mat="steel_frost", segments=4)
+    b.box((0.04, 0.03, 0.03), (0, 0, 0.12), mat="frost_glow", bevel=0.008)
+    blade(b, 0.135, 0.86, 0.058, 0.01, "steel_frost", fuller="frost_glow")
+    tassel(b, "frost_glow", bead="steel_frost")
+    tip_marker(0.995)
     return b
 
 
@@ -92,7 +177,8 @@ def glaive():
     return b
 
 
-WEAPONS = {"sword_old": sword_old, "sword_bamboo": sword_bamboo, "sword_wind": sword_wind, "sabre": sabre, "glaive": glaive}
+WEAPONS = {"sword_old": sword_old, "sword_bamboo": sword_bamboo, "sword_wind": sword_wind, "sabre": sabre, "glaive": glaive,
+           "sword_water": sword_water, "sword_thunder": sword_thunder, "sword_flame": sword_flame, "sword_frost": sword_frost}
 
 
 def main(preview):

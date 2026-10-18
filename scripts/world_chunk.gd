@@ -2,27 +2,27 @@ class_name WorldChunk
 extends Node3D
 ## Pooled terrain tile. `compute` is pure (safe on a worker thread);
 ## `apply` pushes the result into meshes, MultiMeshes and colliders on the main thread.
+## Flora follows data/world/flora.json: each kind has its own RNG stream (so quality
+## presets that thin grass never move a tree), gathers in noise-driven drifts, carries a
+## per-instance tint and darkens the ground under its canopy.
 
-const FLORA_RULES: Dictionary = {
-	"pine": {"min_scale": 0.8, "max_scale": 1.35, "collider": 0.3, "margin": 2.0},
-	"maple": {"min_scale": 0.85, "max_scale": 1.25, "collider": 0.32, "margin": 2.5},
-	"bamboo": {"min_scale": 0.8, "max_scale": 1.3, "collider": 0.55, "margin": 1.2},
-	"rock": {"min_scale": 0.6, "max_scale": 1.6, "collider": 0.0, "margin": 1.0},
-	"grass": {"min_scale": 0.7, "max_scale": 1.3, "collider": 0.0, "margin": 0.2},
-}
-const MAX_PER_KIND: Dictionary = {"pine": 8, "maple": 5, "bamboo": 18, "rock": 6, "grass": 32}
+## Floats per MultiMesh instance: 3x4 transform + RGBA colour.
+const STRIDE: int = 16
+const FAR_TREE_HEIGHT: float = 3.0
 
 var coordinate: Vector2i
 var ground: MeshInstance3D
 var ground_shape: CollisionShape3D
 var body: StaticBody3D
+## kind -> Array[MultiMeshInstance3D], one per mesh part of the kind's model
 var batches: Dictionary = {}
-var distant_trees: MultiMeshInstance3D
+## far group ("cone", "round", "bamboo") -> MultiMeshInstance3D shown past the tree distance
+var far_batches: Dictionary = {}
 var trunk_shapes: Array[CollisionShape3D] = []
 var rock_shapes: Array[CollisionShape3D] = []
 var library: AssetLibrary
 
-func initialize(settings: GameSettings, assets: AssetLibrary, ground_material: Material) -> void:
+func initialize(settings: GameSettings, assets: AssetLibrary, ground_material: Material, layout: WorldLayout) -> void:
 	library = assets
 	ground = MeshInstance3D.new()
 	ground.material_override = ground_material
@@ -33,31 +33,27 @@ func initialize(settings: GameSettings, assets: AssetLibrary, ground_material: M
 	add_child(body)
 	ground_shape = CollisionShape3D.new()
 	body.add_child(ground_shape)
-	for kind: String in FLORA_RULES:
+	var trunk_slots: int = 0
+	for kind: String in layout.flora_kinds:
+		var rule: Dictionary = layout.flora[kind]
 		var kind_batches: Array[MultiMeshInstance3D] = []
 		for part: Dictionary in assets.mesh_parts.get(kind, []):
 			var batch: MultiMeshInstance3D = _new_batch(part["mesh"])
-			if kind in ["pine", "maple", "bamboo"]:
-				batch.visibility_range_end = settings.near_tree_distance
-			elif kind == "grass":
-				batch.visibility_range_end = 46.0
+			batch.set_meta("range", String(rule.get("range", "clutter")))
+			if not rule.get("shadow", false):
 				batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			else:
-				batch.visibility_range_end = 90.0
 			kind_batches.append(batch)
 		batches[kind] = kind_batches
-	var low_mesh: CylinderMesh = CylinderMesh.new()
-	low_mesh.top_radius = 0.0
-	low_mesh.bottom_radius = 1.5
-	low_mesh.height = 4.0
-	low_mesh.radial_segments = 5
-	low_mesh.material = Toon.flat_material(Color("4f7d55"))
-	distant_trees = _new_batch(low_mesh)
-	distant_trees.visibility_range_begin = settings.near_tree_distance
-	distant_trees.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for index: int in range(MAX_PER_KIND["pine"] + MAX_PER_KIND["maple"] + MAX_PER_KIND["bamboo"]):
+		if rule.has("collider"):
+			trunk_slots += int(rule.get("max", 0))
+	for group: String in assets.far_meshes:
+		var far: MultiMeshInstance3D = _new_batch(assets.far_meshes[group])
+		far.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		far.visibility_range_begin = settings.near_tree_distance
+		far_batches[group] = far
+	for index: int in range(trunk_slots):
 		trunk_shapes.append(_new_capsule())
-	for index: int in range(MAX_PER_KIND["rock"]):
+	for index: int in range(int(layout.flora.get("rock", {}).get("max", 0))):
 		var shape: CollisionShape3D = CollisionShape3D.new()
 		shape.shape = SphereShape3D.new()
 		body.add_child(shape)
@@ -77,6 +73,7 @@ func _new_batch(mesh: Mesh) -> MultiMeshInstance3D:
 	var batch: MultiMeshInstance3D = MultiMeshInstance3D.new()
 	batch.multimesh = MultiMesh.new()
 	batch.multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	batch.multimesh.use_colors = true
 	batch.multimesh.mesh = mesh
 	add_child(batch)
 	return batch
@@ -87,7 +84,8 @@ func deactivate() -> void:
 	for shape: CollisionShape3D in trunk_shapes + rock_shapes:
 		shape.disabled = true
 
-static func compute(coord: Vector2i, layout: WorldLayout, chunk_size: int, subdivisions: int, world_seed: int) -> Dictionary:
+static func compute(coord: Vector2i, layout: WorldLayout, chunk_size: int, subdivisions: int, world_seed: int, density_scale: float = 1.0,
+		part_transforms: Dictionary = {}) -> Dictionary:
 	var origin: Vector2 = Vector2(coord.x * chunk_size, coord.y * chunk_size)
 	var count: int = subdivisions + 1
 	var step: float = float(chunk_size) / subdivisions
@@ -96,6 +94,16 @@ static func compute(coord: Vector2i, layout: WorldLayout, chunk_size: int, subdi
 	for z: int in range(-1, count + 1):
 		for x: int in range(-1, count + 1):
 			grid[(z + 1) * (count + 2) + x + 1] = layout.height_at(origin.x + x * step, origin.y + z * step)
+	var flora: Dictionary = {}
+	var canopies: Array = []
+	for kind_index: int in range(layout.flora_kinds.size()):
+		var kind: String = layout.flora_kinds[kind_index]
+		var rule: Dictionary = layout.flora[kind]
+		flora[kind] = _scatter(kind, kind_index, rule, coord, origin, layout, chunk_size, world_seed, density_scale)
+		if rule.has("canopy"):
+			for entry: Array in flora[kind]:
+				var placed: Transform3D = entry[0]
+				canopies.append(Vector3(placed.origin.x, placed.origin.z, float(rule["canopy"]) * placed.basis.get_scale().x))
 	var vertices: PackedVector3Array = PackedVector3Array()
 	var normals: PackedVector3Array = PackedVector3Array()
 	var colors: PackedColorArray = PackedColorArray()
@@ -109,7 +117,18 @@ static func compute(coord: Vector2i, layout: WorldLayout, chunk_size: int, subdi
 			var dz: float = grid[row + count + 2] - grid[row - count - 2]
 			var normal: Vector3 = Vector3(-dx, 2.0 * step, -dz).normalized()
 			normals.append(normal)
-			colors.append(layout.ground_color(origin.x + x * step, origin.y + z * step, height, 1.0 - normal.y * normal.y))
+			var tint: Color = layout.ground_color(origin.x + x * step, origin.y + z * step, height, 1.0 - normal.y * normal.y)
+			# Under a canopy the ground darkens (cheap ambient occlusion); alpha marks the
+			# canopy so the terrain shader can dapple the sunlight there.
+			var shade: float = 0.0
+			for canopy: Vector3 in canopies:
+				var reach: float = canopy.z
+				var gap: float = Vector2(x * step - canopy.x, z * step - canopy.y).length()
+				if gap < reach:
+					shade = maxf(shade, 1.0 - gap / reach)
+			tint = tint.darkened(shade * 0.28)
+			tint.a = shade
+			colors.append(tint)
 	for z: int in range(subdivisions):
 		for x: int in range(subdivisions):
 			var a: int = z * count + x
@@ -118,36 +137,86 @@ static func compute(coord: Vector2i, layout: WorldLayout, chunk_size: int, subdi
 	var faces: PackedVector3Array = PackedVector3Array()
 	for index: int in indices:
 		faces.append(vertices[index])
-	var random: RandomNumberGenerator = RandomNumberGenerator.new()
-	random.seed = hash(Vector3i(coord.x, world_seed, coord.y))
-	var flora: Dictionary = {}
-	for kind: String in FLORA_RULES:
-		flora[kind] = []
-	var attempts: Dictionary = {"pine": 8, "maple": 5, "bamboo": 18, "rock": 6, "grass": 32}
-	for kind: String in attempts:
-		var rule: Dictionary = FLORA_RULES[kind]
-		for attempt: int in range(attempts[kind]):
-			var local: Vector2 = Vector2(random.randf_range(0.5, chunk_size - 0.5), random.randf_range(0.5, chunk_size - 0.5))
-			var world: Vector2 = origin + local
-			var roll: float = random.randf()
-			var scale_factor: float = random.randf_range(rule["min_scale"], rule["max_scale"])
-			var yaw: float = random.randf() * TAU
-			var biome: Dictionary = layout.biomes.get(layout.region_at(world.y).get("id", ""), {})
-			var density: float
-			if kind in ["pine", "maple"]:
-				density = float(biome.get("trees", {}).get(kind, 0)) / attempts[kind]
-			else:
-				density = float(biome.get(kind, 0)) / attempts[kind]
-			if roll > density or not layout.is_clear(world.x, world.y, rule["margin"]):
-				continue
-			var height: float = layout.height_at(world.x, world.y)
-			if kind != "rock" and kind != "grass" and absf(layout.height_at(world.x + 1.0, world.y) - height) > 1.4:
-				continue
-			var basis: Basis = Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale_factor)
-			flora[kind].append(Transform3D(basis, Vector3(local.x, height - 0.05, local.y)))
-	return {"coord": coord, "vertices": vertices, "normals": normals, "colors": colors, "indices": indices, "faces": faces, "flora": flora}
+	var buffers: Dictionary = {}
+	for kind: String in flora:
+		var kind_buffers: Array = []
+		for part: Transform3D in part_transforms.get(kind, [Transform3D.IDENTITY]):
+			kind_buffers.append(_buffer(flora[kind], part))
+		buffers[kind] = kind_buffers
+	var far: Dictionary = {}
+	for kind: String in flora:
+		var group: String = String(layout.flora[kind].get("far", ""))
+		if group == "":
+			continue
+		if not far.has(group):
+			far[group] = []
+		var far_tint: Color = Color(String(layout.flora[kind].get("far_color", "ffffff")))
+		for entry: Array in flora[kind]:
+			far[group].append([(entry[0] as Transform3D) * Transform3D(Basis.IDENTITY, Vector3(0, FAR_TREE_HEIGHT if group != "bamboo" else 0.0, 0)), far_tint])
+	var far_buffers: Dictionary = {}
+	for group: String in far:
+		far_buffers[group] = _buffer(far[group], Transform3D.IDENTITY)
+	return {"coord": coord, "vertices": vertices, "normals": normals, "colors": colors, "indices": indices, "faces": faces, "flora": flora,
+		"buffers": buffers, "far": far_buffers}
 
-func apply(data: Dictionary, chunk_size: int) -> void:
+static func _scatter(kind: String, kind_index: int, rule: Dictionary, coord: Vector2i, origin: Vector2, layout: WorldLayout, chunk_size: int,
+		world_seed: int, density_scale: float) -> Array:
+	## [Transform3D, Color] per instance. Every attempt draws the same random numbers whether or
+	## not it spawns, so density changes never reshuffle the kinds that keep their count.
+	var random: RandomNumberGenerator = RandomNumberGenerator.new()
+	random.seed = hash(Vector4i(coord.x, coord.y, world_seed, kind_index))
+	var placed: Array = []
+	var attempts: int = int(rule.get("max", 0))
+	var scale_range: Array = rule.get("scale", [1.0, 1.0])
+	var tints: Array = rule.get("tints", [])
+	var density_scaled: bool = rule.get("dense", false)
+	for attempt: int in range(attempts):
+		var local: Vector2 = Vector2(random.randf_range(0.5, chunk_size - 0.5), random.randf_range(0.5, chunk_size - 0.5))
+		var roll: float = random.randf()
+		var scale_factor: float = random.randf_range(float(scale_range[0]), float(scale_range[1]))
+		var yaw: float = random.randf() * TAU
+		var pick: float = random.randf()
+		var world: Vector2 = origin + local
+		var chance: float = float(layout.biome_density(world.y).get(kind, 0.0)) / maxf(attempts, 1)
+		if density_scaled:
+			chance *= density_scale
+		if chance <= 0.0:
+			continue
+		if rule.has("cluster"):
+			chance *= layout.cluster_gate(world.x, world.y, kind_index, rule["cluster"])
+		if roll > chance:
+			continue
+		if not layout.flora_clear(world.x, world.y, rule):
+			continue
+		var height: float = layout.height_at(world.x, world.y)
+		if rule.has("slope") and absf(layout.height_at(world.x + 1.0, world.y) - height) > float(rule["slope"]):
+			continue
+		var tint: Color = Color.WHITE
+		if rule.get("tint", "") == "ground":
+			# Pale blades take the colour of the ground they grow from, a shade lighter.
+			tint = layout.ground_color(world.x, world.y, height, 0.0).lightened(0.3)
+		elif not tints.is_empty():
+			tint = Color(String(tints[int(pick * tints.size()) % tints.size()]))
+		var basis: Basis = Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale_factor)
+		# Flora meshes are imported, so their shader takes colours as linear: match the tint.
+		placed.append([Transform3D(basis, Vector3(local.x, height - 0.05, local.y)), tint.srgb_to_linear()])
+	return placed
+
+static func _buffer(entries: Array, part: Transform3D) -> PackedFloat32Array:
+	var buffer: PackedFloat32Array = PackedFloat32Array()
+	buffer.resize(entries.size() * STRIDE)
+	var offset: int = 0
+	for entry: Array in entries:
+		var t: Transform3D = (entry[0] as Transform3D) * part
+		var c: Color = entry[1]
+		var values: Array[float] = [t.basis.x.x, t.basis.y.x, t.basis.z.x, t.origin.x, t.basis.x.y, t.basis.y.y, t.basis.z.y, t.origin.y,
+			t.basis.x.z, t.basis.y.z, t.basis.z.z, t.origin.z, c.r, c.g, c.b, c.a]
+		for value: float in values:
+			buffer[offset] = value
+			offset += 1
+	return buffer
+
+func apply(data: Dictionary, chunk_size: int, layout: WorldLayout) -> void:
 	coordinate = data["coord"]
 	position = Vector3(coordinate.x * chunk_size, 0, coordinate.y * chunk_size)
 	var arrays: Array = []
@@ -165,36 +234,38 @@ func apply(data: Dictionary, chunk_size: int) -> void:
 	ground_shape.disabled = false
 	var flora: Dictionary = data["flora"]
 	for kind: String in batches:
-		_fill_batches(batches[kind], library.mesh_parts.get(kind, []), flora.get(kind, []))
-	var trees: Array = flora.get("pine", []) + flora.get("maple", [])
-	distant_trees.multimesh.instance_count = trees.size()
-	for index: int in range(trees.size()):
-		distant_trees.multimesh.set_instance_transform(index, (trees[index] as Transform3D) * Transform3D(Basis.IDENTITY, Vector3(0, 3, 0)))
+		var kind_buffers: Array = data["buffers"].get(kind, [])
+		for index: int in range(batches[kind].size()):
+			_fill(batches[kind][index], kind_buffers[index] if index < kind_buffers.size() else PackedFloat32Array())
+	for group: String in far_batches:
+		_fill(far_batches[group], data["far"].get(group, PackedFloat32Array()))
 	var trunks: Array = []
-	for kind: String in ["pine", "maple", "bamboo"]:
-		for transform_value: Transform3D in flora.get(kind, []):
-			trunks.append([transform_value, FLORA_RULES[kind]["collider"]])
+	for kind: String in flora:
+		var rule: Dictionary = layout.flora[kind]
+		if rule.has("collider"):
+			for entry: Array in flora[kind]:
+				trunks.append([(entry[0] as Transform3D).origin, float(rule["collider"])])
 	for index: int in range(trunk_shapes.size()):
 		var trunk: CollisionShape3D = trunk_shapes[index]
 		trunk.disabled = index >= trunks.size()
 		if index < trunks.size():
-			var origin: Vector3 = (trunks[index][0] as Transform3D).origin
 			(trunk.shape as CapsuleShape3D).radius = trunks[index][1]
-			trunk.transform = Transform3D(Basis.IDENTITY, origin + Vector3(0, 1.5, 0))
+			trunk.transform = Transform3D(Basis.IDENTITY, (trunks[index][0] as Vector3) + Vector3(0, 1.5, 0))
 	var rocks: Array = flora.get("rock", [])
+	var rock_radius: float = float(layout.flora.get("rock", {}).get("rock_collider", 0.62))
 	for index: int in range(rock_shapes.size()):
 		var rock_shape: CollisionShape3D = rock_shapes[index]
 		rock_shape.disabled = index >= rocks.size()
 		if index < rocks.size():
-			var rock: Transform3D = rocks[index]
+			var rock: Transform3D = rocks[index][0]
 			var scale_factor: float = rock.basis.get_scale().x
-			(rock_shape.shape as SphereShape3D).radius = 0.62 * scale_factor
+			(rock_shape.shape as SphereShape3D).radius = rock_radius * scale_factor
 			rock_shape.transform = Transform3D(Basis.IDENTITY, rock.origin + Vector3(0, 0.25 * scale_factor, 0))
 	visible = true
 
-func _fill_batches(kind_batches: Array, parts: Array, transforms: Array) -> void:
-	for index: int in range(kind_batches.size()):
-		var multimesh: MultiMesh = (kind_batches[index] as MultiMeshInstance3D).multimesh
-		multimesh.instance_count = transforms.size()
-		for instance: int in range(transforms.size()):
-			multimesh.set_instance_transform(instance, (transforms[instance] as Transform3D) * (parts[index]["transform"] as Transform3D))
+func _fill(batch: MultiMeshInstance3D, buffer: PackedFloat32Array) -> void:
+	var multimesh: MultiMesh = batch.multimesh
+	multimesh.instance_count = buffer.size() / STRIDE
+	if multimesh.instance_count > 0:
+		multimesh.buffer = buffer
+	batch.visible = multimesh.instance_count > 0

@@ -57,6 +57,13 @@ func _unhandled_input(event: InputEvent) -> void:
 func add_trauma(amount: float) -> void:
 	trauma = clampf(trauma + amount * shake_scale, 0.0, 1.0)
 
+func punch_fov(amount: float, duration: float) -> void:
+	## Brief zoom-out kick (ultimates); returns to the resting field of view.
+	var rest: float = 62.0
+	var tween: Tween = camera.create_tween()
+	tween.tween_property(camera, "fov", rest + amount, duration * 0.25).set_ease(Tween.EASE_OUT)
+	tween.tween_property(camera, "fov", rest, duration * 0.75).set_trans(Tween.TRANS_SINE)
+
 func forward() -> Vector3:
 	return Vector3(-sin(yaw), 0, -cos(yaw))
 

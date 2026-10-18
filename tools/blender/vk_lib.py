@@ -34,12 +34,35 @@ PALETTE = {
     "metal_dark": "5d666a", "bronze": "9c7a3c", "paper": "efe3c2", "ink": "1b1d22",
     "iris": "2a7f86", "iris_amber": "b47a2c", "mask": "ece6d8", "boar": "6b4a35",
     "boar_dark": "3f2b20", "tusk": "efe6cf", "spirit": "8fe3d6", "seal": "d9473a",
+    # Vertex-coloured assets use one white material; their colours live in the mesh.
+    "vcol": "ffffff",
+    # Foliage and landscape tones for the painted, Ghibli-like environment kit.
+    "leaf_dark": "2a5c34", "leaf": "468a40", "leaf_light": "80b656", "leaf_sun": "b4d36e",
+    "blossom": "f2a9bd", "blossom_light": "ffe3ea", "petal_white": "fdfbf2", "pollen": "f3c94a",
+    "fern": "3f8a4a", "fern_light": "86c25e", "reed": "b9b874", "reed_head": "7a5236",
+    "karst": "b9b39c", "karst_shadow": "7f8476", "karst_forest": "3e7a4c", "karst_forest_light": "6fa65a",
+    "mushroom_cap": "c2482f", "mushroom_spot": "f6efe0", "hay": "d8b866", "hay_dark": "a8853f",
+    "pot": "b5643e", "pot_dark": "7d3f28", "fruit_orange": "f09a2c", "fruit_green": "8fbf4a",
+    "banner_red": "b8352b", "banner_cream": "efe0b8",
+    # Lâm An's outfit has its own keys so skins can recolour it without touching eyes or NPCs.
+    "robe": "2a9d93", "robe_dark": "1b6f69", "robe_trim": "f3ead2", "sash": "c93b2b", "ribbon": "d23a2c",
+    "scarf_white": "f2f5f1", "boot": "6a4128", "pauldron_dark": "22252b", "jade_bead": "56c2a6",
+    # Elemental sword accents (glowing) and fittings.
+    "water_glow": "5fb8ff", "thunder_glow": "ffe066", "flame_glow": "ff7a3a", "frost_glow": "bfefff",
+    "steel_blue": "9fb8d0", "steel_frost": "d8ecf4", "violet": "6b4fa0", "ember": "8a2418", "navy": "203a5c",
 }
-EMISSIVE = {"lantern": 2.2, "spirit": 1.6, "seal": 1.4}
+EMISSIVE = {"lantern": 2.2, "spirit": 1.6, "seal": 1.4, "water_glow": 1.8, "thunder_glow": 2.0, "flame_glow": 2.0, "frost_glow": 1.6}
+# Generators that set this to True build every MeshBuilder vertex-coloured unless told otherwise.
+DEFAULT_VCOL = False
 
 
 def srgb_to_linear(value):
     return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+
+def linear_to_srgb(value):
+    value = max(0.0, value)
+    return value * 12.92 if value <= 0.0031308 else 1.055 * value ** (1 / 2.4) - 0.055
 
 
 def color(name):
@@ -82,15 +105,29 @@ def material(name):
 
 
 class MeshBuilder:
-    """Accumulates primitives into one bmesh with material slots and skin weights."""
+    """Accumulates primitives into one bmesh with material slots and skin weights.
 
-    def __init__(self, name):
+    With vcol=True every face keeps its palette colour as a vertex colour and the mesh
+    gets a single "vcol" material, so a flora kind costs one draw call per chunk. paint()
+    overrides colours per vertex (canopy gradients, darker roots)."""
+
+    def __init__(self, name, vcol=None):
         self.name = name
         self.bm = bmesh.new()
         self.deform = self.bm.verts.layers.deform.verify()
         self.uv = self.bm.loops.layers.uv.verify()
         self.materials = []
         self.groups = []
+        self.vcol = DEFAULT_VCOL if vcol is None else vcol
+        self.vert_colors = {}
+        # Two-sided blades are open surfaces; a normal recalculation could flip their backs forward.
+        self.open_surfaces = False
+
+    def paint(self, verts, fn):
+        """fn(vertex_position) -> linear RGB; applied to the given vertices of the last primitive."""
+        for vert in verts:
+            self.vert_colors[vert] = fn(vert.co.copy())
+        return verts
 
     def _index(self, items, value):
         if value not in items:
@@ -220,13 +257,71 @@ class MeshBuilder:
         verts = [vert for ring in verts_rings for vert in ring]
         return self._finish(verts, mat, bone, Matrix.Identity(4), True, 60)
 
+    def blade(self, points, width, normal=(0, -1, 0), mat="leaf"):
+        """Flat two-sided ribbon (front and back faces, no thickness): cheap grass, leaves, fronds.
+        A width of 0 at a point makes a pointed tip."""
+        normal = Vector(normal).normalized()
+        rows = []
+        for i, point in enumerate(points):
+            point = Vector(point)
+            ahead = Vector(points[min(i + 1, len(points) - 1)]) - Vector(points[max(i - 1, 0)])
+            half = (width[i] if isinstance(width, (list, tuple)) else width) * 0.5
+            side = ahead.cross(normal).normalized() * half
+            rows.append([point] if half <= 0.0 else [point + side, point - side])
+        verts = []
+        for flip in (False, True):
+            made = [[self.bm.verts.new(p) for p in row] for row in rows]
+            for lower, upper in zip(made, made[1:]):
+                ring = lower + list(reversed(upper))
+                self.bm.faces.new(list(reversed(ring)) if flip else ring)
+            verts += [vert for row in made for vert in row]
+        self.open_surfaces = True
+        return self._finish(verts, mat, None, Matrix.Identity(4), False, None)
+
+    def fan(self, center, radius, count, normal_up=True, mat="petal_white", tilt=0.0, rot=0.0):
+        """Flat star-shaped flower head: count petals around a centre, both sides."""
+        center = Vector(center)
+        hub = self.bm.verts.new(center)
+        rim = []
+        for i in range(count * 2):
+            a = math.tau * i / (count * 2) + rot
+            r = radius if i % 2 == 0 else radius * 0.45
+            rim.append(self.bm.verts.new(center + Vector((math.cos(a) * r, math.sin(a) * r, tilt * r))))
+        back_hub = self.bm.verts.new(center - Vector((0, 0, 0.003)))
+        back = [self.bm.verts.new(v.co - Vector((0, 0, 0.003))) for v in rim]
+        for i in range(len(rim)):
+            self.bm.faces.new((hub, rim[i], rim[(i + 1) % len(rim)]))
+            self.bm.faces.new((back_hub, back[(i + 1) % len(back)], back[i]))
+        self.open_surfaces = True
+        return self._finish([hub, back_hub] + rim + back, mat, None, Matrix.Identity(4), False, None)
+
     def build(self, collection=None):
-        bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=0.00001)
-        bmesh.ops.recalc_face_normals(self.bm, faces=self.bm.faces)
+        if not self.vert_colors:
+            # Painted vertices are tracked by identity, so merging only happens when nothing was painted.
+            bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=0.00001)
+        if not self.open_surfaces:
+            bmesh.ops.recalc_face_normals(self.bm, faces=self.bm.faces)
         _box_project_uv(self.bm, self.uv)
+        if self.vcol:
+            # Glowing parts keep their own emissive material; everything else shares "vcol".
+            kept = ["vcol"] + [name for name in self.materials if name in EMISSIVE]
+            layer = self.bm.loops.layers.float_color.new("Color")
+            for face in self.bm.faces:
+                name = self.materials[face.material_index]
+                base = color(name)
+                for loop in face.loops:
+                    rgb = self.vert_colors.get(loop.vert, base) if name not in EMISSIVE else (1.0, 1.0, 1.0)
+                    # Godot keeps glTF vertex colours as stored and the toon shader reads them
+                    # as sRGB (like the terrain), so write the sRGB encoding.
+                    loop[layer] = (linear_to_srgb(rgb[0]), linear_to_srgb(rgb[1]), linear_to_srgb(rgb[2]), 1.0)
+                face.material_index = kept.index(name) if name in EMISSIVE else 0
+            self.materials = kept
         mesh = bpy.data.meshes.new(self.name)
         self.bm.to_mesh(mesh)
         self.bm.free()
+        if self.vcol:
+            mesh.color_attributes.active_color = mesh.color_attributes["Color"]
+            mesh.color_attributes.render_color_index = 0
         for name in self.materials:
             mesh.materials.append(material(name))
         obj = bpy.data.objects.new(self.name, mesh)
@@ -281,6 +376,19 @@ def triangle_count(objects=None):
     return total
 
 
+def mix(a, b, t):
+    """Linear blend of two palette colours (names or linear RGB tuples)."""
+    a = color(a) if isinstance(a, str) else a
+    b = color(b) if isinstance(b, str) else b
+    t = max(0.0, min(1.0, t))
+    return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
+
+
+def shade(rgb, factor):
+    rgb = color(rgb) if isinstance(rgb, str) else rgb
+    return tuple(channel * factor for channel in rgb)
+
+
 def save_and_export(name, animations=False, extra=None):
     ART.mkdir(parents=True, exist_ok=True)
     MODELS.mkdir(parents=True, exist_ok=True)
@@ -289,6 +397,7 @@ def save_and_export(name, animations=False, extra=None):
         filepath=str(MODELS / f"{name}.glb"), export_format="GLB", use_selection=False,
         export_yup=True, export_apply=False, export_cameras=False, export_lights=False,
         export_animations=animations, export_skins=True, export_morph=False,
+        export_vertex_color="ACTIVE", export_all_vertex_colors=False,
     )
     if animations:
         options.update(export_animation_mode="ACTIONS", export_force_sampling=True,
@@ -317,7 +426,8 @@ def render_preview(name, views, size=(640, 640), target=None, frame=None):
     scene.render.engine = "BLENDER_WORKBENCH"
     shading = scene.display.shading
     shading.light = "STUDIO"
-    shading.color_type = "MATERIAL"
+    has_vcol = any(obj.type == "MESH" and len(obj.data.color_attributes) > 0 for obj in scene.objects)
+    shading.color_type = "VERTEX" if has_vcol else "MATERIAL"
     shading.show_object_outline = True
     shading.object_outline_color = (0.05, 0.06, 0.07)
     shading.show_cavity = False

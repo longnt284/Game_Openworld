@@ -1,0 +1,10 @@
+{
+	"lam_an_tuyet_y": {"name": "Tuyết Y", "target": "player", "rarity": "ssr", "description": "Áo trắng tuyết viền bạc, đai lam.",
+		"tint": {"VK_robe": "e8eef2", "VK_robe_trim": "9fb7d6", "VK_sash": "3d6fb8", "VK_ribbon": "3d6fb8", "VK_scarf_white": "dfe8f2"}},
+	"lam_an_huyet_phong": {"name": "Huyết Phong", "target": "player", "rarity": "sr", "description": "Áo đỏ son, đai đen, khăn ngà.",
+		"tint": {"VK_robe": "a8323a", "VK_robe_trim": "e9c98a", "VK_sash": "2a2a30", "VK_ribbon": "2a2a30"}},
+	"lam_an_mac_truc": {"name": "Mặc Trúc", "target": "player", "rarity": "sr", "description": "Áo xanh trúc sẫm, đai vàng đồng.",
+		"tint": {"VK_robe": "3f6b3a", "VK_robe_trim": "d9c27a", "VK_sash": "b0802f", "VK_ribbon": "b0802f"}},
+	"kiem_hoang_kim": {"name": "Hoàng Kim Quang", "target": "weapon", "rarity": "sr", "description": "Lưỡi kiếm tỏa ánh vàng.", "glow": "ffd36a"},
+	"kiem_tu_dien": {"name": "Tử Điện Quang", "target": "weapon", "rarity": "ssr", "description": "Lưỡi kiếm tỏa ánh tím sấm.", "glow": "b48cff"}
+}

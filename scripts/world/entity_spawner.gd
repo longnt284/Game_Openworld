@@ -7,6 +7,8 @@ extends Node3D
 
 const SPAWN_RADIUS: float = 85.0
 const DESPAWN_RADIUS: float = 115.0
+## Group holding the nodes whose static colliders feed encounter navmeshes.
+const NAV_SOURCE: StringName = &"nav_source"
 
 var main: Node
 var assets: AssetLibrary
@@ -94,6 +96,9 @@ func should_exist(data: Dictionary) -> bool:
 	if not main.quests.check(data.get("if", [])):
 		return false
 	if data["type"] == "enemy":
+		if main.state.world_tier > 0 and data.get("persistent", false):
+			# Each World Tier brings the story foes back once; beating them there is remembered per tier.
+			return not main.state.has_flag("tier_dead:%d:%s" % [main.state.world_tier, data["id"]])
 		if main.state.has_flag("dead:" + String(data["id"])):
 			return false
 		if main.state.camp_kills.has(data["id"]):
@@ -160,7 +165,7 @@ func _create(data: Dictionary) -> Node3D:
 			enemy.defeated.connect(main.on_enemy_defeated.bind(data))
 			main.on_enemy_spawned(enemy, data)
 			return enemy
-		"shrine", "chest", "echo", "diary", "chime", "memory_core", "seal_gate":
+		"shrine", "chest", "echo", "diary", "chime", "memory_core", "seal_gate", "trial_gate":
 			var item: Interactable = Interactable.new()
 			item.name = String(data["id"])
 			add_child(item)
@@ -203,6 +208,9 @@ func _bake_navzone(data: Dictionary) -> void:
 	mesh.cell_height = 0.25
 	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	mesh.geometry_collision_mask = Combat.LAYER_WORLD
+	# Only terrain and props are walked, not characters, UI or the arena wind wall.
+	mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
+	mesh.geometry_source_group_name = NAV_SOURCE
 	var low: float = world.height_at(center.x, center.y) - 20.0
 	mesh.filter_baking_aabb = AABB(Vector3(center.x - size * 0.5, low, center.y - size * 0.5), Vector3(size, 60.0, size))
 	var source: NavigationMeshSourceGeometryData3D = NavigationMeshSourceGeometryData3D.new()

@@ -1,0 +1,12 @@
+{
+	"unlock_flag": "slice_complete",
+	"boss": "boss_truc_tuong",
+	"tiers": [
+		{"id": 0, "name": "Phàm Cảnh", "hp": 1.0, "damage": 1.0, "xp": 1.0, "coins": 1.0, "elite": 0.0, "elite_affixes": 0, "ngoc_boss": 0, "description": "Thung lũng như thuở đầu."},
+		{"id": 1, "name": "Huyền Cảnh", "hp": 1.7, "damage": 1.35, "xp": 1.5, "coins": 1.5, "elite": 0.12, "elite_affixes": 1, "ngoc_boss": 80, "description": "Gió dữ hơn. Kẻ địch và Trúc Tướng trở lại, mạnh hơn, đôi khi có tinh anh."},
+		{"id": 2, "name": "Địa Cảnh", "hp": 2.6, "damage": 1.7, "xp": 2.0, "coins": 2.0, "elite": 0.18, "elite_affixes": 1, "ngoc_boss": 120, "description": "Tinh anh xuất hiện thường xuyên hơn."},
+		{"id": 3, "name": "Thiên Cảnh", "hp": 3.8, "damage": 2.1, "xp": 2.6, "coins": 2.6, "elite": 0.24, "elite_affixes": 2, "ngoc_boss": 160, "description": "Tinh anh mang hai ấn."},
+		{"id": 4, "name": "Tiên Cảnh", "hp": 5.4, "damage": 2.6, "xp": 3.3, "coins": 3.3, "elite": 0.3, "elite_affixes": 2, "ngoc_boss": 200, "description": "Chỉ kiếm khách đã luyện thành mới nên bước vào."},
+		{"id": 5, "name": "Thần Cảnh", "hp": 7.5, "damage": 3.2, "xp": 4.0, "coins": 4.0, "elite": 0.36, "elite_affixes": 3, "ngoc_boss": 260, "description": "Đỉnh cao của thung lũng. Tinh anh mang ba ấn."}
+	]
+}

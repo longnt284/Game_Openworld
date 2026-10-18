@@ -37,18 +37,19 @@ func _begin_attack(name: String) -> void:
 	blades_thrown = false
 	if name == "slam" and target:
 		var landing: Vector3 = global_position + facing * 1.6
-		var hit_start: float = float(attack_data.get("hit_start", 1.3)) / speed_scale
+		var hit_start: float = float(attack_data.get("hit_start", 1.3)) / maxf(speed_scale, 0.1)
 		slam_marker = Vfx.telegraph(get_parent(), Vector3(landing.x, world.height_at(landing.x, landing.z), landing.z), float(attack_data["hit_radius"]), hit_start)
 
 func _physics_attack(delta: float) -> void:
 	super._physics_attack(delta)
 	if state != "attack":
 		return
-	var t: float = state_time * speed_scale
+	var t: float = attack_clock
 	if attack_name == "slam" and t >= float(attack_data.get("hit_start", 1.3)) and not attack_hits.has("landed"):
 		attack_hits["landed"] = true
-		Vfx.ring(get_parent(), global_position + facing * 1.6 + Vector3.UP * 0.2, float(attack_data["hit_radius"]), Color(1.0, 0.7, 0.45), 0.5, 0.25)
-		Vfx.burst(get_parent(), global_position + facing * 1.6, Color(0.8, 0.75, 0.6), 30, 7.0, 0.15, 0.6)
+		Vfx.ring(get_parent(), global_position + facing * 1.6 + Vector3.UP * 0.2, float(attack_data["hit_radius"]), Color(1.0, 0.78, 0.35), 0.5, 0.25)
+		Vfx.crack(get_parent(), global_position + facing * 1.6, float(attack_data["hit_radius"]) * 0.8)
+		Vfx.burst(get_parent(), global_position + facing * 1.6, Color(1.0, 0.85, 0.5), 30, 7.0, 0.12, 0.6)
 		if target:
 			target.camera_rig.add_trauma(0.5)
 		if phase == 2:
@@ -73,7 +74,7 @@ func _process(delta: float) -> void:
 		if absf(distance - shockwave_radius) < 0.7 and target.is_on_floor():
 			shockwave_hit = true
 			var wave: Dictionary = {"damage": 16, "poise": 20, "knockback": 6.0, "hitstop": 0.05, "shake": 0.3, "unblockable": true}
-			target.take_damage(Combat.make_damage(self, wave, 16.0, target.global_position))
+			target.take_damage(Combat.make_damage(self, wave, 16.0 * float(data.get("damage_scale", 1.0)), target.global_position))
 	if shockwave_radius > 14.0:
 		shockwave_radius = -1.0
 
@@ -89,7 +90,7 @@ func _throw_blades() -> void:
 		var wave: Dictionary = {"damage": 12, "poise": 10, "knockback": 3.0, "hitstop": 0.04, "shake": 0.2}
 		blade.max_distance = 18.0
 		blade.pierce = false
-		blade.launch(global_position + Vector3.UP * 1.3, base.rotated(Vector3.UP, angle), 11.0, 12.0, wave, Combat.LAYER_HURT_PLAYER, self, Color(1.0, 0.6, 0.45))
+		blade.launch(global_position + Vector3.UP * 1.3, base.rotated(Vector3.UP, angle), 11.0, 12.0 * float(data.get("damage_scale", 1.0)), wave, Combat.LAYER_HURT_PLAYER, self, Color(1.0, 0.6, 0.45))
 
 func take_damage(damage: Combat.Damage) -> Dictionary:
 	var result: Dictionary = super.take_damage(damage)
@@ -99,7 +100,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 
 func _enter_phase_two() -> void:
 	phase = 2
-	speed_scale = 1.18
+	base_speed_scale = 1.18
 	poise = max_poise
 	stagger_time = 0.0
 	_release_token()
@@ -111,7 +112,7 @@ func _enter_phase_two() -> void:
 	Vfx.ring(get_parent(), global_position + Vector3.UP * 0.5, 7.0, Color(1.0, 0.5, 0.35), 0.8, 0.3)
 	if target and _flat_distance(target.global_position) < 6.0:
 		var push: Dictionary = {"damage": 8, "poise": 20, "knockback": 9.0, "hitstop": 0.05, "shake": 0.5, "unblockable": true}
-		target.take_damage(Combat.make_damage(self, push, 8.0, target.global_position))
+		target.take_damage(Combat.make_damage(self, push, 8.0 * float(data.get("damage_scale", 1.0)), target.global_position))
 
 func _think(delta: float) -> void:
 	if state == "roar":
