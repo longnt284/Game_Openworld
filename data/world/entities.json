@@ -34,6 +34,10 @@
 			"talk": [{"d": "villager_3"}]},
 		{"id": "villager_fisher", "type": "npc", "npc": "tieu_mac", "name": "Ông lái đò", "pos": [-15.5, 70], "yaw": 220, "tint": {"VK_cloth_blue": "5d666a"},
 			"talk": [{"d": "villager_2"}]},
+		{"id": "npc_lang_van", "type": "npc", "npc": "chu_bay", "name": "Ông Lang Vân", "pos": [-14.0, 29], "yaw": 90,
+			"tint": {"VK_hair": "e8e2d4", "VK_cloth_dark": "4f6b55", "VK_leather": "9a7a52", "VK_vermilion": "3f5a4a", "VK_cloth_brown": "4a3f35"},
+			"talk": [{"if": ["flag:slice_complete"], "d": "lv_after"}, {"d": "lv_greet"}],
+			"barks": ["Thuốc đây! Bánh ngải mới hấp!", "Trúng độc thì nhai ngay Giải Độc Thảo.", "Lên núi mà không mang thuốc là liều đấy."]},
 
 		{"id": "en_rescue_1", "type": "enemy", "enemy": "tan_binh", "camp": "rescue", "persistent": true, "pos": [-3, 44], "yaw": -30},
 		{"id": "en_rescue_2", "type": "enemy", "enemy": "tan_binh", "camp": "rescue", "persistent": true, "pos": [-9, 51], "yaw": 120},

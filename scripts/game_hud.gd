@@ -1,8 +1,8 @@
 class_name GameHUD
 extends CanvasLayer
-## In-game HUD: vitals, skills, quest tracker with world marker, interaction prompt,
-## toasts/banners, boss bar, dialogue box, memory visions, fade/death screen and
-## the optional technical overlay (F3).
+## In-game HUD: vitals with buff/debuff icons, skills, quest tracker with world marker,
+## interaction prompt, toasts/banners, boss bar, dialogue box, memory visions, fade/death
+## screen and the optional technical overlay (F3).
 
 signal dialogue_advanced
 signal choice_selected(index: int)
@@ -21,6 +21,10 @@ var health_bar: ProgressBar
 var stamina_bar: ProgressBar
 var level_label: Label
 var heal_label: Label
+var quick_label: Label
+var status_row: HBoxContainer
+## Reused status icons, one per active status: {"root", "style", "glyph", "stacks", "time"}
+var status_icons: Array[Dictionary] = []
 ## slot (e, q, x) -> {"panel", "key", "name", "bar", "action"}
 var skill_boxes: Dictionary = {}
 var boss_box: VBoxContainer
@@ -114,8 +118,54 @@ func _build_vitals() -> void:
 	stamina_bar = UiTheme.bar(Color("4fbfa8"), Vector2(250, 8))
 	stamina_bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(stamina_bar)
+	# Healing counter (R) with the quick-use slot (C) beside it.
+	var items: HBoxContainer = HBoxContainer.new()
+	items.add_theme_constant_override("separation", 18)
+	items.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(items)
 	heal_label = UiTheme.label("", 14, UiTheme.MUTED)
-	box.add_child(heal_label)
+	items.add_child(heal_label)
+	quick_label = UiTheme.label("", 14, UiTheme.JADE_LIGHT)
+	items.add_child(quick_label)
+	# Buff and debuff icons sit on their own row above the vitals, so the bars never shift.
+	status_row = HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 6)
+	status_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchored(status_row, Control.PRESET_BOTTOM_LEFT, Vector2(28, -158), Vector2(420, -110))
+
+func _status_icon() -> Dictionary:
+	## Rounded square tinted by the status, glyph in the middle, stacks as a corner badge and
+	## the seconds left underneath. Buffs get a jade border, debuffs a vermilion one.
+	var icon: Control = Control.new()
+	icon.custom_minimum_size = Vector2(36, 48)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel: Panel = Panel.new()
+	panel.position = Vector2.ZERO
+	panel.size = Vector2(36, 36)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
+	panel.add_theme_stylebox_override("panel", style)
+	icon.add_child(panel)
+	var glyph: Label = UiTheme.label("", 15, UiTheme.CREAM, true)
+	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	glyph.position = Vector2.ZERO
+	glyph.size = Vector2(36, 36)
+	icon.add_child(glyph)
+	var stacks: Label = UiTheme.label("", 11, UiTheme.CREAM, true)
+	stacks.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stacks.position = Vector2(14, -6)
+	stacks.size = Vector2(26, 14)
+	icon.add_child(stacks)
+	var time: Label = UiTheme.label("", 11, UiTheme.MUTED)
+	time.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	time.position = Vector2(-4, 35)
+	time.size = Vector2(44, 14)
+	icon.add_child(time)
+	status_row.add_child(icon)
+	return {"root": icon, "style": style, "glyph": glyph, "stacks": stacks, "time": time}
 
 func _build_skills() -> void:
 	var row: HBoxContainer = HBoxContainer.new()
@@ -250,6 +300,41 @@ func set_level(level: int, xp: int, next_xp: int, skill_points: int) -> void:
 func set_heal_count(text: String) -> void:
 	heal_label.text = text
 
+func set_quick_item(text: String, stocked: bool) -> void:
+	## The quick slot dims while it is empty or its stack has run out.
+	quick_label.text = text
+	quick_label.modulate.a = 1.0 if stocked else 0.5
+
+func set_statuses(list: Array) -> void:
+	## list: StatusEffects.list_for_hud() of the player. Icons are pooled and only re-tinted.
+	while status_icons.size() < list.size():
+		status_icons.append(_status_icon())
+	for index: int in range(status_icons.size()):
+		var icon: Dictionary = status_icons[index]
+		var root_control: Control = icon["root"]
+		root_control.visible = index < list.size()
+		if not root_control.visible:
+			continue
+		var entry: Dictionary = list[index]
+		var color: Color = entry["color"]
+		var style: StyleBoxFlat = icon["style"]
+		style.bg_color = Color(color.darkened(0.6), 0.92)
+		style.border_color = UiTheme.JADE_LIGHT if String(entry["kind"]) == "buff" else UiTheme.VERMILION
+		var glyph: Label = icon["glyph"]
+		glyph.text = String(entry["glyph"])
+		glyph.add_theme_color_override("font_color", color.lightened(0.35))
+		(icon["stacks"] as Label).text = "×%d" % int(entry["stacks"]) if int(entry["stacks"]) > 1 else ""
+		(icon["time"] as Label).text = "%ds" % ceili(float(entry["time"]))
+		# The last seconds fade the icon, so an expiring buff is noticed before it is gone.
+		root_control.modulate.a = 0.55 if float(entry["time"]) < 3.0 else 1.0
+
+func status_icon_count() -> int:
+	var count: int = 0
+	for icon: Dictionary in status_icons:
+		if (icon["root"] as Control).visible:
+			count += 1
+	return count
+
 func set_skill(slot: String, title: String, unlocked: bool, fill: float, level: int, tint: Color) -> void:
 	## fill: 1 when ready (cooldown done, or a full charge meter on the ultimate slot).
 	var box: Dictionary = skill_boxes[slot]
@@ -381,7 +466,7 @@ func set_debug(enabled: bool) -> void:
 	status.visible = enabled
 
 func set_gameplay_visible(value: bool) -> void:
-	for node: Control in [region_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, prompt]:
+	for node: Control in [region_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, quick_label, prompt, status_row]:
 		node.visible = value
 	for skill: String in skill_boxes:
 		(skill_boxes[skill]["panel"] as Control).visible = value

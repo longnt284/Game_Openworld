@@ -44,9 +44,12 @@
 		}
 	},
 	"chests": {
-		"trial": {"name": "Rương Ải Vô Tận", "rates": {"ssr": 0.02, "sr": 0.15, "r": 0.83}, "pool": "ngu_hanh"},
-		"boss_tier": {"name": "Rương Cảnh Giới", "rates": {"ssr": 0.05, "sr": 0.30, "r": 0.65}, "pool": "ngu_hanh"},
-		"elite": {"name": "Rương Tinh Anh", "rates": {"ssr": 0.01, "sr": 0.10, "r": 0.89}, "pool": "ngu_hanh"}
+		"trial": {"name": "Rương Ải Vô Tận", "rates": {"ssr": 0.02, "sr": 0.15, "r": 0.83}, "pool": "ngu_hanh",
+			"supplies": [["tra_sen", 1, 1, 0.5], ["bao_huyet_dan", 1, 1, 0.25], ["kim_cang_dan", 1, 1, 0.25]]},
+		"boss_tier": {"name": "Rương Cảnh Giới", "rates": {"ssr": 0.05, "sr": 0.30, "r": 0.65}, "pool": "ngu_hanh",
+			"supplies": [["tra_sen", 1, 2, 1.0], ["kim_cang_dan", 1, 1, 0.5], ["tinh_tam_tra", 1, 1, 0.5]]},
+		"elite": {"name": "Rương Tinh Anh", "rates": {"ssr": 0.01, "sr": 0.10, "r": 0.89}, "pool": "ngu_hanh",
+			"supplies": [["giai_doc_thao", 1, 1, 0.4], ["hoa_on_dan", 1, 1, 0.3], ["khinh_than_tan", 1, 1, 0.3]]}
 	},
 	"duplicates": {"skin": 40},
 	"exchange": [

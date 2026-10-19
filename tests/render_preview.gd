@@ -107,7 +107,7 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "settings", "credits", "gacha", "armory", "daily", "tier", "trial"]
+	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "statuses", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "shop", "settings", "credits", "gacha", "armory", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -146,6 +146,18 @@ func _run() -> void:
 					game.state.unlock_skill("gust")
 					await frames(12)
 					await shot("combat_skill")
+			"statuses":
+				# Buff and debuff icons above the vitals: two buffs, then stacked debuffs.
+				await place(-20, 70.5, 0)
+				var lam_an: PlayerController = game.player
+				for entry: Array in [["buff_atk", 1], ["buff_regen", 1], ["poison", 2], ["bleed", 3], ["weaken", 1]]:
+					lam_an.apply_status(entry[0], entry[1])
+				await frames(20)
+				game._refresh_hud()
+				await frames(2)
+				await shot("statuses")
+				lam_an.cleanse(lam_an.statuses.active.keys())
+				lam_an.heal(lam_an.max_health())
 			"moves":
 				await place(0, 14, 0)
 				var side: Camera3D = Camera3D.new()
@@ -252,6 +264,31 @@ func _run() -> void:
 				game.choose_trial_buff(game.menus.trial_choices[0])
 				game.trial.end_run("leave")
 				await frames(30)
+			"shop":
+				# Ông Lang Vân behind his stall, the HUD's heal counter and quick slot, then his counter
+				# and a bag of consumables in the Inventory.
+				await place(-10.2, 29.6, 75, -0.2)
+				for entry: Array in [["kim_cang_dan", 2], ["giai_doc_thao", 3], ["tra_sen", 1], ["hoa_on_dan", 1]]:
+					game.state.add_item(entry[0], entry[1])
+				game.set_quick_item("kim_cang_dan")
+				game.state.coins = 120
+				await frames(30)
+				game._refresh_hud()
+				await shot("merchant")
+				game.open_shop("quay_thuoc")
+				game.buy_item("quay_thuoc", "tinh_tam_tra")
+				game.menus.panel_note = "Đã mua Tịnh Tâm Trà  •  còn %d Đồng" % game.state.coins
+				game.menus.panel_note_ok = true
+				game.menus.refresh_panel()
+				await frames(10)
+				await shot("shop")
+				game.menus.close_panel()
+				game.menus.selected_item = "kim_cang_dan"
+				game.open_panel("inventory")
+				await frames(10)
+				await shot("inventory_items")
+				game.menus.close_panel()
+				game.set_paused(false)
 			"journal", "inventory", "settings", "credits", "armory", "daily", "tier":
 				game.open_panel(scene)
 				await frames(10)

@@ -6,6 +6,8 @@ extends RefCounted
 signal changed(kind: String, key: String)
 
 const XP_CURVE: Array[int] = [0, 100, 260, 480, 760, 1100, 1500, 1960, 2480, 3060]
+## Stamina before gear, blessings and buffs ("max_stamina" adds flat points).
+const BASE_STAMINA: float = 100.0
 
 var flags: Dictionary = {}
 var camp_kills: Dictionary = {}
@@ -32,7 +34,12 @@ var play_time: float = 0.0
 ## Runtime bonuses from the equipped armory weapon and Endless Trial blessings (PlayerStats);
 ## never saved, recomputed by main. Empty means neutral: story numbers stay exact.
 var stats: Dictionary = {}
+## Live bonuses from Lâm An's buffs and debuffs (StatusEffects "stats"), pushed by
+## PlayerController whenever they change; never saved. stat() adds them to the table above.
+var status_stats: Dictionary = {}
 var tracked_quest: String = ""
+## Consumable on the quick-use key (C), chosen in the Inventory; kept when the stack runs out.
+var quick_item: String = ""
 
 func has_flag(key: String) -> bool:
 	return bool(flags.get(key, false))
@@ -71,6 +78,10 @@ func remove_item(item: String, amount: int = 1) -> bool:
 func max_health() -> float:
 	return 120.0 + (level - 1) * 14.0
 
+func max_stamina() -> float:
+	## Never below a quarter of the base, whatever drains it.
+	return maxf(BASE_STAMINA * 0.25, BASE_STAMINA + stat("max_stamina"))
+
 static func default_skills() -> Dictionary:
 	## Every sword form (data/styles.json) plus khinh công, all unlearned.
 	var result: Dictionary = {"khinh_cong": 0}
@@ -79,10 +90,11 @@ static func default_skills() -> Dictionary:
 	return result
 
 func attack_power() -> float:
-	return (float(ContentDB.weapon(sword).get("attack", 10)) + (level - 1) * 1.5) * (1.0 + stat("attack_bonus"))
+	# Stacked Suy nhược can push the bonus negative; a floor keeps every blow worth something.
+	return (float(ContentDB.weapon(sword).get("attack", 10)) + (level - 1) * 1.5) * maxf(0.2, 1.0 + stat("attack_bonus"))
 
 func stat(id: String) -> float:
-	return float(stats.get(id, 0.0))
+	return float(stats.get(id, 0.0)) + float(status_stats.get(id, 0.0))
 
 func xp_for_next() -> int:
 	return XP_CURVE[mini(level, XP_CURVE.size() - 1)] if level < XP_CURVE.size() else XP_CURVE[-1] + 600 * (level - XP_CURVE.size() + 1)
@@ -174,7 +186,7 @@ func to_dict() -> Dictionary:
 		"level": level, "xp": xp, "skill_points": skill_points, "skills": skills.duplicate(), "sword": sword, "coins": coins,
 		"swords": swords.duplicate(), "equipped_uid": equipped_uid, "world_tier": world_tier, "max_tier": max_tier,
 		"health": health, "checkpoint_id": checkpoint_id, "checkpoints": checkpoints.duplicate(), "discovered": discovered.duplicate(),
-		"play_time": play_time, "tracked_quest": tracked_quest,
+		"play_time": play_time, "tracked_quest": tracked_quest, "quick_item": quick_item,
 	}
 
 func from_dict(data: Dictionary) -> void:
@@ -211,4 +223,8 @@ func from_dict(data: Dictionary) -> void:
 	discovered = (data.get("discovered", []) as Array).duplicate()
 	play_time = float(data.get("play_time", 0.0))
 	tracked_quest = String(data.get("tracked_quest", ""))
+	# Older saves have no quick slot; an item that is no longer usable empties it.
+	quick_item = String(data.get("quick_item", ""))
+	if not Consumables.usable(quick_item):
+		quick_item = ""
 	changed.emit("load", "")

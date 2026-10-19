@@ -1,7 +1,7 @@
 class_name Menus
 extends CanvasLayer
 ## Title screen, pause menu and the full-screen panels (map, journal, inventory,
-## settings). Panels read live game state from `main` and never own game logic.
+## settings, shop). Panels read live game state from `main` and never own game logic.
 
 signal new_game_requested
 signal continue_requested
@@ -33,6 +33,13 @@ var trial_choices: Array = []
 var last_pull: Array = []
 var reveal: bool = false
 var panel_note: String = ""
+## The inline notice reports a success (jade) rather than a refusal (vermilion).
+var panel_note_ok: bool = false
+## Inventory row kept selected across refreshes; the shop the counter panel shows.
+var selected_item: String = ""
+var shop_id: String = ""
+## Panels opened from the world (a shop counter) close straight back into play, not to the pause menu.
+var resume_on_close: bool = false
 
 func setup(owner_main: Node) -> void:
 	main = owner_main
@@ -201,6 +208,8 @@ func panel_open() -> bool:
 func open_panel(name: String) -> void:
 	if current_panel != name:
 		panel_note = ""
+		panel_note_ok = false
+		resume_on_close = false
 	current_panel = name
 	pause_panel.visible = false
 	panel_host.visible = true
@@ -238,6 +247,9 @@ func open_panel(name: String) -> void:
 		"trial_pick":
 			panel_title.text = "Ải Vô Tận"
 			panel_body.add_child(RetentionPanels.trial_pick(self))
+		"shop":
+			panel_title.text = String(Consumables.shop(shop_id).get("name", "Quầy hàng"))
+			panel_body.add_child(ShopPanel.build(self))
 
 func close_panel(force: bool = false) -> void:
 	## The Trial blessing picker cannot be dismissed: a blessing must be chosen.
@@ -248,6 +260,11 @@ func close_panel(force: bool = false) -> void:
 		return
 	panel_host.visible = false
 	current_panel = ""
+	if resume_on_close:
+		resume_on_close = false
+		if get_tree().paused and not title_screen.visible:
+			emit_signal("resume_requested")
+		return
 	if get_tree().paused and not title_screen.visible:
 		pause_panel.visible = true
 		resume_button.grab_focus()
@@ -395,13 +412,48 @@ func _inventory_view() -> Control:
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description.custom_minimum_size = Vector2(460, 70)
 	left.add_child(description)
+	# Consumables can be used here (outside a fight) or put on the quick slot.
+	var actions: HBoxContainer = HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 10)
+	left.add_child(actions)
+	var use_button: Button = UiTheme.button("Dùng", func() -> void:
+		var refusal: String = main.use_item(selected_item)
+		panel_note = refusal if refusal != "" else "Đã dùng " + String(ContentDB.item(selected_item).get("name", selected_item))
+		panel_note_ok = refusal == ""
+		refresh_panel(), 150)
+	actions.add_child(use_button)
+	var quick_button: Button = UiTheme.button("Đặt vào ô nhanh", func() -> void:
+		var clearing: bool = state.quick_item == selected_item
+		var title: String = String(ContentDB.item(selected_item).get("name", selected_item))
+		main.set_quick_item("" if clearing else selected_item)
+		panel_note = ("Đã bỏ %s khỏi ô nhanh" % title) if clearing else ("Đã đặt %s vào ô nhanh (%s)" % [title, UserSettings.event_label("use_item")])
+		panel_note_ok = true
+		refresh_panel(), 260)
+	actions.add_child(quick_button)
+	if panel_note != "":
+		var note: Label = UiTheme.label(panel_note, 15, UiTheme.JADE_LIGHT if panel_note_ok else UiTheme.VERMILION)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.custom_minimum_size.x = 460
+		left.add_child(note)
 	var keys: Array = state.inventory.keys()
 	keys.sort()
 	for item_id: String in keys:
 		var item: Dictionary = ContentDB.item(item_id)
-		items.add_item("%s  ×%d" % [item.get("name", item_id), state.count(item_id)])
+		items.add_item("%s  ×%d%s" % [item.get("name", item_id), state.count(item_id), "   ◆ ô nhanh" if item_id == state.quick_item else ""])
 		items.set_item_metadata(items.item_count - 1, item_id)
-	items.item_selected.connect(func(index: int) -> void: description.text = ContentDB.item(items.get_item_metadata(index)).get("description", ""))
+	var select: Callable = func(index: int) -> void:
+		selected_item = items.get_item_metadata(index)
+		description.text = ContentDB.item(selected_item).get("description", "")
+		use_button.disabled = not Consumables.usable(selected_item)
+		quick_button.disabled = use_button.disabled
+		quick_button.text = "Bỏ khỏi ô nhanh" if state.quick_item == selected_item else "Đặt vào ô nhanh"
+	items.item_selected.connect(select)
+	use_button.disabled = true
+	quick_button.disabled = true
+	var kept: int = keys.find(selected_item)
+	if kept >= 0:
+		items.select(kept)
+		select.call(kept)
 	var right: VBoxContainer = VBoxContainer.new()
 	right.add_theme_constant_override("separation", 8)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL

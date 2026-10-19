@@ -177,6 +177,7 @@ func _start_world() -> void:
 	player.notice.connect(func(text: String) -> void: hud.show_message(text, 2.0))
 	player.skill_used.connect(_on_skill_used)
 	player.status_applied.connect(func(_status: String) -> void: _mission("status"))
+	player.statuses_changed.connect(_on_player_statuses)
 	_equip_visuals()
 	title_camera = Camera3D.new()
 	title_camera.far = 1500
@@ -392,7 +393,7 @@ func _update_combat_state() -> void:
 	audio.set_combat(2 if boss_fight else (1 if engaged > 0 else 0))
 	if engaged > 0 and not hinted.has("combat"):
 		hinted["combat"] = true
-		hud.show_hint("Chuột trái: đánh (3 đòn liên hoàn)  •  Giữ chuột trái: trọng kích\nShift: né  •  Chuột phải: đỡ — bấm đúng lúc đòn tới để phản đòn\n%s: khóa mục tiêu  •  %s: dùng thuốc" % [UserSettings.event_label("lock_on"), UserSettings.event_label("heal")], 12.0)
+		hud.show_hint("Chuột trái: đánh (3 đòn liên hoàn)  •  Giữ chuột trái: trọng kích\nShift: né  •  Chuột phải: đỡ — bấm đúng lúc đòn tới để phản đòn\n%s: khóa mục tiêu  •  %s: dùng thuốc  •  %s: vật phẩm nhanh" % [UserSettings.event_label("lock_on"), UserSettings.event_label("heal"), UserSettings.event_label("use_item")], 12.0)
 	if not spawner.arena.fighting and state.has_flag("chimes_solved") and boss_alive() and spawner.arena.contains(player.global_position):
 		spawner.arena.start_fight()
 
@@ -419,7 +420,14 @@ func _refresh_vitals() -> void:
 func _refresh_hud() -> void:
 	_refresh_vitals()
 	hud.set_level(state.level, state.xp, state.xp_for_next(), state.skill_points)
-	hud.set_heal_count("%s  •  Bánh ngải ×%d  •  Trà sen ×%d" % [UserSettings.event_label("heal"), state.count("banh_ngai"), state.count("tra_sen")])
+	var heals: PackedStringArray = [UserSettings.event_label("heal")]
+	for item: String in Consumables.heal_items(false):
+		heals.append("%s ×%d" % [ContentDB.item(item).get("name", item), state.count(item)])
+	hud.set_heal_count("  •  ".join(heals))
+	var quick: String = state.quick_item
+	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
+	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
+	hud.set_statuses(player.statuses.list_for_hud())
 	var style: String = player.style_id()
 	for slot: String in StyleBook.SLOTS:
 		var form: Dictionary = StyleBook.form(style, slot)
@@ -606,6 +614,8 @@ func run_action(action: String) -> void:
 			hud.show_banner("Nhận " + String(ContentDB.weapon(state.sword).get("name", state.sword)), "Công lực tăng lên %d" % roundi(state.attack_power()))
 		"xp":
 			_add_xp(int(parts[1]))
+		"shop":
+			open_shop(parts[1])
 
 func unlock_skill(skill: String) -> void:
 	state.unlock_skill(skill)
@@ -688,9 +698,59 @@ func _on_quest_completed(id: String) -> void:
 		state.max_tier = maxi(state.max_tier, 1)
 		hud.show_message("Đã mở Cảnh giới thế giới và Ải Vô Tận đầy đủ (menu tạm dừng)", 5.0)
 
-func _on_state_changed(kind: String, _key: String) -> void:
+func _on_state_changed(kind: String, key: String) -> void:
 	if kind in ["item", "coins"]:
 		quests.refresh()
+	# The first tonic picked up in play explains the quick slot (heals already have R).
+	if (kind == "item" and playing and not get_tree().paused and state.quick_item == "" and not hinted.has("quick_item")
+			and state.count(key) > 0 and Consumables.usable(key) and String(ContentDB.item(key).get("kind", "")) != "heal"):
+		hinted["quick_item"] = true
+		hud.show_hint("Nhận %s. Mở Túi đồ (%s) để đặt vào ô nhanh, rồi bấm %s để dùng ngay cả giữa trận." % [
+			ContentDB.item(key).get("name", key), UserSettings.event_label("open_inventory"), UserSettings.event_label("use_item")], 9.0)
+
+# ------------------------------------------------------------------ consumables & shops
+
+func use_item(id: String) -> String:
+	## Inventory "Dùng": applies a consumable at once behind the paused panel. Returns why it
+	## was refused ("" when used). In a fight only R and the quick slot work, so a heal still
+	## costs its moment in the open.
+	if not playing or player.state in ["dead", "disabled", "loading"]:
+		return "Không thể dùng lúc này"
+	if engaged > 0 or spawner.arena.fighting:
+		return "Đang giao chiến: dùng thuốc bằng %s hoặc ô nhanh %s" % [UserSettings.event_label("heal"), UserSettings.event_label("use_item")]
+	var refusal: String = player.item_refusal(id)
+	if refusal == "" and not player.consume_item(id):
+		refusal = "Không dùng được " + String(ContentDB.item(id).get("name", id))
+	return refusal
+
+func set_quick_item(id: String) -> void:
+	## Puts a consumable on the quick slot (C); "" empties it.
+	if id != "" and not Consumables.usable(id):
+		return
+	state.quick_item = id
+	audio.ui("ui_confirm")
+
+func open_shop(id: String) -> void:
+	## Opened by a dialogue "shop:<id>" action; closing the counter drops straight back into play.
+	if Consumables.shop(id).is_empty():
+		return
+	menus.shop_id = id
+	open_panel("shop")
+	menus.resume_on_close = true
+
+func buy_item(shop_id: String, item: String) -> String:
+	## One purchase with Đồng. Returns why it was refused ("" when bought); a refusal changes nothing.
+	var price: int = Consumables.shop_price(shop_id, item)
+	var title: String = String(ContentDB.item(item).get("name", item))
+	if price < 0:
+		return "Quầy không bán " + title
+	if not Consumables.buy(state, item, price):
+		var reason: String = "Không đủ Đồng: %s giá %d, trong túi còn %d" % [title, price, state.coins]
+		hud.show_message(reason)
+		audio.ui("ui_error")
+		return reason
+	audio.play("coins")
+	return ""
 
 # ------------------------------------------------------------------ world events
 
@@ -831,8 +891,10 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 				audio.play("roar", enemy.global_position, 3.0)
 				hud.show_banner("Trúc Tướng nổi giận!", "Gió quanh đấu trường cuộn lên"))
 	enemy.attack_started.connect(func(attacker: Enemy, attack: String) -> void:
-		var sound: String = {"attack": "sabre_swing" if attacker.kind == "tan_binh" else "glaive_slam", "sweep": "glaive_sweep", "slam": "danger", "charge": "boar_grunt"}.get(attack, "sabre_swing")
+		# Wind-up cue from the attack's data (data/attacks.json "start_sfx").
+		var sound: String = String(Combat.attack(attacker.owner_key, attack).get("start_sfx", "sabre_swing"))
 		audio.play(sound, attacker.global_position, 0.0))
+	enemy.status_damage.connect(_on_status_damage)
 
 func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	var id: String = String(data["id"])
@@ -972,6 +1034,21 @@ func _on_attack_landed(target: Node, amount: float) -> void:
 	audio.play("boar_hit" if target is Boar else ("hit_heavy" if amount > 30.0 else "hit_flesh"), position)
 	if user_settings.damage_numbers:
 		Vfx.number(self, position, amount, Color(1.0, 0.95, 0.75) if amount < 30.0 else Color(1.0, 0.75, 0.4))
+
+func _on_player_statuses() -> void:
+	## The first time each debuff lands, explain what it does and how to shake it off
+	## (one at a time: the rest wait for the next change).
+	for id: String in player.statuses.active:
+		var hint: String = String(ContentDB.status(id).get("hint", ""))
+		if hint != "" and not hinted.has("status:" + id):
+			hinted["status:" + id] = true
+			hud.show_hint(hint.format({"dodge": UserSettings.event_label("sprint")}), 8.0)
+			return
+
+func _on_status_damage(enemy: Enemy, amount: float, status: String) -> void:
+	## Damage over time floats up quietly in the colour of the status that dealt it.
+	if user_settings.damage_numbers and amount >= 0.5:
+		Vfx.number(self, enemy.global_position + Vector3.UP, amount, Color(String(ContentDB.status(status).get("color", "ffd0a0"))))
 
 func _epilogue() -> void:
 	audio.set_music("title", 3.0)
@@ -1242,6 +1319,15 @@ func open_reward_chest(chest: Interactable, silent: bool = false) -> Dictionary:
 		chest.wisps.emitting = false
 	var rarity: String = String(chest.entity.get("rarity", "r"))
 	var result: Dictionary = Gacha.open_chest(profile, String(chest.entity.get("table", "trial")), rarity)
+	# Consumables ride along in the save's bag (the reward itself is account-wide).
+	var supplies: Array = Gacha.chest_supplies(String(chest.entity.get("table", "trial")), rng)
+	if silent:
+		for entry: Array in supplies:
+			state.add_item(String(entry[0]), int(entry[1]))
+	elif not supplies.is_empty():
+		give_items(supplies)
+	if not result.is_empty():
+		result["supplies"] = supplies
 	_mission("chest")
 	save_profile()
 	if not silent and not result.is_empty():

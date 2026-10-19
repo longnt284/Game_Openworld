@@ -13,6 +13,8 @@ const LAYER_NPC: int = 8
 const LAYER_HURT_PLAYER: int = 16
 const LAYER_HURT_ENEMY: int = 32
 const LAYER_INTERACT: int = 64
+## Flat armor (enemies) and defense (Lâm An) both leave 100 / (100 + value) of a blow.
+const ARMOR_SCALE: float = 100.0
 
 
 class Damage:
@@ -35,13 +37,15 @@ class Damage:
 	var status_power: float = 0.0
 	## Ticking areas hurt without making the target flinch, flash or freeze the frame.
 	var flinch: bool = true
+	## Flat enemy "armor" this blow ignores (Lâm An's armor_pen).
+	var armor_pen: float = 0.0
 
-static func attack(owner: String, name: String, clip: String = "") -> Dictionary:
+static func attack(owner: String, name: String, clip: String = "", rate: float = 1.0) -> Dictionary:
 	## Attack data merged with the timing of the clip it plays (data "clip", else its own
-	## name), scaled by the attack's playback "speed".
+	## name), scaled by the attack's playback "speed" times `rate` (the attacker's attack speed).
 	var data: Dictionary = (((ContentDB.get_data("attacks") as Dictionary).get(owner, {}) as Dictionary).get(name, {}) as Dictionary).duplicate(true)
 	var timing: Dictionary = ContentDB.timing(owner, clip if clip != "" else String(data.get("clip", name)))
-	var speed: float = maxf(float(data.get("speed", 1.0)), 0.01)
+	var speed: float = maxf(float(data.get("speed", 1.0)) * rate, 0.01)
 	for key: String in timing:
 		if not data.has(key):
 			data[key] = float(timing[key]) / speed
@@ -75,6 +79,10 @@ static func sweep(attacker: Node3D, facing: Vector3, data: Dictionary, u_from: f
 			already[area.get_instance_id()] = true
 			hits.append(area)
 	return hits
+
+static func armor_mult(armor: float) -> float:
+	## Share of a blow left after flat armor or defense; none (or less than none) is neutral.
+	return ARMOR_SCALE / (ARMOR_SCALE + maxf(0.0, armor))
 
 static func make_damage(source: Node3D, data: Dictionary, amount: float, target_position: Vector3) -> Damage:
 	var damage: Damage = Damage.new()

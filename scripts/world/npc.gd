@@ -3,12 +3,16 @@ extends StaticBody3D
 ## Villager / story NPC: rigged model with idle/talk/walk loops, optional patrol,
 ## faces the player while talking and shows short barks above the head.
 
+## Barks ("barks" in entities.json, gated by "bark_if") start when the player is this close.
+const BARK_RANGE: float = 9.0
+
 var entity: Dictionary = {}
 var entity_id: String = ""
 var display_name: String = ""
 var visual: CharacterVisual
 var bark_label: Label3D
 var bark_timer: float = 0.0
+var bark_cooldown: float = 0.0
 var talking: bool = false
 var patrol: Array = []
 var patrol_index: int = 0
@@ -84,6 +88,14 @@ func bark(text: String, duration: float = 3.0) -> void:
 	bark_label.visible = true
 	bark_timer = duration
 
+func try_bark() -> void:
+	## Called by the spawner while the player is in range: one of the NPC's lines now and then.
+	var lines: Array = entity.get("barks", [])
+	if lines.is_empty() or talking or bark_cooldown > 0.0:
+		return
+	bark(String(lines[randi() % lines.size()]))
+	bark_cooldown = randf_range(10.0, 16.0)
+
 func set_talking(value: bool, target: Node3D = null) -> void:
 	talking = value
 	player = target
@@ -93,6 +105,7 @@ func set_talking(value: bool, target: Node3D = null) -> void:
 		visual.play_loop(idle_anim, 0.3)
 
 func _process(delta: float) -> void:
+	bark_cooldown -= delta
 	if bark_timer > 0.0:
 		bark_timer -= delta
 		if bark_timer <= 0.0:

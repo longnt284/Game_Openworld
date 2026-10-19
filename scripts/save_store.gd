@@ -45,6 +45,9 @@ static func validate(data: Variant) -> bool:
 			return false
 	if not state.get("sword", "") is String or not _is_number(state.get("equipped_uid", -1)):
 		return false
+	# Optional in v3 (added with the quick-use slot): absent means an empty slot.
+	if not state.get("quick_item", "") is String:
+		return false
 	return true
 
 static func migrate(data: Variant) -> Dictionary:

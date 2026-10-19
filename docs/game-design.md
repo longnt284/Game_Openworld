@@ -71,7 +71,7 @@ Chưa có: địch bắn xa, địch khiên nặng, boss hai pha cuối chương
 
 - Lên cấp theo bảng `XP_CURVE` (`scripts/core/game_state.gd`); mỗi cấp +14 máu, +1,5 công và 1 điểm tu luyện để nâng kỹ năng (tối đa bậc 3) trong Túi đồ.
 - Kiếm cốt truyện: Kiếm Cũ (10) → Thanh Trúc Kiếm (16) → Phong Ngân Kiếm (24). Bốn kiếm nguyên tố (26–27) nhận khi lần đầu vượt đợt 5, 10, 15, 20 của Ải Vô Tận; bản có độ hiếm và chỉ số phụ đến từ Kỳ Ngộ và rương thưởng.
-- Hồi máu: Bánh ngải, Trà sen (phím R). Miếu Gió hồi đầy máu, làm điểm hồi sinh, lưu tự động và đặt lại trại địch.
+- Hồi máu: Bánh ngải, Trà sen (phím R tự lấy món mạnh nhất). Thuốc khác (Kim Cang Đan, Bạo Huyết Đan, Khinh Thân Tán, Giải Độc Thảo, Hỏa Ôn Đan, Tịnh Tâm Trà) đặt vào ô nhanh trong Túi đồ rồi dùng bằng phím C; mua ở quầy thuốc Ông Lang Vân trên quảng trường làng, hoặc nhặt từ địch và rương thưởng. Miếu Gió hồi đầy máu, làm điểm hồi sinh, lưu tự động và đặt lại trại địch.
 - Vật phẩm nhiệm vụ / chìa khóa: thư, chuông gió, nhật ký, Lông vũ gió, Tơ ký ức, Ngọc phong ấn.
 
 ## Chơi dài hạn

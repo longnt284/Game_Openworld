@@ -2,7 +2,8 @@ class_name PlayerController
 extends CharacterBody3D
 ## Lâm An: movement (run, sprint, dodge, jump, khinh công leap and glide) and
 ## sword combat (3-hit combo, charged heavy, parry/block, and the three forms of the
-## equipped sword's style on E, Q and X; X spends the full charge meter).
+## equipped sword's style on E, Q and X; X spends the full charge meter) and consumables
+## (R: the strongest healing item, C: the Inventory's quick slot).
 
 signal health_changed(current: float, maximum: float)
 signal stamina_changed(current: float, maximum: float)
@@ -15,9 +16,10 @@ signal skill_used(skill: String, cooldown: float)
 signal notice(text: String)
 signal meter_changed(current: float, maximum: float)
 signal status_applied(status: String)
+## Lâm An's own buffs and debuffs started, ended or changed stacks.
+signal statuses_changed
 
 const METER_MAX: float = 100.0
-const HEAL_ITEMS: Array = [["tra_sen", 0.65], ["banh_ngai", 0.4]]
 
 var settings: GameSettings
 var assets: AssetLibrary
@@ -60,6 +62,10 @@ var step_distance: float = 0.0
 var was_on_floor: bool = true
 var fall_speed: float = 0.0
 var lock_target: Node3D
+## Buffs, debuffs and elemental statuses on Lâm An (same rules as on enemies); their "stats"
+## reach GameState.stat through status_stats.
+var statuses: StatusEffects = StatusEffects.new()
+var status_revision: int = 0
 
 func initialize(config: GameSettings, library: AssetLibrary = null, state_data: GameState = null) -> void:
 	settings = config
@@ -151,6 +157,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		queue_input("skill_x")
 	elif event.is_action_pressed("heal"):
 		queue_input("heal")
+	elif event.is_action_pressed("use_item"):
+		queue_input("item")
 	elif event.is_action_pressed("lock_on"):
 		toggle_lock()
 	elif event.is_action_pressed("jump"):
@@ -184,6 +192,8 @@ func _physics_process(delta: float) -> void:
 	if state == "loading":
 		state = "move"
 	_tick_timers(delta)
+	if state not in ["dead", "disabled"]:
+		_tick_statuses(delta)
 	# Button releases can be missed while paused, in dialogue or dead: trust the real button state.
 	if not (input_enabled and Input.is_action_pressed("block")):
 		block_held = false
@@ -252,7 +262,7 @@ func _physics_move(delta: float) -> void:
 	var speed: float = settings.sprint_speed if sprinting else settings.walk_speed
 	if block_held and on_floor:
 		speed = 2.2
-	var target: Vector3 = direction * speed
+	var target: Vector3 = direction * speed * move_speed_scale()
 	var accel: float = settings.acceleration * (1.0 if on_floor else 0.45)
 	velocity.x = move_toward(velocity.x, target.x, accel * delta)
 	velocity.z = move_toward(velocity.z, target.z, accel * delta)
@@ -321,6 +331,9 @@ func _consume_ground_commands(on_floor: bool) -> void:
 	elif command == "heal" and on_floor:
 		buffered = ""
 		_try_heal()
+	elif command == "item" and on_floor:
+		buffered = ""
+		_try_quick_item()
 
 func _update_locomotion_visual() -> void:
 	var horizontal: float = Vector2(velocity.x, velocity.z).length()
@@ -351,6 +364,11 @@ func _start_dodge() -> void:
 	invulnerable = float(timing.get("hit_end", 0.34))
 	emit_signal("footstep", "dodge")
 	Vfx.burst(get_parent(), global_position + Vector3.UP * 0.2, Color(0.85, 0.9, 0.8, 0.6), 10, 2.0, 0.12, 0.4)
+	var shaken: PackedStringArray = statuses.shed(1)
+	if not shaken.is_empty():
+		# Rolling clear shakes off a layer of bleeding.
+		Vfx.burst(get_parent(), global_position + Vector3.UP * 0.9, Color(String(ContentDB.status(shaken[0]).get("color", "d23c3c"))), 8, 2.5, 0.08, 0.35)
+		_sync_statuses()
 
 func _physics_dodge(delta: float) -> void:
 	dodge_time += delta
@@ -409,16 +427,66 @@ func _try_skill(slot: String) -> void:
 	emit_signal("skill_used", skill, cooldowns[skill])
 
 func _try_heal() -> void:
+	## R: the strongest healing item in the bag (data/items.json "effect" "heal").
 	if health >= max_health() - 0.5:
 		emit_signal("notice", "Khí huyết đang đầy")
 		return
-	for entry: Array in HEAL_ITEMS:
-		if game.count(entry[0]) > 0:
-			_start_action("interact")
-			action["heal_item"] = entry[0]
-			action["heal_ratio"] = entry[1]
-			return
-	emit_signal("notice", "Không còn thuốc hồi phục")
+	var item: String = Consumables.best_heal(game)
+	if item == "":
+		emit_signal("notice", "Không còn thuốc hồi phục")
+		return
+	_begin_item(item)
+
+func _try_quick_item() -> void:
+	## C: the consumable placed on the quick slot from the Inventory.
+	if game.quick_item == "":
+		emit_signal("notice", "Chưa đặt vật phẩm vào ô nhanh (Túi đồ)")
+		return
+	var refusal: String = item_refusal(game.quick_item)
+	if refusal != "":
+		emit_signal("notice", refusal)
+		return
+	_begin_item(game.quick_item)
+
+func _begin_item(item: String) -> void:
+	## The same short interact motion for every consumable; the item is spent at 0.35 s.
+	_start_action("interact")
+	if current_action() == "interact":
+		action["item"] = item
+
+func item_refusal(id: String) -> String:
+	## Why using this consumable now would be refused or wasted; "" when it would do something.
+	var effect: Dictionary = Consumables.effect(id)
+	var title: String = String(ContentDB.item(id).get("name", id))
+	if effect.is_empty():
+		return "Không dùng được " + title
+	if game.count(id) <= 0:
+		return "Đã hết " + title
+	if effect.has("buff") or (float(effect.get("heal", 0.0)) > 0.0 and health < max_health() - 0.5):
+		return ""
+	for cured: Variant in effect.get("cleanse", []):
+		if statuses.has(String(cured)):
+			return ""
+	return "Khí huyết đang đầy" if effect.has("heal") and not effect.has("cleanse") else "Lúc này chưa cần dùng " + title
+
+func consume_item(id: String) -> bool:
+	## Spends one consumable and applies its effect at once: heal, cleanse, then the buff.
+	## Returns false, spending nothing, when the item has no effect or none is left.
+	var effect: Dictionary = Consumables.effect(id)
+	if effect.is_empty() or is_dead() or not game.remove_item(id):
+		return false
+	var ratio: float = float(effect.get("heal", 0.0))
+	if ratio > 0.0:
+		heal(max_health() * ratio)
+		Vfx.wisps(self, Color(0.7, 1.0, 0.75), 12, 0.6).emitting = true
+	var cured: Array = effect.get("cleanse", [])
+	if not cured.is_empty() and cleanse(cured) > 0:
+		Vfx.burst(get_parent(), global_position + Vector3.UP, Color(0.85, 1.0, 0.85), 14, 3.0, 0.08, 0.5)
+	var buff: String = String(effect.get("buff", ""))
+	if buff != "":
+		apply_status(buff, 1, 0.0, float(effect.get("duration", 0.0)))
+	emit_signal("footstep", "heal")
+	return true
 
 func _start_action(anim_name: String, slot: String = "", skill: String = "") -> void:
 	var data: Dictionary = Combat.attack("player", anim_name)
@@ -442,7 +510,7 @@ func _start_action(anim_name: String, slot: String = "", skill: String = "") -> 
 	state = "action"
 	if slot != "":
 		data["slot"] = slot
-	action = {"name": anim_name, "data": data, "t": 0.0, "hits": {}, "prev_u": -1.0, "fired": false, "tick": 0.0, "healed": false, "skill": skill, "start": global_position}
+	action = {"name": anim_name, "data": data, "t": 0.0, "hits": {}, "prev_u": -1.0, "fired": false, "tick": 0.0, "used": false, "skill": skill, "start": global_position}
 	combat_timer = 0.0 if anim_name != "interact" else combat_timer
 	visual.set_sheathed(false)
 	visual.play_action(clip, float(data.get("speed", 1.0)))
@@ -505,12 +573,9 @@ func _physics_action(delta: float) -> void:
 	if not visual.is_frozen():
 		move_and_slide()
 	if name == "interact":
-		if t >= 0.35 and not action["healed"] and action.has("heal_item"):
-			action["healed"] = true
-			if game.remove_item(action["heal_item"]):
-				heal(max_health() * float(action["heal_ratio"]))
-				Vfx.wisps(self, Color(0.7, 1.0, 0.75), 12, 0.6).emitting = true
-				emit_signal("footstep", "heal")
+		if t >= 0.35 and not action["used"] and action.has("item"):
+			action["used"] = true
+			consume_item(String(action["item"]))
 	elif name == "parry":
 		if t > hit_end and block_held and t >= float(data.get("combo_open", 0.3)):
 			_finish_action()
@@ -685,6 +750,8 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		return {"hit": false, "parried": true}
 	if game.stat("damage_taken") != 0.0:
 		damage.amount *= maxf(0.2, 1.0 + game.stat("damage_taken"))
+	# A soaked Lâm An conducts thunder just like a soaked bandit.
+	damage.amount *= statuses.taken_mult(damage.element)
 	var blocking: bool = (current_action() == "parry" or (state == "move" and block_held and is_on_floor())) and from_front
 	if blocking and not damage.unblockable:
 		var chip: float = damage.amount * 0.15
@@ -698,10 +765,15 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		camera_rig.add_trauma(0.15)
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.2 + facing * 0.6, Color(0.9, 0.95, 1.0), 12, 4.0, 0.06)
 		emit_signal("footstep", "block")
+		# A guarded blow only grazes: its status sticks at half the chance.
+		var guarded: String = _roll_status(damage, 0.5)
+		var guard_stun: float = statuses.stun_time(guarded) if guarded != "" else 0.0
 		if stamina <= 0.0:
-			_enter_hit(damage, 0.8)
+			_enter_hit(damage, maxf(0.8, guard_stun))
 			emit_signal("notice", "Phá thế đỡ!")
-		return {"hit": true, "blocked": true, "amount": chip}
+		elif guard_stun > 0.0:
+			stun(guard_stun, damage)
+		return {"hit": true, "blocked": true, "amount": chip, "status": guarded}
 	_apply_damage(damage.amount)
 	set_meter(meter + 4.0)
 	visual.flash(Color(1.0, 0.55, 0.45))
@@ -709,9 +781,14 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 	Vfx.burst(get_parent(), global_position + Vector3.UP * 1.1, Color(1.0, 0.5, 0.4), 12, 4.0)
 	if health <= 0.0:
 		_die()
+		return {"hit": true, "amount": damage.amount}
+	var started: String = _roll_status(damage, 1.0)
+	var stun_for: float = statuses.stun_time(started) if started != "" else 0.0
+	if stun_for > 0.0:
+		stun(maxf(0.35, stun_for), damage)
 	elif hit_cooldown <= 0.0:
 		_enter_hit(damage, 0.35)
-	return {"hit": true, "amount": damage.amount}
+	return {"hit": true, "amount": damage.amount, "status": started}
 
 func _apply_damage(amount: float) -> void:
 	health = maxf(0.0, health - amount)
@@ -744,6 +821,8 @@ func _die() -> void:
 	Engine.time_scale = 1.0
 	set_meter(0.0)
 	set_lock(null)
+	statuses.clear()
+	_sync_statuses()
 	visual.stop_action()
 	visual.set_state("dead")
 	emit_signal("died")
@@ -765,10 +844,104 @@ func revive(point: Vector3) -> void:
 	state = "move"
 	action = {}
 	invulnerable = 1.5
+	# Waking at a shrine (or starting over) washes off every buff and debuff.
+	statuses.clear()
+	_sync_statuses()
 	visual.stop_action()
 	visual.set_state("ground")
 	emit_signal("health_changed", health, max_health())
 	emit_signal("stamina_changed", stamina, max_stamina)
+
+# ------------------------------------------------------------------ statuses
+
+func apply_status(id: String, stacks: int = 1, power: float = 0.0, duration: float = 0.0) -> String:
+	## Puts a buff or debuff on Lâm An directly (potions, shrines, auras). Returns the status
+	## that started ("" when refused), like StatusEffects.apply; duration > 0 replaces the rule's.
+	if state in ["dead", "disabled", "loading"]:
+		return ""
+	statuses.resist = clampf(game.stat("status_resist"), 0.0, 0.9)
+	var started: String = statuses.apply(id, stacks, power, duration)
+	if started != "":
+		_status_started(started)
+		var stun_for: float = statuses.stun_time(started)
+		if stun_for > 0.0:
+			stun(stun_for)
+	_sync_statuses()
+	return started
+
+func cleanse(ids: Array) -> int:
+	## Removes the listed statuses (antidotes, cleansing tea); returns how many were active.
+	var removed: int = statuses.cleanse(ids)
+	_sync_statuses()
+	return removed
+
+func status_resistance(element: String) -> float:
+	## 0..0.9 lower chance for an enemy's status to stick: status_resist plus the matching
+	## res_<element> (both 0 until gear or buffs grant them).
+	return clampf(game.stat("status_resist") + (game.stat("res_" + element) if element != "" else 0.0), 0.0, 0.9)
+
+func move_speed_scale() -> float:
+	## Chill and soak slow Lâm An like they slow enemies; Khinh thân and gear "move_speed" quicken her.
+	return statuses.speed_mult() * maxf(0.3, 1.0 + game.stat("move_speed"))
+
+func stun(duration: float, damage: Combat.Damage = null) -> void:
+	## Choáng, đóng băng, tê liệt: Lâm An reels in the hit state, unable to act. A blow carries
+	## its knockback; a status from nowhere holds her in place. Never cuts a longer stun short.
+	if state in ["dead", "disabled", "loading"] or duration <= 0.0:
+		return
+	if damage == null:
+		damage = Combat.Damage.new()
+		damage.direction = -facing
+	_enter_hit(damage, maxf(duration, hit_time if state == "hit" else 0.0))
+
+func apply_dot(amount: float, _status: String) -> void:
+	## Quiet damage from a status: no flinch, flash or meter, but it can still finish her off.
+	if state in ["dead", "disabled", "loading"] or amount <= 0.0:
+		return
+	_apply_damage(amount)
+	if health <= 0.0:
+		_die()
+
+func _roll_status(damage: Combat.Damage, scale: float) -> String:
+	## An enemy blow's status sticks like it does on enemies, lowered by Lâm An's resistances.
+	var id: String = String(damage.status.get("id", ""))
+	if id == "" or state == "dead":
+		return ""
+	if randf() >= float(damage.status.get("chance", 1.0)) * scale * (1.0 - status_resistance(damage.element)):
+		return ""
+	statuses.resist = clampf(game.stat("status_resist"), 0.0, 0.9)
+	var started: String = statuses.apply(id, int(damage.status.get("stacks", 1)), damage.status_power)
+	if started != "":
+		_status_started(started)
+	_sync_statuses()
+	return started
+
+func _tick_statuses(delta: float) -> void:
+	if statuses.active.is_empty() and statuses.immune.is_empty():
+		return
+	var effects: Dictionary = statuses.tick(delta, max_health())
+	if float(effects["heal"]) > 0.0 and health < max_health():
+		heal(float(effects["heal"]))
+	if float(effects["dot"]) > 0.0:
+		apply_dot(float(effects["dot"]), String(effects["dot_id"]))
+	if float(effects["stun"]) > 0.0:
+		stun(float(effects["stun"]))
+	_sync_statuses()
+
+func _status_started(id: String) -> void:
+	var color: Color = Color(String(ContentDB.status(id).get("color", "ffffff")))
+	if StatusEffects.kind_of(id) == "buff":
+		Vfx.ring(get_parent(), global_position + Vector3.UP * 0.15, 1.2, color, 0.5)
+	else:
+		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.2, color, 10, 3.0, 0.08, 0.4)
+
+func _sync_statuses() -> void:
+	## Pushes the live status bonuses into GameState.stat and tells listeners the list changed.
+	if status_revision == statuses.revision:
+		return
+	status_revision = statuses.revision
+	game.status_stats = statuses.stat_table()
+	emit_signal("statuses_changed")
 
 # ------------------------------------------------------------------ lock-on
 

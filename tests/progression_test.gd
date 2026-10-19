@@ -1,7 +1,8 @@
 extends SceneTree
 ## Account and long-term progression: save schema v3 migration and validation, the
 ## account profile (currency, armory, RNG state) and its backup recovery. Later
-## sections cover gacha, world tiers, the Endless Trial and daily missions.
+## sections cover gacha, world tiers, the Endless Trial, daily missions, consumables
+## (heal pick, buffs, cures, quick slot) and the village medicine counter.
 
 var failures: int = 0
 const PROFILE: String = "user://progression_test_profile.json"
@@ -27,6 +28,7 @@ func _run() -> void:
 	_gacha()
 	_stats()
 	_missions()
+	_consumables()
 	await _scene()
 	print("PROGRESSION RESULT: %d failure(s)" % failures)
 	quit(0 if failures == 0 else 1)
@@ -172,6 +174,61 @@ func _missions() -> void:
 	check(Missions.claim_login(profile, "2026-10-18") == int(rewards[1]), "Consecutive days continue the login streak")
 	check(Missions.claim_login(profile, "2026-10-20") == int(rewards[0]), "A missed day restarts the login streak")
 
+func _consumables() -> void:
+	var items: Dictionary = ContentDB.get_data("items")
+	var data_ok: bool = true
+	for id: String in items:
+		var effect: Dictionary = Consumables.effect(id)
+		if effect.has("buff") and StatusEffects.kind_of(String(effect["buff"])) != "buff":
+			data_ok = false
+		for cured: Variant in effect.get("cleanse", []):
+			data_ok = data_ok and not ContentDB.status(String(cured)).is_empty()
+	for enemy: String in ContentDB.get_data("enemies"):
+		for drop: Array in ContentDB.enemy(enemy).get("drops", []):
+			data_ok = data_ok and (drop[0] == "coins" or items.has(drop[0]))
+	for table: Dictionary in (Gacha.data()["chests"] as Dictionary).values():
+		for supply: Array in table.get("supplies", []):
+			data_ok = data_ok and Consumables.usable(String(supply[0]))
+	var offers: Array[Dictionary] = Consumables.offers("quay_thuoc")
+	check(data_ok and offers.size() == (Consumables.shop("quay_thuoc")["items"] as Array).size()
+		and offers.all(func(offer: Dictionary) -> bool: return Consumables.usable(String(offer["item"])) and int(offer["price"]) > 0),
+		"Consumable buffs and cures name real statuses, drops and chest supplies real items, and the counter prices every shelf item")
+	check(Consumables.shop_price("quay_thuoc", "banh_ngai") == 12 and Consumables.shop_price("quay_thuoc", "tra_sen") == int(items["tra_sen"]["price"])
+		and Consumables.shop_price("quay_thuoc", "da_gio") == -1, "A shelf price overrides the item's own, null falls back to it, unsold items have none")
+	var heals: Array[String] = Consumables.heal_items()
+	var state: GameState = GameState.new()
+	var none: String = Consumables.best_heal(state)
+	state.add_item("banh_ngai", 2)
+	var weak_only: String = Consumables.best_heal(state)
+	state.add_item("tra_sen", 1)
+	check(heals.size() == 2 and heals[0] == "tra_sen" and heals[1] == "banh_ngai" and none == "" and weak_only == "banh_ngai" and Consumables.best_heal(state) == "tra_sen",
+		"Healing items rank strongest first: R takes Trà sen before Bánh ngải, and Bánh ngải when it is all that is left")
+	state.coins = 50
+	var price: int = Consumables.shop_price("quay_thuoc", "kim_cang_dan")
+	check(Consumables.buy(state, "kim_cang_dan", price) and state.coins == 50 - price and state.count("kim_cang_dan") == 1, "Buying deducts the price in Đồng and adds the item")
+	var coins: int = state.coins
+	check(not Consumables.buy(state, "bao_huyet_dan", Consumables.shop_price("quay_thuoc", "bao_huyet_dan")) and state.coins == coins and state.count("bao_huyet_dan") == 0,
+		"A purchase the coins cannot cover is refused and changes nothing")
+	state.quick_item = "kim_cang_dan"
+	var save: Dictionary = {"version": SaveStore.SCHEMA_VERSION, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [1.0, 2.0, 3.0], "state": state.to_dict()}
+	var loaded: GameState = GameState.new()
+	loaded.from_dict(save["state"])
+	check(SaveStore.validate(save) and loaded.quick_item == "kim_cang_dan", "The quick slot is saved with the game state")
+	var older: Dictionary = save.duplicate(true)
+	(older["state"] as Dictionary).erase("quick_item")
+	loaded.from_dict(older["state"])
+	check(SaveStore.validate(older) and loaded.quick_item == "", "A v3 save from before the quick slot still loads, with the slot empty")
+	save["state"]["quick_item"] = "da_gio"
+	loaded.from_dict(save["state"])
+	check(loaded.quick_item == "", "A material on the quick slot is dropped on load")
+	save["state"]["quick_item"] = 7
+	check(not SaveStore.validate(save), "A non-text quick slot is rejected")
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = 2842
+	var supplies: Array = Gacha.chest_supplies("boss_tier", rng)
+	check(supplies.any(func(entry: Array) -> bool: return entry[0] == "tra_sen" and int(entry[1]) >= 1) and Gacha.chest_supplies("missing", rng).is_empty(),
+		"A Cảnh Giới chest always carries Trà sen; an unknown table carries nothing")
+
 func _settle(game: Node) -> void:
 	for index: int in range(3000):
 		var world: WorldManager = game.world
@@ -182,6 +239,114 @@ func _settle(game: Node) -> void:
 
 func _kill(game: Node, enemy: Enemy) -> void:
 	enemy.take_damage(Combat.make_damage(game.player, {"poise": 0}, 999999.0, enemy.global_position))
+
+func _wait_action(player: PlayerController) -> void:
+	for attempt: int in range(120):
+		if player.state != "action":
+			break
+		await frames(1)
+
+func _items_scene(game: Node) -> void:
+	## Consumables through the real player, inventory actions, save and the village counter.
+	var player: PlayerController = game.player
+	var state: GameState = game.state
+	var effect: Dictionary = Consumables.effect("kim_cang_dan")
+	state.add_item("kim_cang_dan", 1)
+	check(player.consume_item("kim_cang_dan") and state.count("kim_cang_dan") == 0 and player.statuses.has("buff_def")
+		and is_equal_approx(float(player.statuses.active["buff_def"]["duration"]), float(effect["duration"])) and is_equal_approx(state.stat("damage_taken"), -0.25),
+		"Kim Cang Đan spends the pill and puts Kim cang on Lâm An for its %d s" % int(effect["duration"]))
+	player._tick_statuses(float(effect["duration"]) - 1.0)
+	var lasting: bool = player.statuses.has("buff_def")
+	player._tick_statuses(1.5)
+	check(lasting and not player.statuses.has("buff_def") and is_equal_approx(state.stat("damage_taken"), 0.0), "The buff ends when the item's time runs out")
+	state.add_item("giai_doc_thao", 1)
+	var idle_refusal: String = player.item_refusal("giai_doc_thao")
+	player.apply_status("poison", 2)
+	player.apply_status("bleed", 3)
+	check(idle_refusal != "" and player.item_refusal("giai_doc_thao") == "" and player.consume_item("giai_doc_thao") and not player.statuses.has("poison") and not player.statuses.has("bleed"),
+		"Giải Độc Thảo is kept while there is nothing to cure, then removes poison and bleeding")
+	state.add_item("hoa_on_dan", 1)
+	player.apply_status("chill", 1)
+	player.consume_item("hoa_on_dan")
+	check(not player.statuses.has("chill") and player.statuses.has("buff_warm") and is_equal_approx(player.status_resistance("frost"), 0.5),
+		"Hỏa Ôn Đan thaws chill and leaves frost resistance behind")
+	player.cleanse(player.statuses.active.keys())
+	# R takes the strongest heal with the old interact timing.
+	for heal: String in ["banh_ngai", "tra_sen"]:
+		state.inventory.erase(heal)
+		state.add_item(heal, 1)
+	player.health = player.max_health() * 0.2
+	player._try_heal()
+	var picked: String = String(player.action.get("item", ""))
+	await _wait_action(player)
+	check(picked == "tra_sen" and state.count("tra_sen") == 0 and state.count("banh_ngai") == 1 and is_equal_approx(player.health, player.max_health() * 0.85),
+		"R uses the strongest healing item first (Trà sen, +65%)")
+	game._refresh_hud()
+	check(game.hud.heal_label.text == "%s  •  Bánh ngải ×1  •  Trà sen ×0" % UserSettings.event_label("heal"), "The heal counter lists the healing items from data")
+	# The quick slot (C) uses the chosen consumable and keeps the choice when the stack runs out.
+	game.set_quick_item("tinh_tam_tra")
+	state.add_item("tinh_tam_tra", 1)
+	player.queue_input("item")
+	await frames(2)
+	await _wait_action(player)
+	check(state.count("tinh_tam_tra") == 0 and player.statuses.has("buff_resist") and is_equal_approx(state.stat("status_resist"), 0.5) and state.quick_item == "tinh_tam_tra",
+		"The quick-use key drinks Tịnh Tâm Trà and the slot stays set")
+	player._try_quick_item()
+	game._refresh_hud()
+	check(player.state == "move" and game.hud.quick_label.text.ends_with("Tịnh Tâm Trà ×0"), "An empty quick slot refuses and the HUD shows the stack at zero")
+	check(game.save_game(true), "Saving with a quick slot set")
+	state.quick_item = ""
+	check(game.load_game() and game.state.quick_item == "tinh_tam_tra", "The quick slot survives a save and reload")
+	await frames(2)
+	state.add_item("khinh_than_tan", 1)
+	check(game.use_item("khinh_than_tan") == "" and player.statuses.has("buff_speed") and state.count("khinh_than_tan") == 0 and game.use_item("khinh_than_tan") != "",
+		"Inventory 'Dùng' applies a tonic at once; an empty stack is refused")
+	var chest: Interactable = game.spawn_reward_chest("boss_tier", player.global_position + Vector3(3, 0, 0))
+	var sen: int = state.count("tra_sen")
+	var opened: Dictionary = game.open_reward_chest(chest, true)
+	check(state.count("tra_sen") > sen and not (opened.get("supplies", []) as Array).is_empty(), "A reward chest adds its consumable supplies to the bag")
+	chest.queue_free()
+	# Ông Lang Vân's counter: dialogue choice -> shop panel -> purchases with Đồng.
+	var merchant: Npc = null
+	for attempt: int in range(120):
+		game.spawner.update_now()
+		merchant = game.spawner.node_for("npc_lang_van") as Npc
+		if merchant:
+			break
+		await frames(1)
+	if merchant == null:
+		check(false, "Ông Lang Vân keeps a medicine counter on the village plaza")
+		return
+	# Standing at the front of his stall is close enough to talk across the counter.
+	var gate: Vector3 = player.global_position
+	player.teleport(Vector3(-11.7, game.world.height_at(-11.7, 29.0) + 0.3, 29.0))
+	player.face_direction(Vector3(-1, 0, 0), true)
+	await frames(8)
+	game._update_focus()
+	check(merchant.display_name == "Ông Lang Vân" and game.focus == merchant and player.global_position.x > -12.0,
+		"Ông Lang Vân keeps a counter on the village plaza, reachable from the front of his stall")
+	game.spawner.update_now()
+	check(merchant.bark_label.visible and (merchant.entity["barks"] as Array).has(merchant.bark_label.text), "He calls out his wares when Lâm An comes near")
+	game.start_dialogue(merchant)
+	for step: int in range(10):
+		if game.dialogue.is_empty() or game.dialogue.has("choices"):
+			break
+		game._advance_dialogue()
+	if game.dialogue.has("choices"):
+		game._choose_dialogue(0)
+	check(game.menus.current_panel == "shop" and game.get_tree().paused and game.dialogue.is_empty(), "Choosing 'Xem quầy thuốc' opens the counter")
+	var price: int = Consumables.shop_price("quay_thuoc", "bao_huyet_dan")
+	state.coins = price - 5
+	var refusal: String = game.buy_item("quay_thuoc", "bao_huyet_dan")
+	check(refusal != "" and state.coins == price - 5 and state.count("bao_huyet_dan") == 0 and (game.hud.toast.text == refusal or game.hud.toast_queue.has(refusal)),
+		"Short of Đồng, the counter refuses with a notice and nothing changes")
+	state.coins = price + 30
+	check(game.buy_item("quay_thuoc", "bao_huyet_dan") == "" and state.coins == 30 and state.count("bao_huyet_dan") == 1, "Buying at the counter deducts the price and adds the item")
+	game.menus.refresh_panel()
+	game.menus.close_panel()
+	check(game.menus.current_panel == "" and not game.get_tree().paused and not game.menus.pause_panel.visible, "Closing the counter returns straight to play")
+	player.revive(gate)
+	await frames(2)
 
 func _scene() -> void:
 	var save: String = "user://progression_test_save.json"
@@ -203,6 +368,7 @@ func _scene() -> void:
 	var player: PlayerController = game.player
 	var trial: TrialDirector = game.trial
 	check(game.profile.balance(Gacha.currency()) == int(Gacha.data()["welcome"]), "A first run grants the welcome Ngọc Gió once")
+	await _items_scene(game)
 	var flags_before: int = game.state.flags.size()
 	var kills_before: int = game.state.camp_kills.size()
 	var gate: Vector3 = player.global_position

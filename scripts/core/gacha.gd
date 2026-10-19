@@ -176,6 +176,16 @@ static func open_chest(profile: PlayerProfile, table_id: String, rarity: String)
 	profile.keep_rng(rng)
 	return result
 
+static func chest_supplies(table_id: String, rng: RandomNumberGenerator) -> Array:
+	## Consumables a reward chest also holds: the table's "supplies" [[item, min, max, chance]]
+	## (the enemy drop format) rolled into [[item, amount]]. They go to the save, not the profile.
+	var table: Dictionary = (data().get("chests", {}) as Dictionary).get(table_id, {})
+	var result: Array = []
+	for entry: Array in table.get("supplies", []):
+		if rng.randf() < float(entry[3]):
+			result.append([String(entry[0]), rng.randi_range(int(entry[1]), int(entry[2]))])
+	return result
+
 static func exchange(profile: PlayerProfile, id: String) -> Dictionary:
 	## Trades Mảnh Kỳ Ngộ for a fixed reward from the exchange list.
 	for offer: Dictionary in data().get("exchange", []):

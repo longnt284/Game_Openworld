@@ -10,6 +10,9 @@ signal health_changed(enemy: Enemy, current: float, maximum: float)
 signal attack_started(enemy: Enemy, attack: String)
 signal status_damage(enemy: Enemy, amount: float, status: String)
 
+## Attack slots per camp when the enemy data has no "max_attackers".
+const MAX_ATTACKERS: int = 2
+
 static var tokens: Dictionary = {}
 
 var data: Dictionary = {}
@@ -70,7 +73,7 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	max_poise = float(data.get("poise", 30))
 	poise = max_poise
 	statuses.resist = float(data.get("status_resist", 0.0))
-	statuses.no_freeze = bool(data.get("armor", false))
+	statuses.no_freeze = bool(data.get("super_armor", false))
 	collision_layer = Combat.LAYER_ENEMY
 	collision_mask = Combat.LAYER_WORLD | Combat.LAYER_PLAYER | Combat.LAYER_ENEMY
 	var radius: float = float(data.get("radius", 0.4))
@@ -93,6 +96,10 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	visual.setup(assets, String(data["model"]), false)
 	if data.has("weapon"):
 		visual.attach_weapon(assets, String(data["weapon"]))
+	# Palette recolour by material name, so one model serves several kinds (or one placed foe).
+	var tint: Dictionary = entity.get("tint", data.get("tint", {}))
+	if not tint.is_empty():
+		visual.apply_tint(tint)
 	hurtbox = Combat.make_hurtbox(self, Combat.LAYER_HURT_ENEMY, radius + 0.15, height)
 	if data.get("quadruped", false):
 		(hurtbox.get_child(0) as CollisionShape3D).rotation.x = PI * 0.5
@@ -156,9 +163,10 @@ func _physics_process(delta: float) -> void:
 
 func _tick_statuses(delta: float) -> void:
 	var effects: Dictionary = statuses.tick(delta)
-	speed_scale = base_speed_scale * statuses.speed_mult()
+	# Buffs such as Cuồng nộ quicken the whole body, swings included.
+	speed_scale = base_speed_scale * statuses.speed_mult() * maxf(0.3, 1.0 + statuses.stat_bonus("move_speed"))
 	if float(effects["dot"]) > 0.0:
-		apply_dot(float(effects["dot"]), "burn")
+		apply_dot(float(effects["dot"]), String(effects["dot_id"]))
 	if float(effects["stun"]) > 0.0 and state in ["idle", "alert", "chase", "recover", "return"] or (float(effects["stun"]) > 0.0 and state == "attack" and not boss):
 		_stagger(float(effects["stun"]))
 	var dominant: String = statuses.dominant()
@@ -349,7 +357,8 @@ func _deliver(area: Area3D, attack: Dictionary) -> void:
 	var entity: Node = Combat.entity_of(area)
 	if entity == null or not entity.has_method("take_damage"):
 		return
-	var damage: Combat.Damage = Combat.make_damage(self, attack, float(attack.get("damage", 10)) * float(data.get("damage_scale", 1.0)), (entity as Node3D).global_position)
+	var amount: float = float(attack.get("damage", 10)) * float(data.get("damage_scale", 1.0)) * maxf(0.2, 1.0 + statuses.stat_bonus("attack_bonus"))
+	var damage: Combat.Damage = Combat.make_damage(self, attack, amount, (entity as Node3D).global_position)
 	var result: Dictionary = entity.take_damage(damage)
 	if result.get("hit", false):
 		visual.hitstop(damage.hitstop * 0.8)
@@ -375,6 +384,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 	if state == "dead" or invulnerable:
 		return {"hit": false}
 	var amount: float = damage.amount * (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
+	amount *= Combat.armor_mult(armor() - damage.armor_pen)
 	health = maxf(0.0, health - amount)
 	emit_signal("health_changed", self, health, max_health)
 	if damage.flinch:
@@ -399,7 +409,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		poise = max_poise
 		velocity = damage.direction * damage.knockback
 		_stagger(float(data.get("break_stagger", 1.4)))
-	elif state != "stagger" and not (state == "attack" and data.get("armor", false)):
+	elif state != "stagger" and not (state == "attack" and data.get("super_armor", false)):
 		if state == "attack":
 			_release_token()
 		velocity = damage.direction * damage.knockback * float(data.get("knockback_scale", 1.0))
@@ -410,6 +420,11 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 
 func element_mult(element: String) -> float:
 	return float((data.get("resist", {}) as Dictionary).get(element, 1.0)) if element != "" else 1.0
+
+func armor() -> float:
+	## Flat damage reduction from data "armor" (0 by default) plus any status that grants it;
+	## blows keep 100 / (100 + armor − their armor_pen). Not "super_armor", which only stops flinching.
+	return float(data.get("armor", 0.0)) + statuses.stat_bonus("armor")
 
 func _roll_status(damage: Combat.Damage) -> String:
 	var status: String = String(damage.status.get("id", ""))
@@ -450,7 +465,7 @@ func _take_token() -> bool:
 		return true
 	var holders: Array = tokens.get(camp, [])
 	holders = holders.filter(func(item: Variant) -> bool: return is_instance_valid(item) and (item as Enemy).state == "attack")
-	if holders.size() >= 2:
+	if holders.size() >= max_attackers():
 		tokens[camp] = holders
 		return false
 	holders.append(self)
@@ -459,7 +474,11 @@ func _take_token() -> bool:
 
 func _token_free() -> bool:
 	var holders: Array = (tokens.get(camp, []) as Array).filter(func(item: Variant) -> bool: return is_instance_valid(item) and (item as Enemy).state == "attack")
-	return holders.size() < 2
+	return holders.size() < max_attackers()
+
+func max_attackers() -> int:
+	## How many of this enemy's camp may swing at once before it waits its turn (bosses never wait).
+	return int(data.get("max_attackers", MAX_ATTACKERS))
 
 func _has_token() -> bool:
 	return (tokens.get(camp, []) as Array).has(self)
