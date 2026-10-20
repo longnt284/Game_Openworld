@@ -22,6 +22,10 @@
 			{"id": "no_khi", "name": "Nộ Khí", "desc": "+25% nộ khí nhận được", "stat": "meter_gain", "value": 0.25, "max": 3, "weight": 7},
 			{"id": "nguyen_to", "name": "Ngũ Hành", "desc": "+15% sát thương nguyên tố và +10% tỉ lệ gây trạng thái", "stats": {"element_dmg": 0.15, "status_chance": 0.10}, "max": 3, "weight": 6},
 			{"id": "hoi_khi", "name": "Hồi Khí", "desc": "Hạ một kẻ địch hồi 6% khí huyết", "stat": "heal_on_kill", "value": 0.06, "max": 3, "weight": 6},
+			{"id": "thiet_bi", "name": "Thiết Bì", "desc": "+20 phòng ngự", "stat": "defense", "value": 20, "max": 3, "weight": 7},
+			{"id": "huyet_kiem", "name": "Huyết Kiếm", "desc": "Mỗi đòn trúng hồi lại 5% sát thương gây ra", "stat": "lifesteal", "value": 0.05, "max": 3, "weight": 5},
+			{"id": "tat_kiem", "name": "Tật Kiếm", "desc": "Ra đòn và thi triển chiêu nhanh hơn 10%", "stat": "attack_speed", "value": 0.10, "max": 3, "weight": 6},
+			{"id": "pha_the", "name": "Phá Thế", "desc": "+30% sức phá thế của mọi đòn", "stat": "poise_dmg", "value": 0.30, "max": 3, "weight": 6},
 			{"id": "linh_duoc", "name": "Linh Dược", "desc": "Hồi đầy khí huyết ngay", "instant": "heal", "weight": 5}
 		]
 	},

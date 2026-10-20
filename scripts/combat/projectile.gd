@@ -16,6 +16,8 @@ var color: Color = Vfx.WIND
 var pierce: bool = true
 ## Player missiles deal damage through PlayerController.strike with this scale (skill level bonus).
 var strike_scale: float = -1.0
+## Thrown by an enemy: flies on the enemy clock, so Tâm Nhãn slows it too.
+var enemy_owned: bool = false
 
 func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: float, attack_data: Dictionary, hit_mask: int, owner_node: Node3D, tint: Color = Vfx.WIND, shape: String = "crescent") -> void:
 	global_position = origin
@@ -24,6 +26,7 @@ func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: fl
 	data = attack_data
 	mask = hit_mask
 	source = owner_node
+	enemy_owned = owner_node is Enemy
 	color = tint
 	look_at(origin + velocity, Vector3.UP)
 	var body: MeshInstance3D = MeshInstance3D.new()
@@ -61,6 +64,8 @@ func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: fl
 	Vfx.wisps(self, color, 18 if shape == "wave" else 10, radius * 0.6)
 
 func _physics_process(delta: float) -> void:
+	if enemy_owned:
+		delta *= Enemy.time_dilation
 	var step: Vector3 = velocity * delta
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var ray: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(global_position, global_position + step, Combat.LAYER_WORLD)

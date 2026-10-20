@@ -29,6 +29,8 @@ var flash_material: StandardMaterial3D
 var status_material: StandardMaterial3D
 var meshes: Array[MeshInstance3D] = []
 var base_speed: float = 1.0
+## Playback rate on top of every clip's own speed: enemies follow Enemy.time_dilation (Tâm Nhãn).
+var time_scale: float = 1.0
 var has_tree: bool = false
 ## Only the player opts in (enable_trail); enemies keep plain swings.
 var trail: SwordTrail
@@ -142,7 +144,7 @@ func play_action(anim_name: String, speed: float = 1.0) -> void:
 		trail.emitting = TRAIL_CLIPS.has(anim_name)
 	if has_tree:
 		action_node.animation = anim_name
-		tree.set("parameters/speed/scale", speed)
+		tree.set("parameters/speed/scale", speed * time_scale)
 		tree.set("parameters/action/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 	else:
 		player.play(anim_name, 0.1, speed)
@@ -153,7 +155,7 @@ func stop_action() -> void:
 		trail.emitting = false
 	if has_tree:
 		tree.set("parameters/action/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FADE_OUT)
-		tree.set("parameters/speed/scale", 1.0)
+		tree.set("parameters/speed/scale", time_scale)
 
 func play_loop(anim_name: String, blend_time: float = 0.2, speed: float = 1.0) -> void:
 	## Direct AnimationPlayer playback for tree-less characters (NPCs, enemies).
@@ -250,6 +252,14 @@ func set_status_tint(color: Color) -> void:
 func hitstop(duration: float) -> void:
 	hitstop_left = maxf(hitstop_left, duration)
 
+func set_time_scale(scale: float) -> void:
+	## Slows or restores the whole model's playback (a hit-stop keeps its own freeze on top).
+	if is_equal_approx(scale, time_scale):
+		return
+	time_scale = scale
+	if hitstop_left <= 0.0:
+		_set_playback_speed(1.0)
+
 func is_frozen() -> bool:
 	return hitstop_left > 0.0
 
@@ -260,7 +270,7 @@ func _process(delta: float) -> void:
 		if hitstop_left <= 0.0:
 			_set_playback_speed(1.0)
 	elif current_action != "":
-		action_time += delta
+		action_time += delta * time_scale
 		if action_time >= action_length:
 			current_action = ""
 			if trail:
@@ -272,6 +282,7 @@ func _process(delta: float) -> void:
 				mesh.material_overlay = status_material
 
 func _set_playback_speed(factor: float) -> void:
+	factor *= time_scale
 	if has_tree:
 		tree.set("parameters/speed/scale", base_speed * factor)
 		tree.set("parameters/loco_scale/scale", factor if factor < 1.0 else 1.0)

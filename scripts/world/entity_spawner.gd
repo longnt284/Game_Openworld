@@ -83,6 +83,10 @@ func update_now() -> void:
 					_bake_navzone(data)
 			_:
 				_update_spawn(data, position_rule, distance)
+				if type == "npc" and distance < Npc.BARK_RANGE and data.has("barks") and main.quests.check(data.get("bark_if", [])):
+					var npc: Npc = node_for(String(data["id"])) as Npc
+					if npc:
+						npc.try_bark()
 
 func _position_rule(data: Dictionary) -> Dictionary:
 	if data.has("positions"):
@@ -150,15 +154,7 @@ func _create(data: Dictionary) -> Node3D:
 			npc.setup(data, assets, world.layout)
 			return npc
 		"enemy":
-			var enemy_data: Dictionary = ContentDB.enemy(String(data["enemy"]))
-			var enemy: Enemy
-			match String(enemy_data.get("class", "")):
-				"boar":
-					enemy = Boar.new()
-				"guardian":
-					enemy = Guardian.new()
-				_:
-					enemy = Enemy.new()
+			var enemy: Enemy = EnemyFactory.create(ContentDB.enemy(String(data["enemy"])))
 			enemy.name = String(data["id"])
 			add_child(enemy)
 			enemy.setup(data, assets, world)

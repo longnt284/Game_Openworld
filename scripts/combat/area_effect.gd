@@ -1,10 +1,14 @@
 class_name AreaEffect
 extends Node3D
-## Timed area attacks of sword forms: novas pulsing around the caster, delayed strikes on
-## chosen spots and lingering fields that tick. Damage goes through PlayerController.strike.
+## Timed area attacks: novas pulsing around the caster, delayed strikes on chosen spots and
+## lingering fields that tick. The player's sword forms hit through PlayerController.strike;
+## any other caster (an enemy) deals its attack "damage" × strike_scale straight to take_damage.
 
-var caster: PlayerController
+var caster: Node3D
+## Hurtboxes the area hits: enemies' for the player's forms, the player's for enemy casters.
+var mask: int = Combat.LAYER_HURT_ENEMY
 var data: Dictionary = {}
+## Player: skill multiplier passed to strike. Other casters: multiplier on data "damage".
 var strike_scale: float = 1.0
 var color: Color = Vfx.WIND
 var mode: String = "nova"
@@ -15,9 +19,10 @@ var field_left: float = 0.0
 var tick_left: float = 0.0
 var field_radius: float = 0.0
 
-static func spawn(owner_node: PlayerController, attack: Dictionary, scale: float, kind: String, tint: Color) -> AreaEffect:
+static func spawn(owner_node: Node3D, attack: Dictionary, scale: float, kind: String, tint: Color, hit_mask: int = Combat.LAYER_HURT_ENEMY) -> AreaEffect:
 	var effect: AreaEffect = AreaEffect.new()
 	effect.caster = owner_node
+	effect.mask = hit_mask
 	effect.data = attack
 	effect.strike_scale = scale
 	effect.mode = kind
@@ -29,8 +34,9 @@ static func spawn(owner_node: PlayerController, attack: Dictionary, scale: float
 
 func add_strike(point: Vector3, delay: float, radius: float) -> void:
 	events.append({"time": delay, "position": point, "radius": radius})
-	var ground: Vector3 = Vector3(point.x, caster.world.height_at(point.x, point.z) if caster.world else point.y, point.z)
-	Vfx.telegraph(get_parent(), ground, radius, delay, color)
+	var world: WorldManager = caster.get("world") as WorldManager
+	var ground: Vector3 = Vector3(point.x, world.height_at(point.x, point.z) if world else point.y, point.z)
+	Vfx.telegraph(get_parent(), ground, radius, delay, color, caster is Enemy)
 	if String(data.get("vfx", "")) == "ice_sword":
 		Vfx.ice_sword(get_parent(), ground, delay)
 
@@ -39,12 +45,15 @@ func start_field(center: Vector3, radius: float, duration: float) -> void:
 	field_radius = radius
 	field_left = duration
 	tick_left = 0.0
-	Vfx.field(get_parent(), center, radius, color, duration)
+	Vfx.field(get_parent(), center, radius, color, duration, caster is Enemy)
 
 func _physics_process(delta: float) -> void:
-	if not is_instance_valid(caster):
+	# A slain enemy's area stops hurting the winner, like the guardian's shockwave.
+	if not is_instance_valid(caster) or (caster is Enemy and (caster as Enemy).is_dead()):
 		queue_free()
 		return
+	if caster is Enemy:
+		delta *= Enemy.time_dilation  # an enemy's area keeps its caster's (Tâm Nhãn) clock
 	clock += delta
 	for event: Dictionary in events.duplicate():
 		if clock >= float(event["time"]):
@@ -75,26 +84,33 @@ func _land(point: Vector3, radius: float) -> void:
 			pass  # the falling blade already shatters on its own clock
 		_:
 			Vfx.ring(get_parent(), point + Vector3.UP * 0.2, radius, color, 0.4, 0.2)
-	if caster.camera_rig:
-		caster.camera_rig.add_trauma(float(data.get("shake", 0.3)) * 0.6)
+	if caster is PlayerController and (caster as PlayerController).camera_rig:
+		(caster as PlayerController).camera_rig.add_trauma(float(data.get("shake", 0.3)) * 0.6)
 	_hit_area(point, radius)
 
 func _hit_area(center: Vector3, radius: float) -> void:
-	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
-	var shape: SphereShape3D = SphereShape3D.new()
-	shape.radius = radius
-	var query: PhysicsShapeQueryParameters3D = PhysicsShapeQueryParameters3D.new()
-	query.shape = shape
-	query.collide_with_areas = true
-	query.collide_with_bodies = false
-	query.collision_mask = Combat.LAYER_HURT_ENEMY
-	query.transform = Transform3D(Basis.IDENTITY, center + Vector3.UP * 0.8)
-	var seen: Dictionary = {}
-	for result: Dictionary in space.intersect_shape(query, 24):
-		var entity: Node = Combat.entity_of(result["collider"] as Area3D)
-		if entity == null or seen.has(entity) or not entity.has_method("take_damage"):
+	for entity: Node in Combat.entities_in(self, center + Vector3.UP * 0.8, radius, mask):
+		if entity == caster:
 			continue
-		seen[entity] = true
 		var away: Vector3 = (entity as Node3D).global_position - center
 		away.y = 0.0
-		caster.strike(entity, data, strike_scale, away.normalized() if away.length() > 0.05 else caster.facing, true)
+		var direction: Vector3 = away.normalized() if away.length() > 0.05 else _caster_facing()
+		if caster is PlayerController:
+			(caster as PlayerController).strike(entity, data, strike_scale, direction, true)
+		else:
+			_hurt(entity, direction)
+
+func _hurt(entity: Node, direction: Vector3) -> void:
+	## A non-player caster's hit: the attack's own damage, pushed away from the centre (or
+	## pulled in for negative knockback). Ranged, so parrying it never staggers the caster.
+	var damage: Combat.Damage = Combat.make_damage(caster, data, float(data.get("damage", 10)) * strike_scale, (entity as Node3D).global_position)
+	damage.direction = direction
+	if damage.knockback < 0.0:
+		damage.direction = -direction
+		damage.knockback = absf(damage.knockback)
+	damage.ranged = true
+	entity.take_damage(damage)
+
+func _caster_facing() -> Vector3:
+	var value: Variant = caster.get("facing")
+	return value if value is Vector3 else Vector3.FORWARD

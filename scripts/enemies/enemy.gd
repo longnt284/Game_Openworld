@@ -9,8 +9,25 @@ signal defeated(enemy: Enemy)
 signal health_changed(enemy: Enemy, current: float, maximum: float)
 signal attack_started(enemy: Enemy, attack: String)
 signal status_damage(enemy: Enemy, amount: float, status: String)
+## A blow set off an elemental reaction on this enemy (splash false), or a reaction's splash,
+## spread or chain hit it (splash true); amount is what this enemy lost.
+signal reaction_hit(enemy: Enemy, reaction: String, amount: float, splash: bool)
+## Poise ran out: the enemy is broken (a long stagger, open to a finisher).
+signal poise_broken(enemy: Enemy)
+
+## Attack slots per camp when the enemy data has no "max_attackers".
+const MAX_ATTACKERS: int = 2
+## Ordinary foes stay broken at least this long, whatever their "break_stagger".
+const BROKEN_MIN: float = 2.2
+## Bosses can be finished only early in their break unless their data has "finish_window".
+const BOSS_FINISH_WINDOW: float = 1.5
+## Seconds the overhead poise bar lingers after the last hit.
+const POISE_BAR_LINGER: float = 3.0
 
 static var tokens: Dictionary = {}
+## Tâm Nhãn: the rate of every enemy's clock (AI, swings, animation, statuses, its missiles and
+## areas); Lâm An keeps real time. 1.0 outside focus; set through set_time_dilation.
+static var time_dilation: float = 1.0
 
 var data: Dictionary = {}
 var kind: String = ""
@@ -55,6 +72,14 @@ var last_position: Vector3
 var body_shape: CollisionShape3D
 var blocked_time: float = 0.0
 var quadruped: bool = false
+## The current stagger came from a poise break; finish_time is how much of it is still open to
+## a finisher (all of it for ordinary foes, the first BOSS_FINISH_WINDOW seconds for bosses).
+var broken: bool = false
+var finish_time: float = 0.0
+## Seconds since a blow last landed (drives the overhead poise bar).
+var since_hit: float = 99.0
+## Overhead poise gauge, built the first time it is needed (never for bosses).
+var poise_bar: PoiseBar
 
 func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManager) -> void:
 	data = ContentDB.enemy(String(entity["enemy"]))
@@ -70,7 +95,7 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	max_poise = float(data.get("poise", 30))
 	poise = max_poise
 	statuses.resist = float(data.get("status_resist", 0.0))
-	statuses.no_freeze = bool(data.get("armor", false))
+	statuses.no_freeze = bool(data.get("super_armor", false))
 	collision_layer = Combat.LAYER_ENEMY
 	collision_mask = Combat.LAYER_WORLD | Combat.LAYER_PLAYER | Combat.LAYER_ENEMY
 	var radius: float = float(data.get("radius", 0.4))
@@ -93,6 +118,10 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	visual.setup(assets, String(data["model"]), false)
 	if data.has("weapon"):
 		visual.attach_weapon(assets, String(data["weapon"]))
+	# Palette recolour by material name, so one model serves several kinds (or one placed foe).
+	var tint: Dictionary = entity.get("tint", data.get("tint", {}))
+	if not tint.is_empty():
+		visual.apply_tint(tint)
 	hurtbox = Combat.make_hurtbox(self, Combat.LAYER_HURT_ENEMY, radius + 0.15, height)
 	if data.get("quadruped", false):
 		(hurtbox.get_child(0) as CollisionShape3D).rotation.x = PI * 0.5
@@ -126,12 +155,50 @@ func is_dead() -> bool:
 func display_name() -> String:
 	return String(data.get("name", kind))
 
+func is_broken() -> bool:
+	## Staggered by a poise break: takes ×1.35 like any stagger, and the poise bars show it.
+	return broken and state == "stagger"
+
+func is_finishable() -> bool:
+	## A finisher may start on this enemy now (F within reach, PlayerController.start_finisher).
+	return is_broken() and finish_time > 0.0 and not invulnerable
+
+func poise_ratio() -> float:
+	## 0..1 poise left before the next break, for the poise bars; empty while broken.
+	if is_broken() or max_poise <= 0.0:
+		return 0.0
+	return clampf(poise / max_poise, 0.0, 1.0)
+
+func hold(seconds: float) -> void:
+	## Keeps a staggered enemy down at least `seconds` longer, so a finisher on its way still lands.
+	if state == "stagger":
+		stagger_time = maxf(stagger_time, state_time + seconds)
+
+static func set_time_dilation(value: float) -> void:
+	## Tâm Nhãn slows every enemy to `value` of real time (1.0 restores it). Ground warnings
+	## already on their way (Vfx "enemy_clock") follow at once, so they still fill as the blow lands.
+	time_dilation = clampf(value, 0.05, 1.0)
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for marker: Node in tree.get_nodes_in_group(Vfx.ENEMY_CLOCK):
+		for tween: Variant in marker.get_meta("tweens", []):
+			if (tween as Tween).is_valid():
+				(tween as Tween).set_speed_scale(time_dilation)
+
 # ------------------------------------------------------------------ loop
+
+func _process(delta: float) -> void:
+	since_hit += delta
+	update_poise_bar(delta)
 
 func _physics_process(delta: float) -> void:
 	if world == null or not world.is_position_ready(global_position):
 		velocity = Vector3.ZERO
 		return
+	# Everything below runs on the enemy clock: slowed under Tâm Nhãn, real time otherwise.
+	delta *= time_dilation
+	visual.set_time_scale(time_dilation)
 	if state == "dead":
 		state_time += delta
 		_physics_dead(delta)
@@ -151,14 +218,25 @@ func _physics_process(delta: float) -> void:
 	if visual.is_frozen():
 		return
 	_guard_edges()
-	move_and_slide()
+	_slide()
 	_track_stuck(delta)
+
+func _slide() -> void:
+	## move_and_slide on the enemy clock: velocity stays in the enemy's own metres per second
+	## (knockback, charges and gravity included), only the distance covered per frame slows.
+	if time_dilation >= 1.0:
+		move_and_slide()
+		return
+	velocity *= time_dilation
+	move_and_slide()
+	velocity /= time_dilation
 
 func _tick_statuses(delta: float) -> void:
 	var effects: Dictionary = statuses.tick(delta)
-	speed_scale = base_speed_scale * statuses.speed_mult()
+	# Buffs such as Cuồng nộ quicken the whole body, swings included.
+	speed_scale = base_speed_scale * statuses.speed_mult() * maxf(0.3, 1.0 + statuses.stat_bonus("move_speed"))
 	if float(effects["dot"]) > 0.0:
-		apply_dot(float(effects["dot"]), "burn")
+		apply_dot(float(effects["dot"]), String(effects["dot_id"]))
 	if float(effects["stun"]) > 0.0 and state in ["idle", "alert", "chase", "recover", "return"] or (float(effects["stun"]) > 0.0 and state == "attack" and not boss):
 		_stagger(float(effects["stun"]))
 	var dominant: String = statuses.dominant()
@@ -203,6 +281,7 @@ func _think(delta: float) -> void:
 		"stagger":
 			velocity.x = move_toward(velocity.x, 0.0, 12.0 * delta)
 			velocity.z = move_toward(velocity.z, 0.0, 12.0 * delta)
+			finish_time = maxf(0.0, finish_time - delta)
 			if state_time >= stagger_time:
 				poise = max_poise
 				_set_state("chase")
@@ -212,6 +291,9 @@ func _think(delta: float) -> void:
 func _set_state(next: String) -> void:
 	if state == "attack" and next != "attack":
 		_release_token()
+	if next != "stagger":
+		broken = false
+		finish_time = 0.0
 	state = next
 	state_time = 0.0
 	match next:
@@ -284,7 +366,7 @@ func _physics_dead(delta: float) -> void:
 	velocity.z = 0.0
 	if not is_on_floor():
 		velocity.y -= 20.0 * delta
-		move_and_slide()
+		_slide()
 	if death_timer > 3.0:
 		visual.scale = visual.scale.lerp(Vector3.ONE * 0.01, clampf((death_timer - 3.0) * 1.6, 0.0, 1.0))
 	if death_timer > 3.8:
@@ -349,7 +431,8 @@ func _deliver(area: Area3D, attack: Dictionary) -> void:
 	var entity: Node = Combat.entity_of(area)
 	if entity == null or not entity.has_method("take_damage"):
 		return
-	var damage: Combat.Damage = Combat.make_damage(self, attack, float(attack.get("damage", 10)) * float(data.get("damage_scale", 1.0)), (entity as Node3D).global_position)
+	var amount: float = float(attack.get("damage", 10)) * float(data.get("damage_scale", 1.0)) * maxf(0.2, 1.0 + statuses.stat_bonus("attack_bonus"))
+	var damage: Combat.Damage = Combat.make_damage(self, attack, amount, (entity as Node3D).global_position)
 	var result: Dictionary = entity.take_damage(damage)
 	if result.get("hit", false):
 		visual.hitstop(damage.hitstop * 0.8)
@@ -364,17 +447,46 @@ func on_parried(_player: Node) -> void:
 	_stagger(float(data.get("parry_stagger", 1.3)))
 
 func _stagger(duration: float) -> void:
-	stagger_time = duration
+	# A freeze or stun landing on a broken foe keeps it down for the rest of the break;
+	# any other stagger starts unbroken.
+	if state != "stagger":
+		broken = false
+		finish_time = 0.0
+	stagger_time = maxf(duration, finish_time) if broken else duration
 	_release_token()
 	_set_state("stagger")
 	Vfx.burst(get_parent(), global_position + Vector3.UP * float(data.get("height", 1.8)) * 0.8, Color(1, 0.95, 0.6), 10, 3.0)
+
+func _break(duration: float = -1.0) -> void:
+	## Poise ran out: a long stagger ("break_stagger", at least BROKEN_MIN for ordinary foes) in
+	## which the enemy takes ×1.35 and can be finished ("finish_window"; bosses only briefly).
+	poise = max_poise
+	var hold_for: float = duration if duration > 0.0 else float(data.get("break_stagger", 1.4))
+	if not boss:
+		hold_for = maxf(hold_for, BROKEN_MIN)
+	_stagger(hold_for)
+	broken = true
+	finish_time = float(data.get("finish_window", minf(hold_for, BOSS_FINISH_WINDOW) if boss else hold_for))
+	Vfx.ring(get_parent(), global_position + Vector3.UP * float(data.get("height", 1.8)) * 0.55, float(data.get("radius", 0.4)) + 0.6, Color(1.0, 0.8, 0.4), 0.35, 0.12)
+	emit_signal("poise_broken", self)
 
 # ------------------------------------------------------------------ damage
 
 func take_damage(damage: Combat.Damage) -> Dictionary:
 	if state == "dead" or invulnerable:
 		return {"hit": false}
-	var amount: float = damage.amount * (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
+	since_hit = 0.0
+	# A finisher deals at least its share of this foe's health, before the reaction and multipliers.
+	damage.amount = maxf(damage.amount, max_health * damage.hp_floor)
+	# Judged on what the blow found: a reaction may consume the status that made this target take
+	# more of the element, and a freeze it starts is no stagger for the blow that started it.
+	var multiplier: float = (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
+	var reaction: Dictionary = Reactions.check(statuses, damage)
+	if not reaction.is_empty():
+		Reactions.apply(self, damage, reaction)
+	var amount: float = damage.amount * multiplier * Combat.defense_mult(defense() - damage.armor_pen)
+	if boss and damage.boss_cap > 0.0:
+		amount = minf(amount, max_health * damage.boss_cap)
 	health = maxf(0.0, health - amount)
 	emit_signal("health_changed", self, health, max_health)
 	if damage.flinch:
@@ -382,34 +494,42 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		visual.hitstop(damage.hitstop)
 	if state in ["idle", "return"]:
 		_alert_camp()
+	var result: Dictionary = {"hit": true, "amount": amount}
+	if damage.reaction != "":
+		result["reaction"] = damage.reaction
+		emit_signal("reaction_hit", self, damage.reaction, amount, damage.reaction_splash)
 	if health <= 0.0:
 		_die(damage)
-		return {"hit": true, "amount": amount, "killed": true}
-	var started: String = _roll_status(damage)
+		result["killed"] = true
+		return result
+	# A reaction's own status (Đông Kết's freeze, Hỏa Lốc's burn) replaces the blow's roll.
+	var started: String = Reactions.apply_status(self, reaction, damage.status_power) if reaction.has("apply") else _roll_status(damage)
+	result["status"] = started
 	if started == "freeze":
-		velocity = Vector3.ZERO
-		_stagger(statuses.stun_time("freeze"))
-		Vfx.shards(get_parent(), global_position, Color("dff8ff"), 7, float(data.get("radius", 0.5)) + 0.4, float(data.get("height", 1.8)) * 0.7, statuses.stun_time("freeze"))
-		return {"hit": true, "amount": amount, "status": started}
-	if not damage.flinch:
-		poise -= damage.poise * statuses.poise_mult()
-		return {"hit": true, "amount": amount, "status": started}
+		return result
 	poise -= damage.poise * statuses.poise_mult()
-	if poise <= 0.0 and state != "stagger":
-		poise = max_poise
+	if not damage.flinch:
+		return result
+	# A reaction that breaks (Vỡ Băng) knocks down a foe the ice was already holding.
+	if poise <= 0.0 and (state != "stagger" or reaction.get("break", false)):
 		velocity = damage.direction * damage.knockback
-		_stagger(float(data.get("break_stagger", 1.4)))
-	elif state != "stagger" and not (state == "attack" and data.get("armor", false)):
+		_break()
+	elif state != "stagger" and not (state == "attack" and data.get("super_armor", false)):
 		if state == "attack":
 			_release_token()
 		velocity = damage.direction * damage.knockback * float(data.get("knockback_scale", 1.0))
 		state = "hit"
 		state_time = 0.0
 		visual.play_action("hit")
-	return {"hit": true, "amount": amount, "status": started}
+	return result
 
 func element_mult(element: String) -> float:
 	return float((data.get("resist", {}) as Dictionary).get(element, 1.0)) if element != "" else 1.0
+
+func defense() -> float:
+	## Flat damage reduction from data "defense" (0 by default) plus any status that grants it;
+	## blows keep 100 / (100 + defense − their armor_pen). Not "super_armor", which only stops flinching.
+	return float(data.get("defense", 0.0)) + statuses.stat_bonus("defense")
 
 func _roll_status(damage: Combat.Damage) -> String:
 	var status: String = String(damage.status.get("id", ""))
@@ -417,10 +537,22 @@ func _roll_status(damage: Combat.Damage) -> String:
 		return ""
 	if randf() >= float(damage.status.get("chance", 1.0)) * (1.0 - statuses.resist * 0.5):
 		return ""
-	return statuses.apply(status, int(damage.status.get("stacks", 1)), damage.status_power)
+	return apply_status(status, int(damage.status.get("stacks", 1)), damage.status_power)
+
+func apply_status(id: String, stacks: int = 1, power: float = 0.0) -> String:
+	## Puts a status on this enemy (a blow's roll, a reaction); a freeze holds it in place at once.
+	## Returns the status that started, like StatusEffects.apply.
+	var started: String = statuses.apply(id, stacks, power)
+	if started == "freeze":
+		velocity = Vector3.ZERO
+		_stagger(statuses.stun_time("freeze"))
+		Vfx.shards(get_parent(), global_position, Color("dff8ff"), 7, float(data.get("radius", 0.5)) + 0.4, float(data.get("height", 1.8)) * 0.7, statuses.stun_time("freeze"))
+	return started
 
 func _die(damage: Combat.Damage) -> void:
 	_release_token()
+	broken = false
+	finish_time = 0.0
 	statuses.clear()
 	if shown_status != "":
 		shown_status = ""
@@ -434,6 +566,26 @@ func _die(damage: Combat.Damage) -> void:
 	remove_from_group("enemy")
 	visual.play_action("death")
 	emit_signal("defeated", self)
+
+# ------------------------------------------------------------------ poise bar
+
+func poise_bar_wanted() -> bool:
+	## The overhead poise bar shows over ordinary foes only (bosses use the HUD): while Lâm An is
+	## locked on, for POISE_BAR_LINGER seconds after a hit, and all through a break.
+	if boss or state == "dead" or max_poise <= 0.0:
+		return false
+	return (target != null and target.lock_target == self) or since_hit < POISE_BAR_LINGER or is_broken()
+
+func update_poise_bar(delta: float) -> void:
+	var wanted: bool = poise_bar_wanted()
+	if poise_bar == null:
+		if not wanted:
+			return
+		poise_bar = PoiseBar.new()
+		poise_bar.name = "PoiseBar"
+		add_child(poise_bar)
+		poise_bar.setup(float(data.get("height", 1.8)))
+	poise_bar.show_poise(wanted, poise_ratio(), is_finishable(), delta)
 
 # ------------------------------------------------------------------ helpers
 
@@ -450,7 +602,7 @@ func _take_token() -> bool:
 		return true
 	var holders: Array = tokens.get(camp, [])
 	holders = holders.filter(func(item: Variant) -> bool: return is_instance_valid(item) and (item as Enemy).state == "attack")
-	if holders.size() >= 2:
+	if holders.size() >= max_attackers():
 		tokens[camp] = holders
 		return false
 	holders.append(self)
@@ -459,7 +611,11 @@ func _take_token() -> bool:
 
 func _token_free() -> bool:
 	var holders: Array = (tokens.get(camp, []) as Array).filter(func(item: Variant) -> bool: return is_instance_valid(item) and (item as Enemy).state == "attack")
-	return holders.size() < 2
+	return holders.size() < max_attackers()
+
+func max_attackers() -> int:
+	## How many of this enemy's camp may swing at once before it waits its turn (bosses never wait).
+	return int(data.get("max_attackers", MAX_ATTACKERS))
 
 func _has_token() -> bool:
 	return (tokens.get(camp, []) as Array).has(self)
@@ -558,14 +714,15 @@ func _guard_edges() -> void:
 func _block_move() -> void:
 	velocity.x = 0.0
 	velocity.z = 0.0
-	blocked_time += get_physics_process_delta_time()
+	blocked_time += get_physics_process_delta_time() * time_dilation
 	# A target across water or a gorge cannot be reached: give up and walk home.
 	if state == "chase" and blocked_time > 2.5:
 		blocked_time = 0.0
 		_set_state("return")
 
 func _track_stuck(delta: float) -> void:
-	if state in ["chase", "return"] and Vector2(velocity.x, velocity.z).length() > 0.5:
+	# Judged on the distance really covered, which Tâm Nhãn shortens.
+	if state in ["chase", "return"] and Vector2(velocity.x, velocity.z).length() * time_dilation > 0.5:
 		if global_position.distance_to(last_position) < 0.02:
 			stuck_time += delta
 			if stuck_time > 2.5 and state == "return":

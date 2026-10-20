@@ -112,15 +112,7 @@ func wave_scale(number: int) -> Vector2:
 	return Vector2(1.0 + float(scaling.get("hp", 0.12)) * (number - 1), 1.0 + float(scaling.get("damage", 0.06)) * (number - 1))
 
 func _spawn(kind: String) -> Enemy:
-	var data: Dictionary = ContentDB.enemy(kind)
-	var enemy: Enemy
-	match String(data.get("class", "")):
-		"boar":
-			enemy = Boar.new()
-		"guardian":
-			enemy = Guardian.new()
-		_:
-			enemy = Enemy.new()
+	var enemy: Enemy = EnemyFactory.create(ContentDB.enemy(kind))
 	serial += 1
 	var entity: Dictionary = {"id": "trial_%d" % serial, "enemy": kind, "camp": "trial", "yaw": rng.randf() * 360.0}
 	enemy.name = entity["id"]

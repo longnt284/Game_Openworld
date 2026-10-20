@@ -1,0 +1,17 @@
+{
+	"quay_thuoc": {
+		"name": "Quầy thuốc Ông Lang Vân",
+		"keeper": "Ông Lang Vân",
+		"description": "Thuốc men gom từ khắp thung lũng. Mua bằng Đồng, mỗi lần một món.",
+		"items": [
+			["banh_ngai", 12],
+			["tra_sen", null],
+			["giai_doc_thao", null],
+			["hoa_on_dan", null],
+			["khinh_than_tan", null],
+			["tinh_tam_tra", null],
+			["kim_cang_dan", null],
+			["bao_huyet_dan", null]
+		]
+	}
+}

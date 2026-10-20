@@ -1,12 +1,16 @@
 class_name GameHUD
 extends CanvasLayer
-## In-game HUD: vitals, skills, quest tracker with world marker, interaction prompt,
-## toasts/banners, boss bar, dialogue box, memory visions, fade/death screen and
-## the optional technical overlay (F3).
+## In-game HUD: vitals with buff/debuff icons, skills, quest tracker with world marker,
+## interaction prompt, toasts/banners, boss bar with its poise gauge, the Tâm Nhãn veil,
+## dialogue box, memory visions, fade/death screen and the optional technical overlay (F3).
 
 signal dialogue_advanced
 signal choice_selected(index: int)
 signal vision_closed
+
+const FOCUS_SHADER: Shader = preload("res://shaders/focus_veil.gdshader")
+## Seconds the Tâm Nhãn name stays up (it fades over the last 0.4 s).
+const FOCUS_TITLE_TIME: float = 1.3
 
 var root: Control
 var status: Label
@@ -21,11 +25,22 @@ var health_bar: ProgressBar
 var stamina_bar: ProgressBar
 var level_label: Label
 var heal_label: Label
+var quick_label: Label
+var status_row: HBoxContainer
+## Reused status icons, one per active status: {"root", "style", "glyph", "stacks", "time"}
+var status_icons: Array[Dictionary] = []
 ## slot (e, q, x) -> {"panel", "key", "name", "bar", "action"}
 var skill_boxes: Dictionary = {}
 var boss_box: VBoxContainer
 var boss_name: Label
 var boss_bar: ProgressBar
+## Thin poise gauge under the boss bar; pulses gold while the boss can be finished.
+var boss_poise: ProgressBar
+var boss_poise_fill: StyleBoxFlat
+var boss_poise_back: StyleBoxFlat
+var boss_finishable: bool = false
+var pulse_time: float = 0.0
+var prompt_tint: Color = UiTheme.CREAM
 var marker: Label
 var reticle: Label
 var dialogue_panel: PanelContainer
@@ -41,7 +56,18 @@ var fade_text: Label
 var fade_sub: Label
 var hint_panel: PanelContainer
 var hint_label: Label
+## Tâm Nhãn: a full-screen cool veil (its own ColorRect under every other HUD element, apart
+## from `fade`) easing toward focus_active, with the name and how it was earned above the centre.
+var focus_veil: ColorRect
+var focus_material: ShaderMaterial
+var focus_title: Label
+var focus_sub: Label
+var focus_active: bool = false
+var focus_level: float = 0.0
+var focus_title_left: float = 0.0
 var toast_queue: Array[String] = []
+## Colour of a queued toast by its text (a talisman drop shows in its rarity colour); cream otherwise.
+var toast_tints: Dictionary = {}
 var toast_remaining: float = 0.0
 var banner_remaining: float = 0.0
 var typing: float = 0.0
@@ -56,6 +82,7 @@ func _ready() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	_build_focus()
 	_build_tracker()
 	_build_vitals()
 	_build_skills()
@@ -76,6 +103,25 @@ func _anchored(control: Control, preset: int, top_left: Vector2, bottom_right: V
 	control.offset_right = bottom_right.x
 	control.offset_bottom = bottom_right.y
 	return control
+
+func _build_focus() -> void:
+	focus_veil = ColorRect.new()
+	focus_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	focus_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	focus_material = ShaderMaterial.new()
+	focus_material.shader = FOCUS_SHADER
+	focus_veil.material = focus_material
+	focus_veil.visible = false
+	root.add_child(focus_veil)
+	focus_title = _anchored(UiTheme.title("", 34, UiTheme.CREAM), Control.PRESET_CENTER, Vector2(-300, -240), Vector2(300, -192))
+	focus_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	focus_sub = _anchored(UiTheme.label("", 16, UiTheme.CREAM, true), Control.PRESET_CENTER, Vector2(-300, -192), Vector2(300, -166))
+	focus_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for label: Label in [focus_title, focus_sub]:
+		# An ink outline keeps the pale name readable against the sky behind it.
+		label.add_theme_color_override("font_outline_color", Color(UiTheme.INK, 0.8))
+		label.add_theme_constant_override("outline_size", 6 if label == focus_title else 4)
+		label.visible = false
 
 func _build_tracker() -> void:
 	var box: VBoxContainer = VBoxContainer.new()
@@ -114,8 +160,54 @@ func _build_vitals() -> void:
 	stamina_bar = UiTheme.bar(Color("4fbfa8"), Vector2(250, 8))
 	stamina_bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(stamina_bar)
+	# Healing counter (R) with the quick-use slot (C) beside it.
+	var items: HBoxContainer = HBoxContainer.new()
+	items.add_theme_constant_override("separation", 18)
+	items.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(items)
 	heal_label = UiTheme.label("", 14, UiTheme.MUTED)
-	box.add_child(heal_label)
+	items.add_child(heal_label)
+	quick_label = UiTheme.label("", 14, UiTheme.JADE_LIGHT)
+	items.add_child(quick_label)
+	# Buff and debuff icons sit on their own row above the vitals, so the bars never shift.
+	status_row = HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 6)
+	status_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchored(status_row, Control.PRESET_BOTTOM_LEFT, Vector2(28, -158), Vector2(420, -110))
+
+func _status_icon() -> Dictionary:
+	## Rounded square tinted by the status, glyph in the middle, stacks as a corner badge and
+	## the seconds left underneath. Buffs get a jade border, debuffs a vermilion one.
+	var icon: Control = Control.new()
+	icon.custom_minimum_size = Vector2(36, 48)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel: Panel = Panel.new()
+	panel.position = Vector2.ZERO
+	panel.size = Vector2(36, 36)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
+	panel.add_theme_stylebox_override("panel", style)
+	icon.add_child(panel)
+	var glyph: Label = UiTheme.label("", 15, UiTheme.CREAM, true)
+	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	glyph.position = Vector2.ZERO
+	glyph.size = Vector2(36, 36)
+	icon.add_child(glyph)
+	var stacks: Label = UiTheme.label("", 11, UiTheme.CREAM, true)
+	stacks.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stacks.position = Vector2(14, -6)
+	stacks.size = Vector2(26, 14)
+	icon.add_child(stacks)
+	var time: Label = UiTheme.label("", 11, UiTheme.MUTED)
+	time.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	time.position = Vector2(-4, 35)
+	time.size = Vector2(44, 14)
+	icon.add_child(time)
+	status_row.add_child(icon)
+	return {"root": icon, "style": style, "glyph": glyph, "stacks": stacks, "time": time}
 
 func _build_skills() -> void:
 	var row: HBoxContainer = HBoxContainer.new()
@@ -169,6 +261,16 @@ func _build_boss() -> void:
 	boss_box.add_child(boss_name)
 	boss_bar = UiTheme.bar(Color("c8402e"), Vector2(600, 12))
 	boss_box.add_child(boss_bar)
+	boss_poise = UiTheme.bar(UiTheme.CREAM, Vector2(600, 5))
+	boss_poise.max_value = 1.0
+	boss_poise.step = 0.0
+	boss_poise.value = 1.0
+	boss_poise_fill = boss_poise.get_theme_stylebox("fill") as StyleBoxFlat
+	boss_poise_back = boss_poise.get_theme_stylebox("background") as StyleBoxFlat
+	# Thin: the shared bar background pads to label height, which the gauge does not need.
+	boss_poise_back.content_margin_top = 0
+	boss_poise_back.content_margin_bottom = 0
+	boss_box.add_child(boss_poise)
 	boss_box.visible = false
 
 func _build_dialogue() -> void:
@@ -250,6 +352,41 @@ func set_level(level: int, xp: int, next_xp: int, skill_points: int) -> void:
 func set_heal_count(text: String) -> void:
 	heal_label.text = text
 
+func set_quick_item(text: String, stocked: bool) -> void:
+	## The quick slot dims while it is empty or its stack has run out.
+	quick_label.text = text
+	quick_label.modulate.a = 1.0 if stocked else 0.5
+
+func set_statuses(list: Array) -> void:
+	## list: StatusEffects.list_for_hud() of the player. Icons are pooled and only re-tinted.
+	while status_icons.size() < list.size():
+		status_icons.append(_status_icon())
+	for index: int in range(status_icons.size()):
+		var icon: Dictionary = status_icons[index]
+		var root_control: Control = icon["root"]
+		root_control.visible = index < list.size()
+		if not root_control.visible:
+			continue
+		var entry: Dictionary = list[index]
+		var color: Color = entry["color"]
+		var style: StyleBoxFlat = icon["style"]
+		style.bg_color = Color(color.darkened(0.6), 0.92)
+		style.border_color = UiTheme.JADE_LIGHT if String(entry["kind"]) == "buff" else UiTheme.VERMILION
+		var glyph: Label = icon["glyph"]
+		glyph.text = String(entry["glyph"])
+		glyph.add_theme_color_override("font_color", color.lightened(0.35))
+		(icon["stacks"] as Label).text = "×%d" % int(entry["stacks"]) if int(entry["stacks"]) > 1 else ""
+		(icon["time"] as Label).text = "%ds" % ceili(float(entry["time"]))
+		# The last seconds fade the icon, so an expiring buff is noticed before it is gone.
+		root_control.modulate.a = 0.55 if float(entry["time"]) < 3.0 else 1.0
+
+func status_icon_count() -> int:
+	var count: int = 0
+	for icon: Dictionary in status_icons:
+		if (icon["root"] as Control).visible:
+			count += 1
+	return count
+
 func set_skill(slot: String, title: String, unlocked: bool, fill: float, level: int, tint: Color) -> void:
 	## fill: 1 when ready (cooldown done, or a full charge meter on the ultimate slot).
 	var box: Dictionary = skill_boxes[slot]
@@ -301,15 +438,25 @@ func update_reticle(camera: Camera3D, target: Node3D) -> void:
 	reticle.position = screen - reticle.size * 0.5
 	reticle.visible = true
 
-func show_prompt(text: String) -> void:
+func show_prompt(text: String, tint: Color = UiTheme.CREAM) -> void:
+	## Called every frame by main._update_focus; gold marks a finisher.
 	prompt.text = text
+	if tint != prompt_tint:
+		prompt_tint = tint
+		prompt.add_theme_color_override("font_color", tint)
 
-func show_message(message: String, duration: float = 3.5) -> void:
+func show_message(message: String, duration: float = 3.5, tint: Color = UiTheme.CREAM) -> void:
+	toast_tints[message] = tint
 	if toast_remaining > 0.0 and toast.text != message:
 		if not toast_queue.has(message):
 			toast_queue.append(message)
 		return
+	_show_toast(message, duration)
+
+func _show_toast(message: String, duration: float) -> void:
 	toast.text = message
+	toast.add_theme_color_override("font_color", toast_tints.get(message, UiTheme.CREAM))
+	toast_tints.erase(message)
 	toast_remaining = duration
 
 func show_banner(title: String, subtitle: String = "", duration: float = 3.5) -> void:
@@ -328,8 +475,31 @@ func show_boss(name: String, title: String, ratio: float) -> void:
 	boss_bar.max_value = 1.0
 	boss_bar.value = ratio
 
+func set_boss_poise(ratio: float, broken: bool, finishable: bool) -> void:
+	## ratio: Enemy.poise_ratio() (empty while broken). While a finisher can still land the
+	## gauge fills gold and pulses; for the rest of the break it stays empty with a gold rim.
+	boss_poise.value = 1.0 if finishable else ratio
+	boss_poise_fill.bg_color = UiTheme.GOLD if broken else UiTheme.CREAM
+	boss_poise_back.border_color = UiTheme.GOLD if broken else Color(0.0, 0.0, 0.0, 0.7)
+	boss_finishable = finishable
+	if not finishable:
+		boss_poise.modulate.a = 1.0
+
+func set_focus(active: bool, title: String = "", subtitle: String = "", tint: Color = UiTheme.JADE_LIGHT) -> void:
+	## Tâm Nhãn on, with its name and how it was earned in its colour, or off. The veil eases in
+	## quickly and lifts slowly (_process), so a pause holds it where it is.
+	focus_active = active
+	if not active:
+		return
+	focus_material.set_shader_parameter("tint", tint)
+	focus_title.text = title
+	focus_title.add_theme_color_override("font_color", tint)
+	focus_sub.text = subtitle
+	focus_title_left = FOCUS_TITLE_TIME
+
 func hide_boss() -> void:
 	boss_box.visible = false
+	boss_finishable = false
 
 func open_dialogue(speaker: String, text: String, choices: Array = []) -> void:
 	dialogue_panel.visible = true
@@ -381,7 +551,7 @@ func set_debug(enabled: bool) -> void:
 	status.visible = enabled
 
 func set_gameplay_visible(value: bool) -> void:
-	for node: Control in [region_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, prompt]:
+	for node: Control in [region_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, quick_label, prompt, status_row]:
 		node.visible = value
 	for skill: String in skill_boxes:
 		(skill_boxes[skill]["panel"] as Control).visible = value
@@ -402,14 +572,32 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			emit_signal("dialogue_advanced")
 
+func _fade_focus(delta: float) -> void:
+	## Writes the veil's strength only while it changes; the name fades on its own timer.
+	var goal: float = 1.0 if focus_active else 0.0
+	if focus_level != goal:
+		focus_level = move_toward(focus_level, goal, delta * (8.0 if focus_active else 2.5))
+		focus_material.set_shader_parameter("strength", focus_level)
+		focus_veil.visible = focus_level > 0.0
+	if focus_title_left > 0.0 or focus_title.visible:
+		focus_title_left = maxf(0.0, focus_title_left - delta)
+		var alpha: float = clampf(focus_title_left * 2.5, 0.0, 1.0)
+		focus_title.modulate.a = alpha
+		focus_sub.modulate.a = alpha
+		focus_title.visible = alpha > 0.0
+		focus_sub.visible = alpha > 0.0
+
 func _process(delta: float) -> void:
 	if dialogue_panel.visible and dialogue_text.visible_ratio < 1.0:
 		typing += delta
 		dialogue_text.visible_ratio = clampf(typing * 55.0 / maxf(1.0, float(dialogue_text.get_total_character_count())), 0.0, 1.0)
+	if boss_finishable and boss_box.visible:
+		pulse_time += delta
+		boss_poise.modulate.a = 0.55 + 0.45 * sin(pulse_time * 11.0)
+	_fade_focus(delta)
 	toast_remaining = maxf(0.0, toast_remaining - delta)
 	if toast_remaining <= 0.0 and not toast_queue.is_empty():
-		toast.text = toast_queue.pop_front()
-		toast_remaining = 3.0
+		_show_toast(toast_queue.pop_front(), 3.0)
 	toast.visible = toast_remaining > 0.0
 	toast.modulate.a = clampf(toast_remaining * 3.0, 0.0, 1.0)
 	banner_remaining = maxf(0.0, banner_remaining - delta)

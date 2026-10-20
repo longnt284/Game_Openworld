@@ -1,7 +1,7 @@
 class_name RetentionPanels
 extends RefCounted
-## Full-screen panels for the long-term systems: Kỳ Ngộ banner, armory and outfits, daily
-## missions with the login calendar, World Tier and the Endless Trial blessing picker.
+## Full-screen panels for the long-term systems: Kỳ Ngộ banner, armory with talismans and
+## outfits, daily missions with the login calendar, World Tier and the Endless Trial blessing picker.
 ## Built by Menus.open_panel; they read `menus.main` and call its retention methods.
 
 const BANNER: String = "ngu_hanh"
@@ -218,6 +218,19 @@ static func _exchange(menus: Menus) -> Control:
 # ------------------------------------------------------------------ armory & outfits
 
 static func armory(menus: Menus) -> Control:
+	## Two tabs: swords with outfits, and the Ngọc bội slots and pouch. The open tab survives refreshes.
+	var tabs: TabContainer = TabContainer.new()
+	tabs.name = "ArmoryTabs"
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var swords: Control = _swords(menus)
+	swords.name = "Kiếm & trang phục"
+	tabs.add_child(swords)
+	tabs.add_child(_talismans(menus))
+	tabs.current_tab = clampi(menus.armory_tab, 0, tabs.get_tab_count() - 1)
+	tabs.tab_changed.connect(func(tab: int) -> void: menus.armory_tab = tab)
+	return tabs
+
+static func _swords(menus: Menus) -> Control:
 	var main: Node = menus.main
 	var profile: PlayerProfile = main.profile
 	var state: GameState = main.state
@@ -275,6 +288,164 @@ static func armory(menus: Menus) -> Control:
 					main.equip_skin(target, id)
 					menus.refresh_panel()))
 	return split
+
+# ------------------------------------------------------------------ talismans (Ngọc bội)
+
+static func _talismans(menus: Menus) -> Control:
+	## Left: the three slots (Thiên, Địa, Nhân) and the set bonuses they make; right: the pouch.
+	var main: Node = menus.main
+	var profile: PlayerProfile = main.profile
+	var can_change: bool = main.can_change_talismans()
+	var worn: Array = profile.equipped_talismans()
+	var split: HBoxContainer = HBoxContainer.new()
+	split.name = "Ngọc bội"
+	split.add_theme_constant_override("separation", 24)
+	var left: VBoxContainer = VBoxContainer.new()
+	left.add_theme_constant_override("separation", 8)
+	var left_scroll: ScrollContainer = _scroll(left)
+	left_scroll.size_flags_stretch_ratio = 0.8
+	split.add_child(left_scroll)
+	left.add_child(UiTheme.label("Ô Ngọc bội", 20, UiTheme.GOLD, true))
+	if not can_change:
+		left.add_child(UiTheme.label("Chỉ đổi Ngọc bội khi đứng yên, không giao chiến.", 14, UiTheme.MUTED))
+	for slot: int in range(profile.talisman_equipped.size()):
+		var uid: int = int(profile.talisman_equipped[slot])
+		var item: Dictionary = profile.talisman(uid) if uid >= 0 else {}
+		var card: PanelContainer = _card(PlayerStats.rarity_color(String(item["rarity"])) if not item.is_empty() else UiTheme.MUTED.darkened(0.4))
+		var row: HBoxContainer = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		card.add_child(row)
+		var text: VBoxContainer = VBoxContainer.new()
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if item.is_empty():
+			row.add_child(_talisman_icon(UiTheme.MUTED.darkened(0.3), String(Talismans.slots()[slot].get("glyph", "?"))))
+			row.add_child(text)
+			text.add_child(UiTheme.label("Ô %s" % Talismans.slot_name(slot), 17, UiTheme.CREAM, true))
+			text.add_child(UiTheme.label("Trống", 14, UiTheme.MUTED))
+		else:
+			row.add_child(_talisman_icon(Talismans.color(item), Talismans.glyph(item)))
+			row.add_child(text)
+			_talisman_lines(text, item, "", true)
+			var remove: Button = UiTheme.button("Tháo", func() -> void:
+				menus.panel_note = ""
+				main.unequip_talisman(slot)
+				menus.refresh_panel(), 90)
+			remove.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			remove.disabled = not can_change
+			row.add_child(remove)
+		left.add_child(card)
+	left.add_child(UiTheme.label("Hiệu ứng bộ", 20, UiTheme.GOLD, true))
+	var sets: Array[Dictionary] = Talismans.set_summary(worn)
+	if sets.is_empty():
+		left.add_child(_wrap(UiTheme.label("Đeo 2 hoặc 3 món cùng bộ để mở hiệu ứng bộ.", 14, UiTheme.MUTED), 380))
+	for entry: Dictionary in sets:
+		left.add_child(UiTheme.label("%s  (%d/%d)" % [entry["name"], int(entry["count"]), Talismans.slots().size()], 16, entry["color"], true))
+		for tier: Dictionary in entry["tiers"]:
+			left.add_child(_wrap(UiTheme.label("%s %d món: %s" % ["✓" if tier["active"] else "•", int(tier["pieces"]), tier["desc"]], 14,
+				UiTheme.JADE_LIGHT if tier["active"] else UiTheme.MUTED), 380))
+	if menus.panel_note != "":
+		left.add_child(_wrap(UiTheme.label(menus.panel_note, 15, UiTheme.JADE_LIGHT if menus.panel_note_ok else UiTheme.VERMILION), 380))
+	var right: VBoxContainer = VBoxContainer.new()
+	right.add_theme_constant_override("separation", 8)
+	split.add_child(_scroll(right))
+	right.add_child(UiTheme.label("Ngọc bội trong túi  (%d/%d)" % [profile.talismans.size(), Talismans.capacity()], 20, UiTheme.GOLD, true))
+	right.add_child(_wrap(UiTheme.label("Rơi từ kẻ địch, tinh anh, boss (chắc chắn) và rương thưởng; không có trong Kỳ Ngộ. Túi đầy thì món mới thấp bậc nhất tự phân giải thành Đồng.", 14, UiTheme.MUTED), 420))
+	var items: Array = profile.talismans.duplicate()
+	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return Talismans.rank(a) > Talismans.rank(b) or (Talismans.rank(a) == Talismans.rank(b) and int(a["uid"]) > int(b["uid"])))
+	if items.is_empty():
+		right.add_child(_wrap(UiTheme.label("Túi chưa có Ngọc bội nào.", 14, UiTheme.MUTED), 420))
+	for item: Dictionary in items:
+		right.add_child(_talisman_row(menus, item, can_change))
+	return split
+
+static func _talisman_row(menus: Menus, item: Dictionary, can_change: bool) -> Control:
+	var main: Node = menus.main
+	var uid: int = int(item["uid"])
+	var worn: bool = main.profile.is_worn(uid)
+	var color: Color = PlayerStats.rarity_color(String(item["rarity"]))
+	var card: PanelContainer = _card(color if worn else color.darkened(0.45))
+	card.tooltip_text = String(Talismans.piece(String(item["piece"])).get("description", ""))
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	card.add_child(row)
+	row.add_child(_talisman_icon(Talismans.color(item), Talismans.glyph(item)))
+	var text: VBoxContainer = VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(text)
+	_talisman_lines(text, item, "Ô %s" % Talismans.slot_name(Talismans.slot_index(String(item["piece"]))))
+	var buttons: VBoxContainer = VBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 6)
+	row.add_child(buttons)
+	if worn:
+		buttons.add_child(UiTheme.label("Đang đeo", 15, UiTheme.GOLD, true))
+	else:
+		var wear: Button = UiTheme.button("Đeo", func() -> void:
+			menus.panel_note = ""
+			main.equip_talisman(uid)
+			menus.refresh_panel(), 130)
+		wear.disabled = not can_change
+		buttons.add_child(wear)
+	var value: int = Talismans.salvage_value(String(item["rarity"]))
+	var salvage: Button = UiTheme.button("Phân giải", func() -> void:
+		var label: String = Talismans.label(item)
+		var refusal: String = main.salvage_talisman(uid)
+		menus.panel_note = refusal if refusal != "" else "Đã phân giải %s → +%d Đồng" % [label, value]
+		menus.panel_note_ok = refusal == ""
+		if refusal != "":
+			main.audio.ui("ui_error")
+		menus.refresh_panel(), 130)
+	salvage.disabled = worn or not main.playing
+	buttons.add_child(salvage)
+	var worth: Label = UiTheme.label("+%d Đồng" % value, 13, UiTheme.MUTED)
+	worth.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	buttons.add_child(worth)
+	return card
+
+static func _talisman_lines(text: VBoxContainer, item: Dictionary, slot: String, compact: bool = false) -> void:
+	## Name in the rarity colour, rarity • set • slot, the main stat, then the substats. The
+	## compact slot cards put the set beside the name and the substats on one wrapped line, so
+	## the set bonuses below them stay in view.
+	var rarity: String = String(item["rarity"])
+	var piece: Dictionary = Talismans.piece(String(item["piece"]))
+	var name: Label = UiTheme.label(String(piece.get("name", item["piece"])), 17, PlayerStats.rarity_color(rarity), true)
+	var set_name: String = "Bộ " + String(Talismans.set_info(String(piece.get("set", ""))).get("name", ""))
+	if compact:
+		var head: HBoxContainer = HBoxContainer.new()
+		head.add_theme_constant_override("separation", 10)
+		head.add_child(name)
+		head.add_child(UiTheme.label(set_name, 14, UiTheme.MUTED))
+		text.add_child(head)
+	else:
+		text.add_child(name)
+		text.add_child(UiTheme.label("%s  •  %s  •  %s" % [PlayerStats.rarity_data(rarity).get("name", ""), set_name, slot], 14, UiTheme.MUTED))
+	text.add_child(UiTheme.label("★ " + PlayerStats.affix_text(item["main"]), 15, UiTheme.GOLD))
+	if compact:
+		var parts: PackedStringArray = []
+		for affix: Array in item.get("subs", []):
+			parts.append("◆ " + PlayerStats.affix_text(affix))
+		if not parts.is_empty():
+			text.add_child(_wrap(UiTheme.label("  ".join(parts), 13, UiTheme.JADE_LIGHT), 300))
+		return
+	for affix: Array in item.get("subs", []):
+		text.add_child(UiTheme.label("◆ " + PlayerStats.affix_text(affix), 14, UiTheme.JADE_LIGHT))
+
+static func _talisman_icon(color: Color, glyph: String) -> Control:
+	## Rounded square in the set colour with the slot letter.
+	var icon: PanelContainer = PanelContainer.new()
+	var box: StyleBoxFlat = StyleBoxFlat.new()
+	box.bg_color = color.darkened(0.55)
+	box.border_color = color
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(8)
+	icon.add_theme_stylebox_override("panel", box)
+	icon.custom_minimum_size = Vector2(48, 48)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var letter: Label = UiTheme.label(glyph, 22, color.lightened(0.25), true)
+	letter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	icon.add_child(letter)
+	return icon
 
 static func _weapon_row(title: String, subtitle: String, affixes: Array, color: Color, equipped: bool, can_equip: bool, on_equip: Callable) -> Control:
 	var card: PanelContainer = _card(color if equipped else color.darkened(0.45))

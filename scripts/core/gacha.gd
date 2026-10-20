@@ -92,9 +92,15 @@ static func roll_rates(rates: Dictionary, rng: RandomNumberGenerator) -> String:
 
 static func make_weapon(base: String, rarity: String, rng: RandomNumberGenerator) -> Array:
 	## Distinct weighted affixes for a rolled weapon: [[id, value], ...].
+	return roll_affixes(int(PlayerStats.rarity_data(rarity).get("affixes", 1)), rng, "sword")
+
+static func roll_affixes(wanted: int, rng: RandomNumberGenerator, gear: String, exclude: Array = []) -> Array:
+	## Distinct weighted affixes allowed on `gear` ("sword" or "talisman"; data "gear" lists them,
+	## absent means both), skipping `exclude`. Affixes are only ever filtered out, so a sword rolls
+	## exactly as it did before talisman-only affixes existed.
 	var table: Dictionary = ContentDB.get_data("affixes")
-	var ids: Array = table.keys()
-	var count: int = mini(int(PlayerStats.rarity_data(rarity).get("affixes", 1)), ids.size())
+	var ids: Array = table.keys().filter(func(id: String) -> bool: return PlayerStats.affix_allowed(id, gear) and not exclude.has(id))
+	var count: int = mini(wanted, ids.size())
 	var result: Array = []
 	for index: int in range(count):
 		var total: float = 0.0
@@ -174,6 +180,16 @@ static func open_chest(profile: PlayerProfile, table_id: String, rarity: String)
 	var pool: Array = banner(String(table.get("pool", "ngu_hanh")))["pool"][rarity]
 	var result: Dictionary = grant(profile, pool[rng.randi_range(0, pool.size() - 1)], rarity, rng)
 	profile.keep_rng(rng)
+	return result
+
+static func chest_supplies(table_id: String, rng: RandomNumberGenerator) -> Array:
+	## Consumables a reward chest also holds: the table's "supplies" [[item, min, max, chance]]
+	## (the enemy drop format) rolled into [[item, amount]]. They go to the save, not the profile.
+	var table: Dictionary = (data().get("chests", {}) as Dictionary).get(table_id, {})
+	var result: Array = []
+	for entry: Array in table.get("supplies", []):
+		if rng.randf() < float(entry[3]):
+			result.append([String(entry[0]), rng.randi_range(int(entry[1]), int(entry[2]))])
 	return result
 
 static func exchange(profile: PlayerProfile, id: String) -> Dictionary:

@@ -107,7 +107,7 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "settings", "credits", "gacha", "armory", "daily", "tier", "trial"]
+	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "statuses", "reactions", "finisher", "focus", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -146,6 +146,124 @@ func _run() -> void:
 					game.state.unlock_skill("gust")
 					await frames(12)
 					await shot("combat_skill")
+			"statuses":
+				# Buff and debuff icons above the vitals: two buffs, then stacked debuffs.
+				await place(-20, 70.5, 0)
+				var lam_an: PlayerController = game.player
+				for entry: Array in [["buff_atk", 1], ["buff_regen", 1], ["poison", 2], ["bleed", 3], ["weaken", 1]]:
+					lam_an.apply_status(entry[0], entry[1])
+				await frames(20)
+				game._refresh_hud()
+				await frames(2)
+				await shot("statuses")
+				lam_an.cleanse(lam_an.statuses.active.keys())
+				lam_an.heal(lam_an.max_health())
+			"reactions":
+				# Điện Giật arcing between soaked bandits, then Hỏa Lốc's fire whirl. Slow time keeps
+				# the short bolts and the floating name on screen for a slow renderer.
+				await place(-20, 66, 0, -0.25)
+				var foes: Array[Enemy] = []
+				for offset: Vector3 in [Vector3(0, 0, -4.5), Vector3(2.4, 0, -6.2), Vector3(-2.4, 0, -6.2)]:
+					var foe: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+					foe.setup({"id": "preview_reaction_%d" % foes.size(), "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+					game.add_child(foe)
+					var point: Vector3 = game.player.global_position + offset
+					point.y = game.world.height_at(point.x, point.z) + 0.05
+					foe.activate(point, game.player)
+					foe.set_physics_process(false)
+					foe.max_health = 5000.0
+					foe.health = 5000.0
+					game.on_enemy_spawned(foe, {"id": foe.entity_id})
+					foe.statuses.apply("soak", 1, 10.0)
+					foe._tick_statuses(0.0)
+					foes.append(foe)
+				game.player.face_direction(Vector3(0, 0, -1), true)
+				await frames(4)
+				Engine.time_scale = 0.1
+				game.player.strike(foes[0], {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": "thunder"}, 1.0)
+				await frames(3)
+				await shot("reaction_electrocharge")
+				Engine.time_scale = 1.0
+				await frames(90)
+				foes[0].statuses.apply("gale", 1, 10.0)
+				Engine.time_scale = 0.25
+				game.player.strike(foes[0], {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": "flame"}, 1.0)
+				await frames(12)
+				await shot("reaction_firestorm")
+				Engine.time_scale = 1.0
+				for foe: Enemy in foes:
+					foe.queue_free()
+				await frames(30)
+			"finisher":
+				# Poise bars over a bandit just hit and a broken one (gold), the F prompt, the boss
+				# bar's poise gauge; then the finisher's blow, slowed so it is caught mid-swing.
+				await place(-20, 66, 0, -0.25)
+				var guards: Array[Enemy] = []
+				for offset: Vector3 in [Vector3(-1.6, 0, -4.2), Vector3(0.9, 0, -2.4)]:
+					var guard: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+					guard.setup({"id": "preview_poise_%d" % guards.size(), "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+					game.add_child(guard)
+					var spot: Vector3 = game.player.global_position + offset
+					spot.y = game.world.height_at(spot.x, spot.z) + 0.05
+					guard.activate(spot, game.player)
+					guard.set_physics_process(false)
+					game.on_enemy_spawned(guard, {"id": guard.entity_id})
+					guards.append(guard)
+				var tap: Combat.Damage = Combat.make_damage(game.player, {"poise": guards[0].max_poise * 0.6, "knockback": 0.0, "hitstop": 0.0}, 4.0, guards[0].global_position)
+				guards[0].take_damage(tap)
+				guards[1].take_damage(Combat.make_damage(game.player, {"poise": 999, "knockback": 0.0, "hitstop": 0.0}, 4.0, guards[1].global_position))
+				game.hud.show_boss("Trúc Tướng", "Kẻ gác rừng trúc", 0.72)
+				game.hud.set_boss_poise(0.45, false, false)
+				game.player.face_direction(Vector3(0.3, 0, -1), true)
+				game.player.set_lock(guards[0])
+				await frames(20)
+				game._refresh_hud()
+				await frames(2)
+				await shot("poise_bars")
+				game.hud.set_boss_poise(0.0, true, true)
+				game.player.set_lock(null)
+				game.player.start_finisher(guards[1])
+				Engine.time_scale = 0.2
+				for step: int in range(80):
+					await frames(1)
+					if game.player.action.get("fired", false):
+						break
+				await frames(2)
+				await shot("finisher")
+				Engine.time_scale = 1.0
+				await frames(60)
+				game.hud.hide_boss()
+				for guard: Enemy in guards:
+					if is_instance_valid(guard):
+						guard.queue_free()
+				await frames(30)
+			"focus":
+				# Tâm Nhãn: Lâm An rolls clear of a bandit's swing at the last instant; the cool veil
+				# and its name come up while the bandit finishes the swing on its slowed clock.
+				await place(-20, 66, 0, -0.25)
+				var swordsman: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+				swordsman.setup({"id": "preview_focus", "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+				game.add_child(swordsman)
+				var stand: Vector3 = game.player.global_position + Vector3(0.3, 0, -2.0)
+				stand.y = game.world.height_at(stand.x, stand.z) + 0.05
+				swordsman.activate(stand, game.player)
+				game.on_enemy_spawned(swordsman, {"id": swordsman.entity_id})
+				await frames(4)
+				swordsman._begin_attack("attack")
+				for step: int in range(90):
+					await frames(1)
+					if swordsman.attack_clock >= float(swordsman.attack_data.get("hit_start", 0.7)) - 0.12:
+						break
+				game.hinted["focus"] = true  # the first-time hint would cover the bandit
+				game.player.face_direction(Vector3(1, 0, 0.4), true)
+				game.player._start_dodge()
+				game.player.take_damage(Combat.make_damage(swordsman, swordsman.attack_data, 10.0, game.player.global_position))
+				# Early: a slow renderer catches physics up several steps a frame, and the focus is short.
+				await frames(2)
+				await shot("focus")
+				game.player.end_focus()
+				swordsman.queue_free()
+				await frames(40)
 			"moves":
 				await place(0, 14, 0)
 				var side: Camera3D = Camera3D.new()
@@ -252,6 +370,73 @@ func _run() -> void:
 				game.choose_trial_buff(game.menus.trial_choices[0])
 				game.trial.end_run("leave")
 				await frames(30)
+			"shop":
+				# Ông Lang Vân behind his stall, the HUD's heal counter and quick slot, then his counter
+				# and a bag of consumables in the Inventory.
+				await place(-10.2, 29.6, 75, -0.2)
+				for entry: Array in [["kim_cang_dan", 2], ["giai_doc_thao", 3], ["tra_sen", 1], ["hoa_on_dan", 1]]:
+					game.state.add_item(entry[0], entry[1])
+				game.set_quick_item("kim_cang_dan")
+				game.state.coins = 120
+				await frames(30)
+				game._refresh_hud()
+				await shot("merchant")
+				game.open_shop("quay_thuoc")
+				game.buy_item("quay_thuoc", "tinh_tam_tra")
+				game.menus.panel_note = "Đã mua Tịnh Tâm Trà  •  còn %d Đồng" % game.state.coins
+				game.menus.panel_note_ok = true
+				game.menus.refresh_panel()
+				await frames(10)
+				await shot("shop")
+				game.menus.close_panel()
+				game.menus.selected_item = "kim_cang_dan"
+				game.open_panel("inventory")
+				await frames(10)
+				await shot("inventory_items")
+				game.menus.close_panel()
+				game.set_paused(false)
+			"character":
+				# The Nhân vật tab: a rolled sword, two Trial blessings and live buffs all in the totals.
+				game.state.stats = PlayerStats.compute({"base": "sword_flame", "rarity": "sr", "affixes": [["attack_speed", 8], ["defense", 15]]}, {"lifesteal": 0.05, "poise_dmg": 0.3})
+				game.player.apply_status("buff_atk")
+				game.player.apply_status("weaken")
+				game.menus.inventory_tab = 1
+				game.open_panel("inventory")
+				await frames(10)
+				await shot("character")
+				var sheet_tabs: TabContainer = game.menus.panel_body.find_child("InventoryTabs", true, false)
+				(sheet_tabs.get_current_tab_control() as ScrollContainer).scroll_vertical = 10000
+				await frames(5)
+				await shot("character_more")
+				game.menus.close_panel()
+				game.menus.inventory_tab = 0
+				game.player.cleanse(["buff_atk", "weaken"])
+				game.refresh_stats()
+				game.set_paused(false)
+			"talismans":
+				# The Ngọc bội tab: a worn Huyết Ngọc pair with one Lôi Văn piece, and a pouch of rolls.
+				game.profile.talismans.clear()
+				game.profile.talisman_equipped = Talismans.empty_slots()
+				var rolls: RandomNumberGenerator = RandomNumberGenerator.new()
+				rolls.seed = 2846
+				for entry: Array in [["huyet_ngoc_thien", "ssr"], ["huyet_ngoc_dia", "sr"], ["loi_van_nhan", "sr"], ["kim_cuong_thien", "r"],
+						["phong_linh_dia", "r"], ["loi_van_dia", "ssr"], ["phong_linh_nhan", "sr"], ["kim_cuong_nhan", "r"]]:
+					var item: Dictionary = game.profile.add_talisman(Talismans.make(entry[0], entry[1], rolls))
+					if game.profile.equipped_talismans().size() < 3:
+						game.equip_talisman(int(item["uid"]))
+				game.menus.armory_tab = 1
+				game.open_panel("armory")
+				await frames(10)
+				await shot("talismans")
+				game.menus.armory_tab = 0
+				game.menus.inventory_tab = 1
+				game.menus.close_panel()
+				game.open_panel("inventory")
+				await frames(10)
+				await shot("talismans_character")
+				game.menus.close_panel()
+				game.menus.inventory_tab = 0
+				game.set_paused(false)
 			"journal", "inventory", "settings", "credits", "armory", "daily", "tier":
 				game.open_panel(scene)
 				await frames(10)

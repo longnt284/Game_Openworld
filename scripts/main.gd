@@ -177,6 +177,10 @@ func _start_world() -> void:
 	player.notice.connect(func(text: String) -> void: hud.show_message(text, 2.0))
 	player.skill_used.connect(_on_skill_used)
 	player.status_applied.connect(func(_status: String) -> void: _mission("status"))
+	player.finisher_landed.connect(_on_finisher_landed)
+	player.focus_started.connect(_on_focus_started)
+	player.focus_ended.connect(func() -> void: hud.set_focus(false))
+	player.statuses_changed.connect(_on_player_statuses)
 	_equip_visuals()
 	title_camera = Camera3D.new()
 	title_camera.far = 1500
@@ -260,6 +264,7 @@ func continue_game() -> void:
 
 func return_to_title() -> void:
 	death_serial += 1
+	player.end_focus()
 	_abort_trial()
 	set_paused(false)
 	show_title()
@@ -353,7 +358,16 @@ func _update_region() -> void:
 
 func _update_focus() -> void:
 	focus = null
-	if player.state != "move" or not player.is_on_floor() or _ui_blocking():
+	if _ui_blocking():
+		hud.show_prompt("")
+		return
+	# A broken foe within reach outranks every other use of F: the finisher.
+	var broken: Enemy = player.finisher_target() if player.can_finish() else null
+	if broken:
+		focus = broken
+		hud.show_prompt("%s  •  Kết liễu" % UserSettings.event_label("interact"), UiTheme.GOLD)
+		return
+	if player.state != "move" or not player.is_on_floor():
 		hud.show_prompt("")
 		return
 	var best_score: float = INF
@@ -392,9 +406,17 @@ func _update_combat_state() -> void:
 	audio.set_combat(2 if boss_fight else (1 if engaged > 0 else 0))
 	if engaged > 0 and not hinted.has("combat"):
 		hinted["combat"] = true
-		hud.show_hint("Chuột trái: đánh (3 đòn liên hoàn)  •  Giữ chuột trái: trọng kích\nShift: né  •  Chuột phải: đỡ — bấm đúng lúc đòn tới để phản đòn\n%s: khóa mục tiêu  •  %s: dùng thuốc" % [UserSettings.event_label("lock_on"), UserSettings.event_label("heal")], 12.0)
+		hud.show_hint("Chuột trái: đánh (3 đòn liên hoàn)  •  Giữ chuột trái: trọng kích\nShift: né  •  Chuột phải: đỡ — bấm đúng lúc đòn tới để phản đòn\n%s: khóa mục tiêu  •  %s: dùng thuốc  •  %s: vật phẩm nhanh" % [UserSettings.event_label("lock_on"), UserSettings.event_label("heal"), UserSettings.event_label("use_item")], 12.0)
 	if not spawner.arena.fighting and state.has_flag("chimes_solved") and boss_alive() and spawner.arena.contains(player.global_position):
 		spawner.arena.start_fight()
+
+func _fighting_boss() -> Enemy:
+	## The boss whose bar is on screen: the arena guardian or the Trial's wave leader.
+	if trial.active and is_instance_valid(trial.boss):
+		return trial.boss
+	if spawner.arena.fighting:
+		return spawner.node_for("boss_truc_tuong") as Enemy
+	return null
 
 func boss_alive() -> bool:
 	## The arena guardian, once per World Tier after the story fight.
@@ -414,12 +436,22 @@ func _marker_world() -> Variant:
 
 func _refresh_vitals() -> void:
 	if player:
-		hud.set_vitals(player.health, player.max_health(), player.stamina, player.max_stamina)
+		hud.set_vitals(player.health, player.max_health(), player.stamina, player.max_stamina())
 
 func _refresh_hud() -> void:
 	_refresh_vitals()
 	hud.set_level(state.level, state.xp, state.xp_for_next(), state.skill_points)
-	hud.set_heal_count("%s  •  Bánh ngải ×%d  •  Trà sen ×%d" % [UserSettings.event_label("heal"), state.count("banh_ngai"), state.count("tra_sen")])
+	var heals: PackedStringArray = [UserSettings.event_label("heal")]
+	for item: String in Consumables.heal_items(false):
+		heals.append("%s ×%d" % [ContentDB.item(item).get("name", item), state.count(item)])
+	hud.set_heal_count("  •  ".join(heals))
+	var quick: String = state.quick_item
+	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
+	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
+	hud.set_statuses(player.statuses.list_for_hud())
+	var boss: Enemy = _fighting_boss()
+	if boss:
+		hud.set_boss_poise(boss.poise_ratio(), boss.is_broken(), boss.is_finishable())
 	var style: String = player.style_id()
 	for slot: String in StyleBook.SLOTS:
 		var form: Dictionary = StyleBook.form(style, slot)
@@ -474,7 +506,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _ui_blocking():
 		return
-	if event.is_action_pressed("interact") and focus and player.state == "move":
+	if event.is_action_pressed("interact") and is_instance_valid(focus) and focus is Enemy:
+		get_viewport().set_input_as_handled()
+		player.start_finisher(focus as Enemy)
+	elif event.is_action_pressed("interact") and focus and player.state == "move":
 		get_viewport().set_input_as_handled()
 		# Conversations, visions and shrines lock the controls, so they wait until the fight is over.
 		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate", "trial_gate"]):
@@ -606,6 +641,8 @@ func run_action(action: String) -> void:
 			hud.show_banner("Nhận " + String(ContentDB.weapon(state.sword).get("name", state.sword)), "Công lực tăng lên %d" % roundi(state.attack_power()))
 		"xp":
 			_add_xp(int(parts[1]))
+		"shop":
+			open_shop(parts[1])
 
 func unlock_skill(skill: String) -> void:
 	state.unlock_skill(skill)
@@ -688,9 +725,59 @@ func _on_quest_completed(id: String) -> void:
 		state.max_tier = maxi(state.max_tier, 1)
 		hud.show_message("Đã mở Cảnh giới thế giới và Ải Vô Tận đầy đủ (menu tạm dừng)", 5.0)
 
-func _on_state_changed(kind: String, _key: String) -> void:
+func _on_state_changed(kind: String, key: String) -> void:
 	if kind in ["item", "coins"]:
 		quests.refresh()
+	# The first tonic picked up in play explains the quick slot (heals already have R).
+	if (kind == "item" and playing and not get_tree().paused and state.quick_item == "" and not hinted.has("quick_item")
+			and state.count(key) > 0 and Consumables.usable(key) and String(ContentDB.item(key).get("kind", "")) != "heal"):
+		hinted["quick_item"] = true
+		hud.show_hint("Nhận %s. Mở Túi đồ (%s) để đặt vào ô nhanh, rồi bấm %s để dùng ngay cả giữa trận." % [
+			ContentDB.item(key).get("name", key), UserSettings.event_label("open_inventory"), UserSettings.event_label("use_item")], 9.0)
+
+# ------------------------------------------------------------------ consumables & shops
+
+func use_item(id: String) -> String:
+	## Inventory "Dùng": applies a consumable at once behind the paused panel. Returns why it
+	## was refused ("" when used). In a fight only R and the quick slot work, so a heal still
+	## costs its moment in the open.
+	if not playing or player.state in ["dead", "disabled", "loading"]:
+		return "Không thể dùng lúc này"
+	if engaged > 0 or spawner.arena.fighting:
+		return "Đang giao chiến: dùng thuốc bằng %s hoặc ô nhanh %s" % [UserSettings.event_label("heal"), UserSettings.event_label("use_item")]
+	var refusal: String = player.item_refusal(id)
+	if refusal == "" and not player.consume_item(id):
+		refusal = "Không dùng được " + String(ContentDB.item(id).get("name", id))
+	return refusal
+
+func set_quick_item(id: String) -> void:
+	## Puts a consumable on the quick slot (C); "" empties it.
+	if id != "" and not Consumables.usable(id):
+		return
+	state.quick_item = id
+	audio.ui("ui_confirm")
+
+func open_shop(id: String) -> void:
+	## Opened by a dialogue "shop:<id>" action; closing the counter drops straight back into play.
+	if Consumables.shop(id).is_empty():
+		return
+	menus.shop_id = id
+	open_panel("shop")
+	menus.resume_on_close = true
+
+func buy_item(shop_id: String, item: String) -> String:
+	## One purchase with Đồng. Returns why it was refused ("" when bought); a refusal changes nothing.
+	var price: int = Consumables.shop_price(shop_id, item)
+	var title: String = String(ContentDB.item(item).get("name", item))
+	if price < 0:
+		return "Quầy không bán " + title
+	if not Consumables.buy(state, item, price):
+		var reason: String = "Không đủ Đồng: %s giá %d, trong túi còn %d" % [title, price, state.coins]
+		hud.show_message(reason)
+		audio.ui("ui_error")
+		return reason
+	audio.play("coins")
+	return ""
 
 # ------------------------------------------------------------------ world events
 
@@ -773,7 +860,7 @@ func _use_shrine(item: Interactable) -> void:
 	audio.play("shrine_bell", item.global_position)
 	Vfx.ring(self, item.global_position + Vector3.UP * 0.5, 4.0, Vfx.WIND, 0.8)
 	player.heal(player.max_health())
-	player.set_stamina(player.max_stamina)
+	player.set_stamina(player.max_stamina())
 	state.reset_camps()
 	_reset_enemies(false)
 	quests.notify("interact:" + item.entity_id)
@@ -831,8 +918,12 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 				audio.play("roar", enemy.global_position, 3.0)
 				hud.show_banner("Trúc Tướng nổi giận!", "Gió quanh đấu trường cuộn lên"))
 	enemy.attack_started.connect(func(attacker: Enemy, attack: String) -> void:
-		var sound: String = {"attack": "sabre_swing" if attacker.kind == "tan_binh" else "glaive_slam", "sweep": "glaive_sweep", "slam": "danger", "charge": "boar_grunt"}.get(attack, "sabre_swing")
+		# Wind-up cue from the attack's data (data/attacks.json "start_sfx").
+		var sound: String = String(Combat.attack(attacker.owner_key, attack).get("start_sfx", "sabre_swing"))
 		audio.play(sound, attacker.global_position, 0.0))
+	enemy.status_damage.connect(_on_status_damage)
+	enemy.reaction_hit.connect(_on_reaction_hit)
+	enemy.poise_broken.connect(_on_poise_broken)
 
 func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	var id: String = String(data["id"])
@@ -848,12 +939,21 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 		spawn_reward_chest("elite", enemy.global_position)
 	audio.play("enemy_down", enemy.global_position)
 	_add_xp(int(enemy.data.get("xp", 10)))
+	# heal_on_kill (the Huyết Ngọc set) works on world kills too; Trial kills heal in TrialDirector.
+	var heal: float = state.stat("heal_on_kill")
+	if heal > 0.0 and not player.is_dead():
+		player.heal(player.max_health() * heal)
 	var drops: Array = []
+	var talisman_chance: float = 0.0
 	for drop: Array in enemy.data.get("drops", []):
-		if randf() <= float(drop[3]):
+		if drop[0] == Talismans.DROP:
+			talisman_chance = float(drop[3])
+		elif randf() <= float(drop[3]):
 			drops.append([drop[0], randi_range(int(drop[1]), int(drop[2]))])
 	if not drops.is_empty():
 		give_items(drops)
+	if talisman_chance > 0.0:
+		_drop_talisman(enemy, talisman_chance)
 	quests.notify("kill:" + enemy.kind)
 	quests.notify("kill:" + id)
 	var camp: String = String(data.get("camp", ""))
@@ -949,7 +1049,7 @@ func _on_footstep(surface: String) -> void:
 	var position: Vector3 = player.global_position
 	match surface:
 		"swing":
-			audio.play("swing_heavy" if player.current_action() in ["heavy", "attack_3"] else "swing", position, -2.0)
+			audio.play("swing_heavy" if player.current_action() in ["heavy", "attack_3", "finisher"] else "swing", position, -2.0)
 		"dodge":
 			audio.play("dodge", position, -2.0)
 		"jump":
@@ -972,6 +1072,55 @@ func _on_attack_landed(target: Node, amount: float) -> void:
 	audio.play("boar_hit" if target is Boar else ("hit_heavy" if amount > 30.0 else "hit_flesh"), position)
 	if user_settings.damage_numbers:
 		Vfx.number(self, position, amount, Color(1.0, 0.95, 0.75) if amount < 30.0 else Color(1.0, 0.75, 0.4))
+
+func _on_player_statuses() -> void:
+	## The first time each debuff lands, explain what it does and how to shake it off
+	## (one at a time: the rest wait for the next change).
+	for id: String in player.statuses.active:
+		var hint: String = String(ContentDB.status(id).get("hint", ""))
+		if hint != "" and not hinted.has("status:" + id):
+			hinted["status:" + id] = true
+			hud.show_hint(hint.format({"dodge": UserSettings.event_label("sprint")}), 8.0)
+			return
+
+func _on_poise_broken(enemy: Enemy) -> void:
+	## A clang as the guard gives way; the first break explains the finisher.
+	audio.play("parry_metal", enemy.global_position + Vector3.UP, -3.0)
+	if not hinted.has("finisher"):
+		hinted["finisher"] = true
+		hud.show_hint("Phá thế! Kẻ địch loạng choạng một lúc và chịu thêm sát thương.\nĐứng gần rồi bấm %s để kết liễu — khi ra đòn, Lâm An không thể bị đánh trúng." % UserSettings.event_label("interact"), 9.0)
+
+func _on_finisher_landed(target: Node, _amount: float, _killed: bool) -> void:
+	audio.play(String(Combat.attack("player", "finisher").get("impact_sfx", "ground_slam")), (target as Node3D).global_position, 0.0)
+	_mission("finisher")
+
+func _on_focus_started(kind: String) -> void:
+	## Tâm Nhãn: a cool veil and its name on the HUD, a clear bell note; the first one explains itself.
+	var rule: Dictionary = Combat.attack("player", "focus")
+	hud.set_focus(true, String(rule.get("name", "Tâm Nhãn")) + "!", "Né hoàn hảo" if kind == "dodge" else "Phản đòn hoàn hảo", Color(String(rule.get("color", "8fd0f5"))))
+	audio.play(String(rule.get("sfx", "chime_3")), null, -2.0, 0.02)
+	if not hinted.has("focus"):
+		hinted["focus"] = true
+		hud.show_hint("Tâm Nhãn! Né hay đỡ đúng khoảnh khắc đòn địch vừa chạm tới, mọi kẻ địch sẽ chậm hẳn lại trong chốc lát.\nĐòn kế tiếp của Lâm An thành đòn phản (×1,5); né hoàn hảo còn hoàn lại thể lực. Mỗi lần mở xong cần nghỉ vài giây.", 9.0)
+
+func _on_status_damage(enemy: Enemy, amount: float, status: String) -> void:
+	## Damage over time floats up quietly in the colour of the status that dealt it.
+	if user_settings.damage_numbers and amount >= 0.5:
+		Vfx.number(self, enemy.global_position + Vector3.UP, amount, Color(String(ContentDB.status(status).get("color", "ffd0a0"))))
+
+func _on_reaction_hit(enemy: Enemy, reaction: String, amount: float, splash: bool) -> void:
+	## The blow that sets a reaction off sounds it (the hit number comes from attack_landed) and
+	## explains it the first time; its splash floats numbers in the reaction colour.
+	var rule: Dictionary = Reactions.find(reaction)
+	if splash:
+		if user_settings.damage_numbers and amount >= 0.5:
+			Vfx.number(self, enemy.global_position + Vector3.UP, amount, Color(String(rule.get("color", "ffd0a0"))))
+		return
+	audio.play(String(rule.get("sfx", "hit_heavy")), enemy.global_position)
+	var hint: String = String(rule.get("hint", ""))
+	if hint != "" and not hinted.has("reaction:" + reaction):
+		hinted["reaction:" + reaction] = true
+		hud.show_hint(hint, 8.0)
 
 func _epilogue() -> void:
 	audio.set_music("title", 3.0)
@@ -1096,9 +1245,10 @@ func load_game() -> bool:
 # ------------------------------------------------------------------ retention: trial, tiers, gacha, armory, missions
 
 func refresh_stats() -> void:
-	## Bonuses from the equipped armory weapon and this run's Trial blessings (neutral otherwise).
+	## Bonuses from the equipped armory weapon, the worn talismans and this run's Trial
+	## blessings (neutral otherwise).
 	var item: Dictionary = profile.weapon(state.equipped_uid) if state.equipped_uid >= 0 else {}
-	state.stats = PlayerStats.compute(item, trial.buff_stats() if trial and trial.active else {})
+	state.stats = PlayerStats.compute(item, trial.buff_stats() if trial and trial.active else {}, profile.equipped_talismans())
 
 func _equip_visuals() -> void:
 	## Re-attaches the equipped sword with its skins and stats. An armory weapon from another
@@ -1139,6 +1289,74 @@ func equip_skin(target: String, id: String) -> void:
 	if player:
 		_apply_skins()
 	save_profile()
+
+# ------------------------------------------------------------------ talismans (Ngọc bội)
+
+func can_change_talismans() -> bool:
+	## Like swords: only while standing free in play. The title screen may change them freely.
+	return not playing or (player != null and player.state == "move")
+
+func equip_talisman(uid: int) -> bool:
+	if not can_change_talismans() or not profile.equip_talisman(uid):
+		return false
+	_talismans_changed()
+	audio.ui("ui_confirm")
+	return true
+
+func unequip_talisman(slot: int) -> bool:
+	if not can_change_talismans() or not profile.unequip_talisman(slot):
+		return false
+	_talismans_changed()
+	audio.ui("ui_close")
+	return true
+
+func salvage_talisman(uid: int) -> String:
+	## Turns an unworn talisman into Đồng for this save. Returns why it was refused ("" when done).
+	if not playing:
+		return "Vào hành trình để phân giải Ngọc bội lấy Đồng"
+	if profile.is_worn(uid):
+		return "Tháo Ngọc bội ra trước khi phân giải"
+	var coins: int = Talismans.salvage(profile, uid)
+	if coins <= 0:
+		return "Không phân giải được Ngọc bội này"
+	state.add_item("coins", coins)
+	save_profile()
+	audio.play("coins")
+	return ""
+
+func _talismans_changed() -> void:
+	if initialized:
+		refresh_stats()
+	save_profile()
+
+func _drop_talisman(enemy: Enemy, chance: float) -> void:
+	## An enemy's "talisman" drop entry: bosses and elites roll better rarities (data/talismans.json).
+	var source: String = "boss" if enemy.boss else ("elite" if enemy.data.has("elite") else "enemy")
+	var rolled: Dictionary = Talismans.drop(profile, source, chance)
+	if rolled.is_empty():
+		return
+	_receive_talisman(Talismans.grant(profile, rolled), enemy.global_position)
+	save_profile()
+
+func _receive_talisman(outcome: Dictionary, at: Vector3, quiet: bool = false) -> void:
+	## Pays the Đồng of a talisman a full pouch salvaged and announces the drop in its rarity colour.
+	var coins: int = int(outcome.get("coins", 0))
+	if coins > 0:
+		state.add_item("coins", coins)
+	if quiet:
+		return
+	var item: Dictionary = outcome["item"]
+	var color: Color = PlayerStats.rarity_color(String(item.get("rarity", "r")))
+	if outcome.get("kept", false):
+		hud.show_message("Nhận Ngọc bội: %s" % Talismans.label(item), 4.0, color)
+		Vfx.pillar(self, at, color, 6.0, 0.6, 0.5)
+		audio.play("glint", at)
+	var salvaged: Dictionary = outcome.get("salvaged", {})
+	if not salvaged.is_empty():
+		hud.show_message("Túi Ngọc bội đã đầy (%d): phân giải %s → +%d Đồng" % [Talismans.capacity(), Talismans.label(salvaged), coins], 4.5,
+			PlayerStats.rarity_color(String(salvaged.get("rarity", "r"))))
+	if outcome.get("kept", false) and profile.talismans.size() == 1:
+		hud.show_hint("Nhận Ngọc bội đầu tiên. Vào Kho kiếm & trang phục (menu tạm dừng), thẻ Ngọc bội, để đeo vào ô Thiên, Địa, Nhân. Đeo 2 hoặc 3 món cùng bộ sẽ mở hiệu ứng bộ.", 10.0)
 
 func tier_cap() -> int:
 	## Highest World Tier this save may choose; none before the story slice is complete.
@@ -1201,6 +1419,7 @@ func choose_trial_buff(buff: Dictionary) -> void:
 	trial.choose(buff)
 
 func _on_trial_finished(summary: Dictionary) -> void:
+	player.end_focus()  # leaving the pocket arena: no foe should stay slowed behind her
 	profile.add_currency(Gacha.currency(), int(summary.get("ngoc", 0)))
 	state.add_item("coins", int(summary.get("coins", 0)))
 	_add_xp(int(summary.get("xp", 0)))
@@ -1216,7 +1435,12 @@ func _on_trial_finished(summary: Dictionary) -> void:
 		player.teleport(point)
 		player.heal(player.max_health())
 	hud.fade_to(0.0, 0.8)
-	hud.show_banner("Rời Ải Vô Tận", "Vượt %d đợt  •  +%d Ngọc Gió  •  +%d Đồng" % [int(summary["wave"]), int(summary.get("ngoc", 0)), int(summary.get("coins", 0))], 5.0)
+	var line: String = "Vượt %d đợt  •  +%d Ngọc Gió  •  +%d Đồng" % [int(summary["wave"]), int(summary.get("ngoc", 0)), int(summary.get("coins", 0))]
+	# Unopened Trial chests were opened quietly; name any Ngọc bội they held.
+	var found: int = (summary.get("chests", []) as Array).filter(func(opened: Dictionary) -> bool: return opened.get("talisman", {}).get("kept", false)).size()
+	if found > 0:
+		line += "  •  +%d Ngọc bội" % found
+	hud.show_banner("Rời Ải Vô Tận", line, 5.0)
 	save_game(true)
 
 func spawn_reward_chest(table: String, at: Vector3, parent: Node = null) -> Interactable:
@@ -1242,6 +1466,20 @@ func open_reward_chest(chest: Interactable, silent: bool = false) -> Dictionary:
 		chest.wisps.emitting = false
 	var rarity: String = String(chest.entity.get("rarity", "r"))
 	var result: Dictionary = Gacha.open_chest(profile, String(chest.entity.get("table", "trial")), rarity)
+	# Consumables ride along in the save's bag (the reward itself is account-wide).
+	var supplies: Array = Gacha.chest_supplies(String(chest.entity.get("table", "trial")), rng)
+	if silent:
+		for entry: Array in supplies:
+			state.add_item(String(entry[0]), int(entry[1]))
+	elif not supplies.is_empty():
+		give_items(supplies)
+	if not result.is_empty():
+		result["supplies"] = supplies
+	var talisman: Dictionary = Talismans.from_chest(profile, String(chest.entity.get("table", "trial")), rarity)
+	if not talisman.is_empty():
+		var outcome: Dictionary = Talismans.grant(profile, talisman)
+		_receive_talisman(outcome, chest.global_position, silent)
+		result["talisman"] = outcome
 	_mission("chest")
 	save_profile()
 	if not silent and not result.is_empty():

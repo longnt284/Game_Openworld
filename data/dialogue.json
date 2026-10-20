@@ -101,5 +101,25 @@
 	"villager_1": {"lines": [["Dân làng", "Sáng nay tôi ra chợ mà quên mất định mua gì. Chắc tại tiếng chuông…"]]},
 	"villager_2": {"lines": [["Dân làng", "Cậu là lữ khách à? Đừng ở lại qua đêm, nghe chuông nhiều quên cả đường về."]]},
 	"villager_3": {"lines": [["Người bán trà", "Trà sen đây! Uống một chén cho tỉnh, nhớ được thêm chút nào hay chút ấy."]]},
-	"villager_after": {"lines": [["Dân làng", "Chiều nay chuông không đổ! Tôi vừa nhớ ra tên con mèo nhà mình."]]}
+	"villager_after": {"lines": [["Dân làng", "Chiều nay chuông không đổ! Tôi vừa nhớ ra tên con mèo nhà mình."]]},
+	"lv_greet": {
+		"lines": [
+			["Ông Lang Vân", "Lữ khách đấy à? Lão bốc thuốc ở làng này bốn mươi năm rồi. Quên gì thì quên, tên cây thuốc lão chưa quên cây nào."],
+			["Ông Lang Vân", "Đường lên núi dạo này dữ lắm. Cần gì cứ hỏi lão."]
+		],
+		"choices": [["Xem quầy thuốc", "lv_shop"], ["Hỏi về các vị thuốc", "lv_lore"], ["Để sau", ""]]
+	},
+	"lv_lore": {
+		"lines": [
+			["Ông Lang Vân", "Kim Cang Đan làm gân cốt cứng như đá. Bạo Huyết Đan thì máu nóng lên, đường kiếm nặng hơn. Sắp đánh hãy uống."],
+			["Ông Lang Vân", "Có kẻ tẩm độc vào lưỡi đao. Trúng độc hay chảy máu, nhai một nắm Giải Độc Thảo là tan."],
+			["Ông Lang Vân", "Lên chỗ gió buốt thì ngậm Hỏa Ôn Đan. Còn lòng dạ rối bời, một chén Tịnh Tâm Trà là tà khí khó bám."]
+		],
+		"choices": [["Xem quầy thuốc", "lv_shop"], ["Để sau", ""]]
+	},
+	"lv_after": {
+		"lines": [["Ông Lang Vân", "Chuông thôi đổ, đêm qua lão ngủ được một giấc trọn. Nhưng thuốc thì vẫn phải sẵn, phải không cháu?"]],
+		"choices": [["Xem quầy thuốc", "lv_shop"], ["Hỏi về các vị thuốc", "lv_lore"], ["Để sau", ""]]
+	},
+	"lv_shop": {"lines": [], "do": ["shop:quay_thuoc"]}
 }

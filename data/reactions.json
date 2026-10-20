@@ -1,0 +1,22 @@
+{
+	"reactions": [
+		{"id": "shatter", "name": "Vỡ Băng", "needs": ["freeze"], "trigger": "heavy", "mult": 1.5, "poise_mult": 3.0, "break": true, "consume": ["freeze"],
+			"color": "dff8ff", "vfx": "shards", "sfx": "frost_shatter",
+			"hint": "Vỡ Băng: trọng kích vào kẻ đang đóng băng làm vỡ tan lớp băng, gây thêm sát thương và phá thế ngay."},
+		{"id": "electrocharge", "name": "Điện Giật", "needs": ["soak"], "element": "thunder", "mult": 1.4, "radius": 5.0, "spread_needs": ["soak"], "splash": 0.25,
+			"splash_status": {"status": "shock", "stacks": 1}, "color": "ffe066", "vfx": "bolt", "sfx": "thunder_chain",
+			"hint": "Điện Giật: đòn Lôi vào kẻ đang Ướt mạnh thêm, và tê liệt lan sang mọi kẻ ướt đứng gần."},
+		{"id": "firestorm", "name": "Hỏa Lốc", "needs": ["gale"], "element": "flame", "mult": 1.2, "radius": 4.0, "splash": 0.6, "knockback": 2.5,
+			"apply": {"status": "burn", "stacks": 2}, "splash_status": {"status": "burn", "stacks": 2}, "consume": ["gale"], "color": "ff7a3a", "vfx": "flames", "sfx": "flame_burst",
+			"hint": "Hỏa Lốc: đòn Hỏa vào kẻ đang bị Gió cuốn bùng thành lốc lửa, thiêu cả những kẻ đứng quanh."},
+		{"id": "vaporize", "name": "Bốc Hơi", "needs": ["chill", "freeze"], "element": "flame", "mult": 1.8, "consume": ["chill", "freeze"],
+			"color": "f4ece0", "vfx": "steam", "sfx": "flame_burst",
+			"hint": "Bốc Hơi: đòn Hỏa vào kẻ đang Lạnh cóng hay Đóng băng nổ hơi nóng, sát thương gần gấp đôi nhưng tan hết băng giá."},
+		{"id": "deep_freeze", "name": "Đông Kết", "needs": ["soak"], "element": "frost", "mult": 1.0, "apply": {"status": "freeze", "stacks": 1},
+			"fallback": {"status": "chill", "stacks": 2}, "consume": ["soak"], "color": "bfefff", "vfx": "shards", "sfx": "frost_shatter",
+			"hint": "Đông Kết: đòn Băng vào kẻ đang Ướt đóng băng ngay lập tức; kẻ quá mạnh để đóng băng thì lạnh cóng thêm hai lớp."},
+		{"id": "storm_chain", "name": "Lôi Phong", "needs": ["gale"], "element": "thunder", "mult": 1.15, "radius": 6.0, "chain": 2, "splash": 0.6,
+			"splash_status": {"status": "shock", "stacks": 1}, "consume": ["gale"], "color": "e8f58a", "vfx": "bolt", "sfx": "thunder_chain",
+			"hint": "Lôi Phong: đòn Lôi vào kẻ đang bị Gió cuốn phóng sét nảy sang hai kẻ đứng gần."}
+	]
+}

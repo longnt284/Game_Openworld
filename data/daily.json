@@ -6,6 +6,7 @@
 		{"id": "ult", "name": "Tung tuyệt kỹ %d lần", "event": "ult", "goal": [2, 4], "reward": 40},
 		{"id": "trial_wave", "name": "Vượt %d đợt Ải Vô Tận", "event": "trial_wave", "goal": [3, 6], "reward": 50},
 		{"id": "parry", "name": "Phản đòn %d lần", "event": "parry", "goal": [4, 8], "reward": 40},
+		{"id": "finisher", "name": "Kết liễu %d lần", "event": "finisher", "goal": [3, 6], "reward": 40},
 		{"id": "status", "name": "Gây trạng thái nguyên tố %d lần", "event": "status", "goal": [10, 20], "reward": 40},
 		{"id": "skill", "name": "Dùng kiếm thức %d lần", "event": "skill", "goal": [10, 20], "reward": 30},
 		{"id": "chest", "name": "Mở %d rương", "event": "chest", "goal": [1, 2], "reward": 40}
