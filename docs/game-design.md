@@ -37,13 +37,18 @@ Mỗi nhiệm vụ có nguyên nhân, kết quả, phần thưởng và nhiệm 
 |---|---|
 | Chuỗi 3 đòn | Chuột trái; khung nối đòn và thời điểm gây sát thương lấy từ `data/anim_timings.json` (dùng chung với Blender) |
 | Trọng kích | Giữ chuột trái 0,4 s; tốn thể lực, phá thế đỡ |
-| Né | Shift; có khung bất tử 0,03–0,34 s |
-| Đỡ / phản đòn | Chuột phải; bấm đúng lúc đòn tới (0,2 s đầu) để phản, làm địch choáng |
+| Né | Shift; có khung bất tử 0,03–0,34 s; né trong 0,15 s đầu khi đòn địch tới là **né hoàn hảo** (Tâm Nhãn) |
+| Đỡ / phản đòn | Chuột phải; bấm đúng lúc đòn tới (0,2 s đầu) để phản, làm địch choáng; 0,1 s đầu là **phản hoàn hảo** (Tâm Nhãn) |
+| Kết liễu | F khi đứng trong 3 m quanh kẻ địch đã phá thế; ưu tiên hơn mọi tương tác khác |
 | Kiếm thức | E và Q: hai thức của hệ kiếm đang cầm (có hồi chiêu); X: tuyệt kỹ, tốn đầy thanh nộ khí |
 | Khóa mục tiêu | Chuột giữa / T |
 | Khinh công | Space trên không để bật nhảy; giữ Space khi rơi để lướt |
 
 Hệ thống có thể lực, hitbox/hurtbox theo cung quét, báo trước đòn đánh (vòng đỏ dưới đất), hit-stop, rung camera (giảm được trong cài đặt), số sát thương, vệt kiếm màu theo hệ.
+
+**Phá thế và kết liễu:** mỗi đòn trừ thế (`poise`) của địch; hết thế thì địch **phá thế** — loạng choạng ít nhất 2,2 s (boss theo `break_stagger` riêng), nhận ×1,35 sát thương như mọi lần choáng. Thanh thế nhỏ trên đầu địch thường chỉ hiện khi đang khóa mục tiêu hoặc vừa trúng đòn (3 s); boss có thanh thế mảnh dưới thanh máu. Khi thanh chuyển vàng nhấp nháy, bấm F trong 3 m để **kết liễu** (`finisher` trong `data/attacks.json`): Lâm An lướt tới, bất tử tới hết đòn, gây tối thiểu max(công lực ×6, 45% máu tối đa) trước hệ số (đủ hạ gần như mọi kẻ thường), chậm thời gian một nhịp, +20 nộ khí. Boss chỉ kết liễu được trong 1,5 s đầu của lần phá thế và mất tối đa 12% máu tối đa mỗi lần. Kết liễu là trọng kích nên kích hoạt Vỡ Băng; có nhiệm vụ ngày "Kết liễu N lần".
+
+**Tâm Nhãn:** né hoặc phản hoàn hảo một đòn địch (đòn chém, đạn, vùng, vòng chấn động) mở Tâm Nhãn: mọi kẻ địch — hoạt ảnh, đòn đánh, bước chạy, lao húc, đạn và vòng cảnh báo — chậm còn ×0,3 trong 1,5 s, Lâm An giữ nguyên tốc độ. Đòn kế tiếp thành đòn phản (×1,5); né hoàn hảo hoàn lại 20 thể lực. Màn hình phủ một lớp lạnh ở rìa, hiện chữ "Tâm Nhãn!" và vang một tiếng chuông. Hồi 4 s tính từ lúc mở (đang hồi thì né/phản hoàn hảo chỉ như né/phản thường); thời gian tính theo nhịp của Lâm An nên tạm dừng là dừng; chết, hồi sinh, tải game, về màn hình chính hay rời Ải đều trả thời gian về bình thường. Con số nằm ở `focus` trong `data/attacks.json`.
 
 ### Ngũ hành kiếm quyết
 

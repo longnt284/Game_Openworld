@@ -36,7 +36,7 @@ func add_strike(point: Vector3, delay: float, radius: float) -> void:
 	events.append({"time": delay, "position": point, "radius": radius})
 	var world: WorldManager = caster.get("world") as WorldManager
 	var ground: Vector3 = Vector3(point.x, world.height_at(point.x, point.z) if world else point.y, point.z)
-	Vfx.telegraph(get_parent(), ground, radius, delay, color)
+	Vfx.telegraph(get_parent(), ground, radius, delay, color, caster is Enemy)
 	if String(data.get("vfx", "")) == "ice_sword":
 		Vfx.ice_sword(get_parent(), ground, delay)
 
@@ -45,13 +45,15 @@ func start_field(center: Vector3, radius: float, duration: float) -> void:
 	field_radius = radius
 	field_left = duration
 	tick_left = 0.0
-	Vfx.field(get_parent(), center, radius, color, duration)
+	Vfx.field(get_parent(), center, radius, color, duration, caster is Enemy)
 
 func _physics_process(delta: float) -> void:
 	# A slain enemy's area stops hurting the winner, like the guardian's shockwave.
 	if not is_instance_valid(caster) or (caster is Enemy and (caster as Enemy).is_dead()):
 		queue_free()
 		return
+	if caster is Enemy:
+		delta *= Enemy.time_dilation  # an enemy's area keeps its caster's (Tâm Nhãn) clock
 	clock += delta
 	for event: Dictionary in events.duplicate():
 		if clock >= float(event["time"]):

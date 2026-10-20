@@ -38,7 +38,8 @@ func _begin_attack(name: String) -> void:
 	if name == "slam" and target:
 		var landing: Vector3 = global_position + facing * 1.6
 		var hit_start: float = float(attack_data.get("hit_start", 1.3)) / maxf(speed_scale, 0.1)
-		slam_marker = Vfx.telegraph(get_parent(), Vector3(landing.x, world.height_at(landing.x, landing.z), landing.z), float(attack_data["hit_radius"]), hit_start)
+		# On the enemy clock: under Tâm Nhãn the warning fills as slowly as the leap.
+		slam_marker = Vfx.telegraph(get_parent(), Vector3(landing.x, world.height_at(landing.x, landing.z), landing.z), float(attack_data["hit_radius"]), hit_start, Vfx.DANGER, true)
 
 func _physics_attack(delta: float) -> void:
 	super._physics_attack(delta)
@@ -61,12 +62,13 @@ func _physics_attack(delta: float) -> void:
 		_throw_blades()
 
 func _process(delta: float) -> void:
+	super._process(delta)
 	if shockwave_radius < 0.0:
 		return
 	if state == "dead":
 		shockwave_radius = -1.0  # a slain guardian's ring stops hurting the winner
 		return
-	shockwave_radius += 9.0 * delta
+	shockwave_radius += 9.0 * delta * time_dilation  # the ring spreads on the enemy clock
 	if int(shockwave_radius * 4.0) % 3 == 0:
 		Vfx.ring(get_parent(), shockwave_center + Vector3.UP * 0.15, shockwave_radius, Color(1.0, 0.55, 0.35, 0.8), 0.12, 0.06)
 	if target and not shockwave_hit:
@@ -103,6 +105,8 @@ func _enter_phase_two() -> void:
 	base_speed_scale = 1.18
 	poise = max_poise
 	stagger_time = 0.0
+	broken = false
+	finish_time = 0.0
 	_release_token()
 	invulnerable = true
 	state = "roar"
@@ -128,8 +132,7 @@ func on_parried(_player: Node) -> void:
 		return
 	poise -= 55.0
 	if poise <= 0.0:
-		poise = max_poise
-		_stagger(2.4)
+		_break(2.4)  # a parry that empties its poise breaks it like a blow would
 	else:
 		state = "hit"
 		state_time = 0.0

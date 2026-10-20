@@ -177,6 +177,9 @@ func _start_world() -> void:
 	player.notice.connect(func(text: String) -> void: hud.show_message(text, 2.0))
 	player.skill_used.connect(_on_skill_used)
 	player.status_applied.connect(func(_status: String) -> void: _mission("status"))
+	player.finisher_landed.connect(_on_finisher_landed)
+	player.focus_started.connect(_on_focus_started)
+	player.focus_ended.connect(func() -> void: hud.set_focus(false))
 	player.statuses_changed.connect(_on_player_statuses)
 	_equip_visuals()
 	title_camera = Camera3D.new()
@@ -261,6 +264,7 @@ func continue_game() -> void:
 
 func return_to_title() -> void:
 	death_serial += 1
+	player.end_focus()
 	_abort_trial()
 	set_paused(false)
 	show_title()
@@ -354,7 +358,16 @@ func _update_region() -> void:
 
 func _update_focus() -> void:
 	focus = null
-	if player.state != "move" or not player.is_on_floor() or _ui_blocking():
+	if _ui_blocking():
+		hud.show_prompt("")
+		return
+	# A broken foe within reach outranks every other use of F: the finisher.
+	var broken: Enemy = player.finisher_target() if player.can_finish() else null
+	if broken:
+		focus = broken
+		hud.show_prompt("%s  •  Kết liễu" % UserSettings.event_label("interact"), UiTheme.GOLD)
+		return
+	if player.state != "move" or not player.is_on_floor():
 		hud.show_prompt("")
 		return
 	var best_score: float = INF
@@ -397,6 +410,14 @@ func _update_combat_state() -> void:
 	if not spawner.arena.fighting and state.has_flag("chimes_solved") and boss_alive() and spawner.arena.contains(player.global_position):
 		spawner.arena.start_fight()
 
+func _fighting_boss() -> Enemy:
+	## The boss whose bar is on screen: the arena guardian or the Trial's wave leader.
+	if trial.active and is_instance_valid(trial.boss):
+		return trial.boss
+	if spawner.arena.fighting:
+		return spawner.node_for("boss_truc_tuong") as Enemy
+	return null
+
 func boss_alive() -> bool:
 	## The arena guardian, once per World Tier after the story fight.
 	if state.world_tier > 0:
@@ -428,6 +449,9 @@ func _refresh_hud() -> void:
 	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
 	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
 	hud.set_statuses(player.statuses.list_for_hud())
+	var boss: Enemy = _fighting_boss()
+	if boss:
+		hud.set_boss_poise(boss.poise_ratio(), boss.is_broken(), boss.is_finishable())
 	var style: String = player.style_id()
 	for slot: String in StyleBook.SLOTS:
 		var form: Dictionary = StyleBook.form(style, slot)
@@ -482,7 +506,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _ui_blocking():
 		return
-	if event.is_action_pressed("interact") and focus and player.state == "move":
+	if event.is_action_pressed("interact") and is_instance_valid(focus) and focus is Enemy:
+		get_viewport().set_input_as_handled()
+		player.start_finisher(focus as Enemy)
+	elif event.is_action_pressed("interact") and focus and player.state == "move":
 		get_viewport().set_input_as_handled()
 		# Conversations, visions and shrines lock the controls, so they wait until the fight is over.
 		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate", "trial_gate"]):
@@ -896,6 +923,7 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 		audio.play(sound, attacker.global_position, 0.0))
 	enemy.status_damage.connect(_on_status_damage)
 	enemy.reaction_hit.connect(_on_reaction_hit)
+	enemy.poise_broken.connect(_on_poise_broken)
 
 func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	var id: String = String(data["id"])
@@ -1021,7 +1049,7 @@ func _on_footstep(surface: String) -> void:
 	var position: Vector3 = player.global_position
 	match surface:
 		"swing":
-			audio.play("swing_heavy" if player.current_action() in ["heavy", "attack_3"] else "swing", position, -2.0)
+			audio.play("swing_heavy" if player.current_action() in ["heavy", "attack_3", "finisher"] else "swing", position, -2.0)
 		"dodge":
 			audio.play("dodge", position, -2.0)
 		"jump":
@@ -1054,6 +1082,26 @@ func _on_player_statuses() -> void:
 			hinted["status:" + id] = true
 			hud.show_hint(hint.format({"dodge": UserSettings.event_label("sprint")}), 8.0)
 			return
+
+func _on_poise_broken(enemy: Enemy) -> void:
+	## A clang as the guard gives way; the first break explains the finisher.
+	audio.play("parry_metal", enemy.global_position + Vector3.UP, -3.0)
+	if not hinted.has("finisher"):
+		hinted["finisher"] = true
+		hud.show_hint("Phá thế! Kẻ địch loạng choạng một lúc và chịu thêm sát thương.\nĐứng gần rồi bấm %s để kết liễu — khi ra đòn, Lâm An không thể bị đánh trúng." % UserSettings.event_label("interact"), 9.0)
+
+func _on_finisher_landed(target: Node, _amount: float, _killed: bool) -> void:
+	audio.play(String(Combat.attack("player", "finisher").get("impact_sfx", "ground_slam")), (target as Node3D).global_position, 0.0)
+	_mission("finisher")
+
+func _on_focus_started(kind: String) -> void:
+	## Tâm Nhãn: a cool veil and its name on the HUD, a clear bell note; the first one explains itself.
+	var rule: Dictionary = Combat.attack("player", "focus")
+	hud.set_focus(true, String(rule.get("name", "Tâm Nhãn")) + "!", "Né hoàn hảo" if kind == "dodge" else "Phản đòn hoàn hảo", Color(String(rule.get("color", "8fd0f5"))))
+	audio.play(String(rule.get("sfx", "chime_3")), null, -2.0, 0.02)
+	if not hinted.has("focus"):
+		hinted["focus"] = true
+		hud.show_hint("Tâm Nhãn! Né hay đỡ đúng khoảnh khắc đòn địch vừa chạm tới, mọi kẻ địch sẽ chậm hẳn lại trong chốc lát.\nĐòn kế tiếp của Lâm An thành đòn phản (×1,5); né hoàn hảo còn hoàn lại thể lực. Mỗi lần mở xong cần nghỉ vài giây.", 9.0)
 
 func _on_status_damage(enemy: Enemy, amount: float, status: String) -> void:
 	## Damage over time floats up quietly in the colour of the status that dealt it.
@@ -1371,6 +1419,7 @@ func choose_trial_buff(buff: Dictionary) -> void:
 	trial.choose(buff)
 
 func _on_trial_finished(summary: Dictionary) -> void:
+	player.end_focus()  # leaving the pocket arena: no foe should stay slowed behind her
 	profile.add_currency(Gacha.currency(), int(summary.get("ngoc", 0)))
 	state.add_item("coins", int(summary.get("coins", 0)))
 	_add_xp(int(summary.get("xp", 0)))

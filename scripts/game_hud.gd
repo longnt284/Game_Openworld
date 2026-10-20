@@ -1,12 +1,16 @@
 class_name GameHUD
 extends CanvasLayer
 ## In-game HUD: vitals with buff/debuff icons, skills, quest tracker with world marker,
-## interaction prompt, toasts/banners, boss bar, dialogue box, memory visions, fade/death
-## screen and the optional technical overlay (F3).
+## interaction prompt, toasts/banners, boss bar with its poise gauge, the Tâm Nhãn veil,
+## dialogue box, memory visions, fade/death screen and the optional technical overlay (F3).
 
 signal dialogue_advanced
 signal choice_selected(index: int)
 signal vision_closed
+
+const FOCUS_SHADER: Shader = preload("res://shaders/focus_veil.gdshader")
+## Seconds the Tâm Nhãn name stays up (it fades over the last 0.4 s).
+const FOCUS_TITLE_TIME: float = 1.3
 
 var root: Control
 var status: Label
@@ -30,6 +34,13 @@ var skill_boxes: Dictionary = {}
 var boss_box: VBoxContainer
 var boss_name: Label
 var boss_bar: ProgressBar
+## Thin poise gauge under the boss bar; pulses gold while the boss can be finished.
+var boss_poise: ProgressBar
+var boss_poise_fill: StyleBoxFlat
+var boss_poise_back: StyleBoxFlat
+var boss_finishable: bool = false
+var pulse_time: float = 0.0
+var prompt_tint: Color = UiTheme.CREAM
 var marker: Label
 var reticle: Label
 var dialogue_panel: PanelContainer
@@ -45,6 +56,15 @@ var fade_text: Label
 var fade_sub: Label
 var hint_panel: PanelContainer
 var hint_label: Label
+## Tâm Nhãn: a full-screen cool veil (its own ColorRect under every other HUD element, apart
+## from `fade`) easing toward focus_active, with the name and how it was earned above the centre.
+var focus_veil: ColorRect
+var focus_material: ShaderMaterial
+var focus_title: Label
+var focus_sub: Label
+var focus_active: bool = false
+var focus_level: float = 0.0
+var focus_title_left: float = 0.0
 var toast_queue: Array[String] = []
 ## Colour of a queued toast by its text (a talisman drop shows in its rarity colour); cream otherwise.
 var toast_tints: Dictionary = {}
@@ -62,6 +82,7 @@ func _ready() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	_build_focus()
 	_build_tracker()
 	_build_vitals()
 	_build_skills()
@@ -82,6 +103,25 @@ func _anchored(control: Control, preset: int, top_left: Vector2, bottom_right: V
 	control.offset_right = bottom_right.x
 	control.offset_bottom = bottom_right.y
 	return control
+
+func _build_focus() -> void:
+	focus_veil = ColorRect.new()
+	focus_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	focus_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	focus_material = ShaderMaterial.new()
+	focus_material.shader = FOCUS_SHADER
+	focus_veil.material = focus_material
+	focus_veil.visible = false
+	root.add_child(focus_veil)
+	focus_title = _anchored(UiTheme.title("", 34, UiTheme.CREAM), Control.PRESET_CENTER, Vector2(-300, -240), Vector2(300, -192))
+	focus_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	focus_sub = _anchored(UiTheme.label("", 16, UiTheme.CREAM, true), Control.PRESET_CENTER, Vector2(-300, -192), Vector2(300, -166))
+	focus_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for label: Label in [focus_title, focus_sub]:
+		# An ink outline keeps the pale name readable against the sky behind it.
+		label.add_theme_color_override("font_outline_color", Color(UiTheme.INK, 0.8))
+		label.add_theme_constant_override("outline_size", 6 if label == focus_title else 4)
+		label.visible = false
 
 func _build_tracker() -> void:
 	var box: VBoxContainer = VBoxContainer.new()
@@ -221,6 +261,16 @@ func _build_boss() -> void:
 	boss_box.add_child(boss_name)
 	boss_bar = UiTheme.bar(Color("c8402e"), Vector2(600, 12))
 	boss_box.add_child(boss_bar)
+	boss_poise = UiTheme.bar(UiTheme.CREAM, Vector2(600, 5))
+	boss_poise.max_value = 1.0
+	boss_poise.step = 0.0
+	boss_poise.value = 1.0
+	boss_poise_fill = boss_poise.get_theme_stylebox("fill") as StyleBoxFlat
+	boss_poise_back = boss_poise.get_theme_stylebox("background") as StyleBoxFlat
+	# Thin: the shared bar background pads to label height, which the gauge does not need.
+	boss_poise_back.content_margin_top = 0
+	boss_poise_back.content_margin_bottom = 0
+	boss_box.add_child(boss_poise)
 	boss_box.visible = false
 
 func _build_dialogue() -> void:
@@ -388,8 +438,12 @@ func update_reticle(camera: Camera3D, target: Node3D) -> void:
 	reticle.position = screen - reticle.size * 0.5
 	reticle.visible = true
 
-func show_prompt(text: String) -> void:
+func show_prompt(text: String, tint: Color = UiTheme.CREAM) -> void:
+	## Called every frame by main._update_focus; gold marks a finisher.
 	prompt.text = text
+	if tint != prompt_tint:
+		prompt_tint = tint
+		prompt.add_theme_color_override("font_color", tint)
 
 func show_message(message: String, duration: float = 3.5, tint: Color = UiTheme.CREAM) -> void:
 	toast_tints[message] = tint
@@ -421,8 +475,31 @@ func show_boss(name: String, title: String, ratio: float) -> void:
 	boss_bar.max_value = 1.0
 	boss_bar.value = ratio
 
+func set_boss_poise(ratio: float, broken: bool, finishable: bool) -> void:
+	## ratio: Enemy.poise_ratio() (empty while broken). While a finisher can still land the
+	## gauge fills gold and pulses; for the rest of the break it stays empty with a gold rim.
+	boss_poise.value = 1.0 if finishable else ratio
+	boss_poise_fill.bg_color = UiTheme.GOLD if broken else UiTheme.CREAM
+	boss_poise_back.border_color = UiTheme.GOLD if broken else Color(0.0, 0.0, 0.0, 0.7)
+	boss_finishable = finishable
+	if not finishable:
+		boss_poise.modulate.a = 1.0
+
+func set_focus(active: bool, title: String = "", subtitle: String = "", tint: Color = UiTheme.JADE_LIGHT) -> void:
+	## Tâm Nhãn on, with its name and how it was earned in its colour, or off. The veil eases in
+	## quickly and lifts slowly (_process), so a pause holds it where it is.
+	focus_active = active
+	if not active:
+		return
+	focus_material.set_shader_parameter("tint", tint)
+	focus_title.text = title
+	focus_title.add_theme_color_override("font_color", tint)
+	focus_sub.text = subtitle
+	focus_title_left = FOCUS_TITLE_TIME
+
 func hide_boss() -> void:
 	boss_box.visible = false
+	boss_finishable = false
 
 func open_dialogue(speaker: String, text: String, choices: Array = []) -> void:
 	dialogue_panel.visible = true
@@ -495,10 +572,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			emit_signal("dialogue_advanced")
 
+func _fade_focus(delta: float) -> void:
+	## Writes the veil's strength only while it changes; the name fades on its own timer.
+	var goal: float = 1.0 if focus_active else 0.0
+	if focus_level != goal:
+		focus_level = move_toward(focus_level, goal, delta * (8.0 if focus_active else 2.5))
+		focus_material.set_shader_parameter("strength", focus_level)
+		focus_veil.visible = focus_level > 0.0
+	if focus_title_left > 0.0 or focus_title.visible:
+		focus_title_left = maxf(0.0, focus_title_left - delta)
+		var alpha: float = clampf(focus_title_left * 2.5, 0.0, 1.0)
+		focus_title.modulate.a = alpha
+		focus_sub.modulate.a = alpha
+		focus_title.visible = alpha > 0.0
+		focus_sub.visible = alpha > 0.0
+
 func _process(delta: float) -> void:
 	if dialogue_panel.visible and dialogue_text.visible_ratio < 1.0:
 		typing += delta
 		dialogue_text.visible_ratio = clampf(typing * 55.0 / maxf(1.0, float(dialogue_text.get_total_character_count())), 0.0, 1.0)
+	if boss_finishable and boss_box.visible:
+		pulse_time += delta
+		boss_poise.modulate.a = 0.55 + 0.45 * sin(pulse_time * 11.0)
+	_fade_focus(delta)
 	toast_remaining = maxf(0.0, toast_remaining - delta)
 	if toast_remaining <= 0.0 and not toast_queue.is_empty():
 		_show_toast(toast_queue.pop_front(), 3.0)

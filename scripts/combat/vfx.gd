@@ -7,6 +7,8 @@ const WIND: Color = Color(0.62, 0.96, 0.88)
 const SPARK: Color = Color(1.0, 0.86, 0.55)
 const DANGER: Color = Color(1.0, 0.35, 0.22)
 const SEAL: Color = Color(0.95, 0.32, 0.25)
+## Group of effects timed to an enemy's blow: their tweens run at Enemy.time_dilation.
+const ENEMY_CLOCK: String = "vfx_enemy_clock"
 
 static func _material(color: Color, additive: bool = true) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
@@ -111,9 +113,11 @@ static func ring(parent: Node, position: Vector3, radius: float, color: Color = 
 	tween.tween_property(material, "albedo_color", target, duration)
 	tween.chain().tween_callback(instance.queue_free)
 
-static func telegraph(parent: Node, position: Vector3, radius: float, duration: float, color: Color = DANGER) -> Node3D:
-	## Ground warning that fills up until the attack lands (used for unblockable hits).
+static func telegraph(parent: Node, position: Vector3, radius: float, duration: float, color: Color = DANGER, enemy_clock: bool = false) -> Node3D:
+	## Ground warning that fills up until the attack lands (used for unblockable hits). An enemy's
+	## warning (enemy_clock) slows with Tâm Nhãn so it still fills exactly as the blow lands.
 	var holder: Node3D = Node3D.new()
+	var tweens: Array[Tween] = []
 	parent.add_child(holder)
 	holder.global_position = position + Vector3.UP * 0.08
 	for index: int in range(2):
@@ -134,11 +138,23 @@ static func telegraph(parent: Node, position: Vector3, radius: float, duration: 
 		else:
 			instance.scale = Vector3(0.1, 1, 0.1)
 			instance.position.y = 0.01
-			holder.create_tween().tween_property(instance, "scale", Vector3(radius, 1, radius), duration)
+			var grow: Tween = holder.create_tween()
+			grow.tween_property(instance, "scale", Vector3(radius, 1, radius), duration)
+			tweens.append(grow)
 	var tween: Tween = holder.create_tween()
 	tween.tween_interval(duration + 0.05)
 	tween.tween_callback(holder.queue_free)
+	tweens.append(tween)
+	if enemy_clock:
+		follow_enemy_clock(holder, tweens)
 	return holder
+
+static func follow_enemy_clock(holder: Node, tweens: Array[Tween]) -> void:
+	## Runs an effect's tweens at the enemy clock rate now and whenever Tâm Nhãn changes it.
+	holder.add_to_group(ENEMY_CLOCK)
+	holder.set_meta("tweens", tweens)
+	for tween: Tween in tweens:
+		tween.set_speed_scale(Enemy.time_dilation)
 
 static func glint(parent: Node, position: Vector3, color: Color = SPARK, size: float = 0.5) -> void:
 	var quad: QuadMesh = QuadMesh.new()
@@ -469,8 +485,8 @@ static func crack(parent: Node, position: Vector3, radius: float, color: Color =
 	tween.tween_interval(1.2)
 	tween.tween_callback(chips.queue_free)
 
-static func field(parent: Node, position: Vector3, radius: float, color: Color, duration: float) -> Node3D:
-	## Lingering ground disc with drifting mist (frost formation).
+static func field(parent: Node, position: Vector3, radius: float, color: Color, duration: float, enemy_clock: bool = false) -> Node3D:
+	## Lingering ground disc with drifting mist (frost formation); enemy_clock as for telegraph.
 	var holder: Node3D = Node3D.new()
 	parent.add_child(holder)
 	holder.global_position = position + Vector3.UP * 0.06
@@ -498,4 +514,7 @@ static func field(parent: Node, position: Vector3, radius: float, color: Color, 
 	faded.a = 0.0
 	tween.tween_property(material, "albedo_color", faded, 0.4)
 	tween.tween_callback(holder.queue_free)
+	if enemy_clock:
+		var timed: Array[Tween] = [tween]
+		follow_enemy_clock(holder, timed)
 	return holder

@@ -107,7 +107,7 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "statuses", "reactions", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
+	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "statuses", "reactions", "finisher", "focus", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -194,6 +194,76 @@ func _run() -> void:
 				for foe: Enemy in foes:
 					foe.queue_free()
 				await frames(30)
+			"finisher":
+				# Poise bars over a bandit just hit and a broken one (gold), the F prompt, the boss
+				# bar's poise gauge; then the finisher's blow, slowed so it is caught mid-swing.
+				await place(-20, 66, 0, -0.25)
+				var guards: Array[Enemy] = []
+				for offset: Vector3 in [Vector3(-1.6, 0, -4.2), Vector3(0.9, 0, -2.4)]:
+					var guard: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+					guard.setup({"id": "preview_poise_%d" % guards.size(), "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+					game.add_child(guard)
+					var spot: Vector3 = game.player.global_position + offset
+					spot.y = game.world.height_at(spot.x, spot.z) + 0.05
+					guard.activate(spot, game.player)
+					guard.set_physics_process(false)
+					game.on_enemy_spawned(guard, {"id": guard.entity_id})
+					guards.append(guard)
+				var tap: Combat.Damage = Combat.make_damage(game.player, {"poise": guards[0].max_poise * 0.6, "knockback": 0.0, "hitstop": 0.0}, 4.0, guards[0].global_position)
+				guards[0].take_damage(tap)
+				guards[1].take_damage(Combat.make_damage(game.player, {"poise": 999, "knockback": 0.0, "hitstop": 0.0}, 4.0, guards[1].global_position))
+				game.hud.show_boss("Trúc Tướng", "Kẻ gác rừng trúc", 0.72)
+				game.hud.set_boss_poise(0.45, false, false)
+				game.player.face_direction(Vector3(0.3, 0, -1), true)
+				game.player.set_lock(guards[0])
+				await frames(20)
+				game._refresh_hud()
+				await frames(2)
+				await shot("poise_bars")
+				game.hud.set_boss_poise(0.0, true, true)
+				game.player.set_lock(null)
+				game.player.start_finisher(guards[1])
+				Engine.time_scale = 0.2
+				for step: int in range(80):
+					await frames(1)
+					if game.player.action.get("fired", false):
+						break
+				await frames(2)
+				await shot("finisher")
+				Engine.time_scale = 1.0
+				await frames(60)
+				game.hud.hide_boss()
+				for guard: Enemy in guards:
+					if is_instance_valid(guard):
+						guard.queue_free()
+				await frames(30)
+			"focus":
+				# Tâm Nhãn: Lâm An rolls clear of a bandit's swing at the last instant; the cool veil
+				# and its name come up while the bandit finishes the swing on its slowed clock.
+				await place(-20, 66, 0, -0.25)
+				var swordsman: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+				swordsman.setup({"id": "preview_focus", "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+				game.add_child(swordsman)
+				var stand: Vector3 = game.player.global_position + Vector3(0.3, 0, -2.0)
+				stand.y = game.world.height_at(stand.x, stand.z) + 0.05
+				swordsman.activate(stand, game.player)
+				game.on_enemy_spawned(swordsman, {"id": swordsman.entity_id})
+				await frames(4)
+				swordsman._begin_attack("attack")
+				for step: int in range(90):
+					await frames(1)
+					if swordsman.attack_clock >= float(swordsman.attack_data.get("hit_start", 0.7)) - 0.12:
+						break
+				game.hinted["focus"] = true  # the first-time hint would cover the bandit
+				game.player.face_direction(Vector3(1, 0, 0.4), true)
+				game.player._start_dodge()
+				game.player.take_damage(Combat.make_damage(swordsman, swordsman.attack_data, 10.0, game.player.global_position))
+				# Early: a slow renderer catches physics up several steps a frame, and the focus is short.
+				await frames(2)
+				await shot("focus")
+				game.player.end_focus()
+				swordsman.queue_free()
+				await frames(40)
 			"moves":
 				await place(0, 14, 0)
 				var side: Camera3D = Camera3D.new()

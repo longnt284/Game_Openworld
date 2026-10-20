@@ -39,7 +39,7 @@ class Damage:
 	var flinch: bool = true
 	## Flat enemy "defense" this blow ignores (Lâm An's armor_pen).
 	var armor_pen: float = 0.0
-	## Heavy swings (attack data "heavy": the charged attack, later the finisher) shatter ice.
+	## Heavy swings (attack data "heavy": the charged attack and the finisher) shatter ice.
 	var heavy: bool = false
 	## The source's bonus to elemental reaction damage (Lâm An's reaction_dmg).
 	var reaction_dmg: float = 0.0
@@ -47,6 +47,10 @@ class Damage:
 	var reaction: String = ""
 	## A reaction's own splash, spread or chain hit: it never sets off another reaction.
 	var reaction_splash: bool = false
+	## Finisher: the blow deals at least this share of the target's max health (before its
+	## multipliers), but at most boss_cap of a boss's (after them); 0 leaves either alone.
+	var hp_floor: float = 0.0
+	var boss_cap: float = 0.0
 
 static func attack(owner: String, name: String, clip: String = "", rate: float = 1.0) -> Dictionary:
 	## Attack data merged with the timing of the clip it plays (data "clip", else its own
@@ -124,6 +128,8 @@ static func make_damage(source: Node3D, data: Dictionary, amount: float, target_
 	damage.status = data.get("status", {}) as Dictionary
 	damage.flinch = bool(data.get("flinch", true))
 	damage.heavy = bool(data.get("heavy", false))
+	damage.hp_floor = float(data.get("hp_floor", 0.0))
+	damage.boss_cap = float(data.get("boss_cap", 0.0))
 	var direction: Vector3 = target_position - source.global_position
 	direction.y = 0.0
 	damage.direction = direction.normalized() if direction.length() > 0.01 else Vector3.FORWARD

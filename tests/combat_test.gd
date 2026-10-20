@@ -10,6 +10,12 @@ extends SceneTree
 ## Elemental reactions: each of the six fires on its combination only, consumes and applies its
 ## statuses, splashes other enemies once each without chaining into more reactions, grows with
 ## reaction_dmg and grants no lifesteal or meter for its splash.
+## Poise and finishers: a break opens a broken, finishable window (shorter on bosses); F finishes
+## only a broken foe within reach and ahead of any other interaction; the finisher kills an
+## ordinary foe, is capped on bosses and leaves Lâm An untouchable; poise bar visibility.
+## Tâm Nhãn: a perfect dodge or parry (only in its first instant, not while cooling down) slows
+## enemies' clocks, animation, missiles and areas, never Lâm An's; it ends on her time, holds
+## while paused and resets on revive and death.
 
 var failures: int = 0
 var game: Node3D
@@ -753,12 +759,271 @@ func _run() -> void:
 	await clear_dummies()
 	await reset_player()
 
+	# ---- poise break: a broken, finishable stagger; the finisher; interact priority; poise bars
+	await clear_dummies()
+	var finish_stats: Dictionary = state.stats
+	state.stats = {}
+	await reset_player()
+	var finisher: Dictionary = Combat.attack("player", "finisher")
+	check(String(finisher.get("kind", "")) == "finisher" and Combat.make_damage(player, finisher, 1.0, player.global_position).heavy and player.visual.has_animation(String(finisher.get("clip", "")))
+		and float(finisher.get("hp_floor", 0.0)) > 0.0 and float(finisher.get("boss_cap", 0.0)) > 0.0,
+		"The finisher has attack data, a playable clip, the heavy tag (Vỡ Băng), a health floor and a boss cap")
+	var reeling: Enemy = spawn("tan_binh", Vector3(0, 0, -2.2))
+	await frames(2)
+	var breaks: Array[int] = [0]
+	reeling.poise_broken.connect(func(_enemy: Enemy) -> void: breaks[0] += 1)
+	check(not reeling.is_broken() and is_equal_approx(reeling.poise_ratio(), 1.0) and player.finisher_target() == null and not player.start_finisher(reeling),
+		"A foe with poise left cannot be finished")
+	reeling.take_damage(blow(reeling, "", 1.0, {"poise": reeling.max_poise * 0.5}))
+	check(is_equal_approx(reeling.poise_ratio(), 0.5) and not reeling.is_broken(), "Poise drains with each blow (bar at %.2f)" % reeling.poise_ratio())
+	reeling.take_damage(blow(reeling, "", 1.0, {"poise": reeling.max_poise}))
+	check(breaks[0] == 1 and reeling.state == "stagger" and reeling.is_broken() and reeling.is_finishable() and reeling.stagger_time >= Enemy.BROKEN_MIN
+		and is_equal_approx(reeling.finish_time, reeling.stagger_time) and is_zero_approx(reeling.poise_ratio()),
+		"Breaking poise leaves an ordinary foe broken and finishable for %.1f s" % reeling.stagger_time)
+	var punished: Dictionary = reeling.take_damage(blow(reeling, "", 100.0))
+	check(is_equal_approx(float(punished.get("amount", 0.0)), 135.0) and reeling.is_broken(), "A broken foe takes ×1.35 and stays broken")
+	reeling.state_time = reeling.stagger_time
+	reeling._think(0.016)
+	check(reeling.state == "chase" and not reeling.is_broken() and not reeling.is_finishable() and is_equal_approx(reeling.poise_ratio(), 1.0),
+		"The window closes when the foe recovers, poise full again")
+	await clear_dummies()
+
+	# The boss: a shorter finishing window inside its usual break stagger.
+	var warden: Enemy = spawn("truc_tuong", Vector3(0, 0, -2.4), float(ContentDB.enemy("truc_tuong")["hp"]))
+	await frames(2)
+	warden.take_damage(blow(warden, "", 1.0, {"poise": warden.max_poise + 1.0}))
+	var boss_window: float = warden.finish_time
+	check(warden.is_finishable() and is_equal_approx(warden.stagger_time, float(warden.data["break_stagger"])) and boss_window < warden.stagger_time and boss_window < Enemy.BROKEN_MIN,
+		"A broken boss is finishable for %.1f s of its %.1f s stagger" % [boss_window, warden.stagger_time])
+	warden.state_time = boss_window + 0.1
+	warden._think(boss_window + 0.1)
+	check(warden.is_broken() and not warden.is_finishable() and player.finisher_target() == null, "After its window the staggered boss can no longer be finished")
+	# Bosses take a capped share of their health, never the kill.
+	warden.state_time = warden.stagger_time
+	warden._think(0.016)
+	warden.take_damage(blow(warden, "", 1.0, {"poise": warden.max_poise + 1.0}))
+	var boss_hits: Array = []
+	player.finisher_landed.connect(func(target: Node, amount: float, killed: bool) -> void: boss_hits.append([target, amount, killed]), CONNECT_ONE_SHOT)
+	var warden_before: float = warden.health
+	check(player.start_finisher(warden) and player.current_action() == "finisher" and player.invulnerable > 0.0, "F starts the finisher on a broken boss within reach")
+	for step: int in range(150):
+		if player.state != "action":
+			break
+		await frames(1)
+	check(boss_hits.size() == 1 and boss_hits[0][0] == warden and not boss_hits[0][2] and is_equal_approx(warden_before - warden.health, warden.max_health * float(finisher["boss_cap"])),
+		"A finisher takes %.0f of the boss's %.0f health (capped at %d%%)" % [warden_before - warden.health, warden.max_health, roundi(float(finisher["boss_cap"]) * 100.0)])
+	await clear_dummies()
+
+	# Ordinary foes: in range only, then one blow ends a full-health bandit; untouchable meanwhile.
+	await reset_player()
+	var far_foe: Enemy = spawn("tan_binh", Vector3(0, 0, -4.5))
+	var victim: Enemy = spawn("tan_binh", Vector3(0.6, 0, -2.0), float(ContentDB.enemy("tan_binh")["hp"]))
+	await frames(2)
+	for enemy: Enemy in [far_foe, victim]:
+		enemy.take_damage(blow(enemy, "", 0.0, {"poise": enemy.max_poise + 1.0}))
+	check(far_foe.is_finishable() and not player.start_finisher(far_foe) and player.finisher_target() == victim and player.current_action() == "",
+		"Only a broken foe within %.0f m can be finished" % player.finisher_reach())
+	var kills: Array = []
+	player.finisher_landed.connect(func(target: Node, amount: float, killed: bool) -> void: kills.append([target, amount, killed]), CONNECT_ONE_SHOT)
+	player.set_meter(0.0)
+	check(player.start_finisher(victim), "F starts the finisher on the broken bandit")
+	var spared: Dictionary = player.take_damage(Combat.make_damage(far_foe, {"damage": 30, "poise": 20, "knockback": 2.0}, 30.0, player.global_position))
+	check(not spared.get("hit", true) and is_equal_approx(player.health, player.max_health()), "Lâm An cannot be hit while she finishes")
+	for step: int in range(150):
+		if player.state != "action":
+			break
+		await frames(1)
+	check(victim.is_dead() and kills.size() == 1 and kills[0][2] and player.meter >= float(finisher.get("meter_gain", 0.0)) - 0.01,
+		"The finisher kills a full-health bandit (%.0f of %.0f) and fills the meter" % [float(kills[0][1]) if kills.size() > 0 else 0.0, victim.max_health])
+	await clear_dummies()
+
+	# F prefers the finisher over a reward chest beside Lâm An, and only shows it while one is due.
+	await reset_player()
+	var chest: Interactable = game.spawn_reward_chest("trial", player.global_position + Vector3(1.6, 0, 0.6))
+	var duelist: Enemy = spawn("tan_binh", Vector3(0, 0, -2.0))
+	await frames(2)
+	game._update_focus()
+	check(game.focus == chest and not game.hud.prompt.text.contains("Kết liễu"), "Without a broken foe, F still opens the chest")
+	duelist.take_damage(blow(duelist, "", 0.0, {"poise": duelist.max_poise + 1.0}))
+	game._update_focus()
+	check(game.focus == duelist and game.hud.prompt.text.contains("Kết liễu"), "A broken foe in reach takes F over the chest: \"%s\"" % game.hud.prompt.text)
+	var press: InputEventAction = InputEventAction.new()
+	press.action = "interact"
+	press.pressed = true
+	game._unhandled_input(press)
+	check(player.current_action() == "finisher" and not chest.opened, "Pressing F finishes the foe and leaves the chest shut")
+	for step: int in range(150):
+		if player.state != "action":
+			break
+		await frames(1)
+	game._clear_reward_chests()
+	await clear_dummies()
+
+	# Poise bars: ordinary foes only, while locked on, after a hit for a few seconds, and while broken.
+	await reset_player()
+	player.set_lock(null)
+	var marked: Enemy = spawn("tan_binh", Vector3(0, 0, -3.0))
+	var big: Enemy = spawn("truc_tuong", Vector3(5, 0, -6))
+	await frames(2)
+	marked.since_hit = 99.0
+	marked.update_poise_bar(1.0)
+	var bar_hidden: bool = marked.poise_bar == null or not marked.poise_bar.visible
+	marked.take_damage(blow(marked, "", 1.0, {"poise": marked.max_poise * 0.25}))
+	marked.update_poise_bar(1.0)
+	var bar_hit: bool = marked.poise_bar != null and marked.poise_bar.visible and is_equal_approx(float(marked.poise_bar.material.get_shader_parameter("fill")), 0.75)
+	marked.since_hit = Enemy.POISE_BAR_LINGER + 0.1
+	marked.update_poise_bar(1.0)
+	var bar_faded: bool = not marked.poise_bar.visible
+	player.set_lock(marked)
+	marked.update_poise_bar(1.0)
+	var bar_locked: bool = marked.poise_bar.visible
+	player.set_lock(null)
+	marked.update_poise_bar(1.0)
+	var bar_unlocked: bool = not marked.poise_bar.visible
+	check(bar_hidden and bar_hit and bar_faded and bar_locked and bar_unlocked,
+		"The poise bar shows after a hit (%s) and while locked on (%s), hidden otherwise (%s, %s, %s)" % [bar_hit, bar_locked, bar_hidden, bar_faded, bar_unlocked])
+	marked.take_damage(blow(marked, "", 1.0, {"poise": marked.max_poise}))
+	marked.since_hit = Enemy.POISE_BAR_LINGER + 0.1
+	marked.update_poise_bar(1.0)
+	check(marked.is_finishable() and marked.poise_bar.visible and is_equal_approx(float(marked.poise_bar.material.get_shader_parameter("finishable")), 1.0),
+		"A broken foe keeps its bar up, flashing for the finisher")
+	big.take_damage(blow(big, "", 1.0, {"poise": 10.0}))
+	player.set_lock(big)
+	big.update_poise_bar(1.0)
+	game.hud.set_boss_poise(big.poise_ratio(), big.is_broken(), big.is_finishable())
+	var boss_gauge: float = game.hud.boss_poise.value
+	player.set_lock(null)
+	marked.take_damage(blow(marked, "", 99999.0))
+	marked.update_poise_bar(1.0)
+	check(big.poise_bar == null and not big.poise_bar_wanted() and is_equal_approx(boss_gauge, big.poise_ratio()) and not marked.poise_bar.visible,
+		"Bosses show poise on the HUD gauge (%.2f), not overhead; a dead foe's bar goes" % boss_gauge)
+	state.stats = finish_stats
+	await clear_dummies()
+	await reset_player()
+
+	# ---- Tâm Nhãn: a perfect dodge or parry slows every enemy, never Lâm An, for a while
+	var focus: Dictionary = player.focus_rule()
+	var focus_time: float = float(focus.get("duration", 0.0))
+	check(float(focus.get("enemy_time", 1.0)) < 1.0 and focus_time > 0.0 and float(focus.get("cooldown", 0.0)) > focus_time
+		and float(focus.get("perfect_dodge", 0.0)) < float(ContentDB.timing("player", "dodge")["hit_end"]) and float(focus.get("perfect_parry", 0.0)) < float(ContentDB.timing("player", "parry")["hit_end"]),
+		"Tâm Nhãn has data: perfect windows inside the dodge and parry windows, a slower enemy clock, a duration and a longer cooldown")
+	var lunger: Enemy = spawn("tan_binh", Vector3(0, 0, -2.0))
+	await frames(2)
+	var lunge: Dictionary = {"poise": 10, "knockback": 0.0, "hitstop": 0.0}
+	var opened: Array[String] = []
+	var closed: Array[int] = [0]
+	player.focus_started.connect(func(kind: String) -> void: opened.append(kind))
+	player.focus_ended.connect(func() -> void: closed[0] += 1)
+	var rested: float = player.stamina
+	player.counter_bonus = 0.0
+	player._start_dodge()
+	var dodged_clean: Dictionary = player.take_damage(Combat.make_damage(lunger, lunge, 10.0, player.global_position))
+	check(not dodged_clean.get("hit", true) and dodged_clean.get("perfect", false) and Enemy.time_dilation < 1.0 and player.is_focused() and opened.size() == 1 and opened[0] == "dodge"
+		and is_equal_approx(player.stamina, rested) and player.counter_bonus > 0.0 and game.hud.focus_active,
+		"A blow caught in the first instant of a dodge opens Tâm Nhãn: enemies at ×%.2f, the dodge's stamina back, a counter primed, the HUD veiled" % Enemy.time_dilation)
+	player._tick_timers(focus_time * 0.5)
+	var paused_at: float = player.focus_time
+	game.set_paused(true)
+	await frames(20)
+	var held: bool = is_equal_approx(player.focus_time, paused_at)
+	game.set_paused(false)
+	check(held and is_equal_approx(paused_at, focus_time * 0.5) and Enemy.time_dilation < 1.0, "Tâm Nhãn counts down on Lâm An's own clock, and a pause holds it (%.2f s left)" % paused_at)
+	player._tick_timers(player.focus_time + 0.01)
+	game.hud._fade_focus(1.0)
+	check(is_equal_approx(Enemy.time_dilation, 1.0) and not player.is_focused() and closed[0] == 1 and player.focus_cooldown > 0.0 and not game.hud.focus_active and not game.hud.focus_veil.visible,
+		"After %.1f s of her time enemies are back at ×1 and the veil lifts" % focus_time)
+	for step: int in range(60):
+		if player.state == "move":
+			break
+		await frames(1)
+	player._start_dodge()
+	var cooling: Dictionary = player.take_damage(Combat.make_damage(lunger, lunge, 10.0, player.global_position))
+	check(not cooling.get("hit", true) and not cooling.get("perfect", true) and is_equal_approx(Enemy.time_dilation, 1.0) and opened.size() == 1 and player.stamina < rested - 1.0,
+		"While Tâm Nhãn cools down a perfect dodge only dodges (no slow-down, no stamina back)")
+	player._tick_timers(player.focus_cooldown + 0.01)
+	player._start_dodge()
+	var again: Dictionary = player.take_damage(Combat.make_damage(lunger, lunge, 10.0, player.global_position))
+	check(again.get("perfect", false) and Enemy.time_dilation < 1.0 and opened.size() == 2, "Once cooled down, the next perfect dodge opens it again")
+	player.revive(player.global_position)
+	check(is_equal_approx(Enemy.time_dilation, 1.0) and not player.is_focused() and is_zero_approx(player.focus_cooldown) and closed[0] == 2, "Waking at a shrine restores one clock for everyone")
+	await reset_player()
+	player._start_dodge()
+	player.dodge_time = float(focus["perfect_dodge"]) + 0.05
+	var late_dodge: Dictionary = player.take_damage(Combat.make_damage(lunger, lunge, 10.0, player.global_position))
+	check(not late_dodge.get("hit", true) and late_dodge.get("dodged", false) and not late_dodge.get("perfect", true) and is_equal_approx(Enemy.time_dilation, 1.0) and is_equal_approx(player.health, player.max_health()),
+		"A blow met later in the dodge's invulnerable frames is dodged, without Tâm Nhãn")
+	await frames(30)
+	await reset_player()
+	player.face_direction(lunger.global_position - player.global_position, true)
+	player._start_action("parry")
+	player.action["t"] = float(focus["perfect_parry"]) + 0.05
+	var late_parry: Dictionary = player.take_damage(Combat.make_damage(lunger, lunge, 10.0, player.global_position))
+	check(late_parry.get("parried", false) and not late_parry.get("perfect", true) and lunger.state == "stagger" and is_equal_approx(Enemy.time_dilation, 1.0),
+		"A parry late in its window still staggers the attacker, without Tâm Nhãn")
+	await frames(30)
+	await reset_player()
+	lunger._set_state("chase")
+	player.face_direction(lunger.global_position - player.global_position, true)
+	player._start_action("parry")
+	var perfect_parry: Dictionary = player.take_damage(Combat.make_damage(lunger, lunge, 10.0, player.global_position))
+	check(perfect_parry.get("parried", false) and perfect_parry.get("perfect", false) and lunger.state == "stagger" and Enemy.time_dilation < 1.0 and opened.back() == "parry",
+		"A parry in its first instant is perfect: the attacker staggers and Tâm Nhãn opens")
+	await frames(30)
+	await reset_player()
+	await clear_dummies()
+
+	# Only enemies slow down: their attack clock, animation, missiles, the boar's wind-up and the guardian's ring.
+	var swinger: Enemy = spawn("tan_binh", Vector3(0, 0, -2.5))
+	var charger: Boar = spawn("heo_gio", Vector3(4, 0, -4)) as Boar
+	var ringer: Guardian = spawn("truc_tuong", Vector3(-5, 0, -7)) as Guardian
+	await frames(2)
+	swinger._begin_attack("attack")
+	swinger._physics_process(0.1)
+	var real_clock: float = swinger.attack_clock
+	swinger._begin_attack("attack")
+	player.start_focus("parry")
+	var rate: float = Enemy.time_dilation
+	swinger._physics_process(0.1)
+	var slowed_clock: float = swinger.attack_clock
+	var slowed_anim: float = swinger.visual.player.speed_scale
+	check(is_equal_approx(real_clock, 0.1 * swinger.speed_scale) and is_equal_approx(slowed_clock, real_clock * rate) and is_equal_approx(slowed_anim, rate),
+		"Under Tâm Nhãn an enemy's attack clock (%.3f vs %.3f) and animation run at ×%.2f" % [slowed_clock, real_clock, rate])
+	var thrown: WindProjectile = WindProjectile.new()
+	game.add_child(thrown)
+	thrown.launch(swinger.global_position + Vector3(0, 1.3, 0), Vector3.RIGHT, 10.0, 5.0, {}, Combat.LAYER_HURT_PLAYER, swinger)
+	thrown.set_physics_process(false)
+	thrown._physics_process(0.1)
+	var cast: WindProjectile = WindProjectile.new()
+	game.add_child(cast)
+	cast.launch(player.global_position + Vector3(0, 1.3, 0), Vector3.RIGHT, 10.0, 5.0, {}, Combat.LAYER_HURT_ENEMY, player)
+	cast.set_physics_process(false)
+	cast._physics_process(0.1)
+	check(is_equal_approx(thrown.travelled, 1.0 * rate) and is_equal_approx(cast.travelled, 1.0), "An enemy's missile flies at ×%.2f (%.2f m), Lâm An's at full speed (%.2f m)" % [rate, thrown.travelled, cast.travelled])
+	for missile: WindProjectile in [thrown, cast]:
+		if is_instance_valid(missile):
+			missile.queue_free()
+	charger._begin_windup()
+	charger._physics_process(0.1)
+	ringer.shockwave_radius = 0.5
+	ringer.shockwave_center = ringer.global_position
+	ringer._process(0.1)
+	check(is_equal_approx(charger.state_time, 0.1 * rate) and is_equal_approx(ringer.shockwave_radius, 0.5 + 0.9 * rate), "The boar's wind-up and the guardian's shockwave slow with them")
+	ringer.shockwave_radius = -1.0
+	player._tick_timers(player.focus_time + 0.01)
+	swinger._physics_process(0.1)
+	check(is_equal_approx(Enemy.time_dilation, 1.0) and is_equal_approx(swinger.visual.player.speed_scale, 1.0) and is_equal_approx(swinger.attack_clock, slowed_clock + 0.1 * swinger.speed_scale),
+		"When it ends enemies run at exactly ×1 again, animation included")
+	await clear_dummies()
+	await reset_player()
+
 	# ---- last, because it runs the death screen: poison can kill, and death clears statuses
 	await reset_player()
 	player.apply_status("poison", 3)
+	player.start_focus("dodge")
 	player.health = 0.5
 	player._tick_statuses(0.6)
-	check(player.is_dead() and player.statuses.active.is_empty(), "Poison can finish Lâm An off, and death clears her statuses")
+	check(player.is_dead() and player.statuses.active.is_empty() and is_equal_approx(Enemy.time_dilation, 1.0) and not player.is_focused(),
+		"Poison can finish Lâm An off, and death clears her statuses and Tâm Nhãn")
 	player.revive(player.global_position)
 
 	print("COMBAT RESULT: %d failure(s)" % failures)

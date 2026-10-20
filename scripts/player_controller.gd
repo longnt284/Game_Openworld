@@ -1,9 +1,10 @@
 class_name PlayerController
 extends CharacterBody3D
 ## Lâm An: movement (run, sprint, dodge, jump, khinh công leap and glide) and
-## sword combat (3-hit combo, charged heavy, parry/block, and the three forms of the
-## equipped sword's style on E, Q and X; X spends the full charge meter) and consumables
-## (R: the strongest healing item, C: the Inventory's quick slot).
+## sword combat (3-hit combo, charged heavy, parry/block, the three forms of the equipped
+## sword's style on E, Q and X; X spends the full charge meter; F finishes a broken foe; a
+## perfect dodge or parry opens Tâm Nhãn, slowing every enemy) and consumables (R: the
+## strongest healing item, C: the Inventory's quick slot).
 
 signal health_changed(current: float, maximum: float)
 signal stamina_changed(current: float, maximum: float)
@@ -18,8 +19,15 @@ signal meter_changed(current: float, maximum: float)
 signal status_applied(status: String)
 ## Lâm An's own buffs and debuffs started, ended or changed stacks.
 signal statuses_changed
+## A finisher's blow landed on its foe (amount dealt; killed when it ended the foe).
+signal finisher_landed(target: Node, amount: float, killed: bool)
+## Tâm Nhãn opened after a perfect "dodge" or "parry", and later closed again.
+signal focus_started(kind: String)
+signal focus_ended
 
 const METER_MAX: float = 100.0
+## Stamina a dodge costs (a perfect dodge that opens Tâm Nhãn gives it back).
+const DODGE_COST: float = 20.0
 
 var settings: GameSettings
 var assets: AssetLibrary
@@ -65,6 +73,12 @@ var lock_target: Node3D
 ## reach GameState.stat through status_stats.
 var statuses: StatusEffects = StatusEffects.new()
 var status_revision: int = 0
+## Bumped by every slow-motion beat, so only the latest one restores the time scale.
+var slow_serial: int = 0
+## Tâm Nhãn (data/attacks.json player "focus"): seconds of enemy slow motion left, and until a
+## perfect dodge or parry can open it again. Both count Lâm An's own time, so pausing holds them.
+var focus_time: float = 0.0
+var focus_cooldown: float = 0.0
 
 func initialize(config: GameSettings, library: AssetLibrary = null, state_data: GameState = null) -> void:
 	settings = config
@@ -235,6 +249,11 @@ func _tick_timers(delta: float) -> void:
 	invulnerable = maxf(0.0, invulnerable - delta)
 	hit_cooldown = maxf(0.0, hit_cooldown - delta)
 	counter_bonus = maxf(0.0, counter_bonus - delta)
+	focus_cooldown = maxf(0.0, focus_cooldown - delta)
+	if focus_time > 0.0:
+		focus_time -= delta
+		if focus_time <= 0.0:
+			end_focus()
 	combat_timer += delta
 	for skill: String in cooldowns:
 		cooldowns[skill] = maxf(0.0, cooldowns[skill] - delta)
@@ -361,7 +380,7 @@ func _update_locomotion_visual() -> void:
 # ------------------------------------------------------------------ dodge
 
 func _start_dodge() -> void:
-	set_stamina(stamina - 20.0)
+	set_stamina(stamina - DODGE_COST)
 	stamina_delay = 0.8
 	state = "dodge"
 	dodge_time = 0.0
@@ -498,6 +517,144 @@ func consume_item(id: String) -> bool:
 	emit_signal("footstep", "heal")
 	return true
 
+# ------------------------------------------------------------------ finisher
+
+func finisher_reach() -> float:
+	return float(Combat.attack("player", "finisher").get("reach", 3.0))
+
+func finisher_target() -> Enemy:
+	## The finishable foe F would execute: within reach, the closest, preferring the one ahead.
+	var best: Enemy = null
+	var best_score: float = INF
+	var reach: float = -1.0
+	for node: Node in get_tree().get_nodes_in_group("enemy"):
+		var enemy: Enemy = node as Enemy
+		if enemy == null or not enemy.is_finishable() or absf(enemy.global_position.y - global_position.y) > 2.0:
+			continue
+		if reach < 0.0:
+			reach = finisher_reach()  # read only once a broken foe is about
+		var offset: Vector3 = enemy.global_position - global_position
+		offset.y = 0.0
+		var distance: float = offset.length()
+		if distance > reach:
+			continue
+		var score: float = distance - (offset.normalized().dot(facing) * 0.8 if distance > 0.01 else 0.0)
+		if score < best_score:
+			best_score = score
+			best = enemy
+	return best
+
+func can_finish() -> bool:
+	## On her feet and free, or once the current swing has landed (finishers cancel its recovery).
+	if not is_on_floor() or not input_enabled:
+		return false
+	if state == "move":
+		return true
+	if state != "action" or current_action() in ["finisher", "interact"]:
+		return false
+	return float(action.get("t", 0.0)) >= float((action["data"] as Dictionary).get("hit_end", 0.0))
+
+func start_finisher(enemy: Enemy) -> bool:
+	## F next to a broken foe: snap to it and strike once for the kill (see "finisher" in
+	## data/attacks.json), untouchable until the blow has landed and she has recovered.
+	if enemy == null or not is_instance_valid(enemy) or not enemy.is_finishable() or not can_finish():
+		return false
+	var offset: Vector3 = enemy.global_position - global_position
+	offset.y = 0.0
+	if offset.length() > finisher_reach():
+		return false
+	_start_action("finisher")
+	if current_action() != "finisher":
+		return false
+	action["target"] = enemy
+	face_direction(offset, true)
+	var data: Dictionary = action["data"]
+	invulnerable = maxf(invulnerable, float(data.get("recover", 1.0)))
+	enemy.hold(float(data.get("hit_start", 0.5)) + 0.3)
+	return true
+
+func _finisher_victim() -> Enemy:
+	## The foe the running finisher was aimed at, while it is still alive.
+	var victim: Variant = action.get("target")
+	if not is_instance_valid(victim) or (victim as Enemy).is_dead():
+		return null
+	return victim as Enemy
+
+func _finisher_blow(data: Dictionary) -> void:
+	## The blow lands on its chosen foe only (never a sweep), wherever the foe was knocked to.
+	var victim: Enemy = _finisher_victim()
+	if victim == null:
+		return
+	var result: Dictionary = strike(victim, data, 1.0)
+	if not result.get("hit", false):
+		return
+	camera_rig.punch_fov(-9.0, 0.5)
+	var center: Vector3 = victim.global_position + Vector3.UP * float(victim.data.get("height", 1.8)) * 0.6
+	Vfx.ring(get_parent(), victim.global_position + Vector3.UP * 0.2, 2.2, Vfx.SPARK, 0.45, 0.22)
+	Vfx.burst(get_parent(), center, Color(1.0, 0.85, 0.5), 30, 8.0, 0.1, 0.5)
+	Vfx.crack(get_parent(), victim.global_position, 1.3)
+	_slow_motion(float(data.get("slow_motion", 0.3)), float(data.get("slow_time", 0.25)))
+	emit_signal("finisher_landed", victim, float(result.get("amount", 0.0)), bool(result.get("killed", false)))
+
+# ------------------------------------------------------------------ Tâm Nhãn
+
+func focus_rule() -> Dictionary:
+	## Perfect windows, enemy clock rate, duration, cooldown and rewards (data/attacks.json player "focus").
+	return Combat.attack("player", "focus")
+
+func is_focused() -> bool:
+	return focus_time > 0.0
+
+func _try_focus(kind: String, damage: Combat.Damage) -> bool:
+	## A perfect dodge or parry of an enemy's blow, missile or area opens Tâm Nhãn, unless the
+	## last one is still cooling down.
+	if focus_cooldown > 0.0 or not is_instance_valid(damage.source) or not (damage.source is Enemy):
+		return false
+	start_focus(kind)
+	return true
+
+func start_focus(kind: String) -> void:
+	## Tâm Nhãn: every enemy slows to the rule's "enemy_time" (Enemy.time_dilation) for "duration"
+	## seconds of Lâm An's own time while she keeps her pace. Her next blow lands as a counter
+	## (×1.5), and a perfect dodge gives its stamina back. Never Engine.time_scale: that would slow her too.
+	var rule: Dictionary = focus_rule()
+	focus_time = float(rule.get("duration", 1.5))
+	focus_cooldown = float(rule.get("cooldown", 4.0))
+	Enemy.set_time_dilation(float(rule.get("enemy_time", 0.3)))
+	counter_bonus = maxf(counter_bonus, float(rule.get("counter", 2.5)))
+	if kind == "dodge":
+		set_stamina(stamina + float(rule.get("stamina_refund", DODGE_COST)))
+	var tint: Color = Color(String(rule.get("color", "8fd0f5")))
+	Vfx.ring(get_parent(), global_position + Vector3.UP * 0.15, 2.6, tint, 0.45, 0.2)
+	Vfx.burst(get_parent(), global_position + Vector3.UP * 1.1, tint, 18, 4.0, 0.08, 0.5)
+	if camera_rig:
+		camera_rig.punch_fov(-5.0, 0.4)
+	emit_signal("focus_started", kind)
+
+func end_focus() -> void:
+	## One clock for everyone again: time ran out, Lâm An fell or woke, or left the Trial.
+	var was_focused: bool = focus_time > 0.0 or not is_equal_approx(Enemy.time_dilation, 1.0)
+	focus_time = 0.0
+	Enemy.set_time_dilation(1.0)
+	if was_focused:
+		emit_signal("focus_ended")
+
+func _exit_tree() -> void:
+	# Enemy.time_dilation is static: never leave the next game slowed (quit mid-focus, tests).
+	focus_time = 0.0
+	Enemy.set_time_dilation(1.0)
+
+func _slow_motion(scale: float, seconds: float) -> void:
+	## A breath of real-time slow motion (ultimates, finishers); skipped headless.
+	if DisplayServer.get_name() == "headless" or scale >= 1.0 or seconds <= 0.0:
+		return
+	slow_serial += 1
+	var serial: int = slow_serial
+	Engine.time_scale = scale
+	get_tree().create_timer(seconds, true, false, true).timeout.connect(func() -> void:
+		if serial == slow_serial:
+			Engine.time_scale = 1.0)
+
 func _start_action(anim_name: String, slot: String = "", skill: String = "") -> void:
 	# Attack speed quickens swings and forms; parrying and using items keep their own pace.
 	var rate: float = 1.0 if anim_name in ["parry", "interact"] else attack_rate()
@@ -568,7 +725,14 @@ func _physics_action(delta: float) -> void:
 	var push: float = lunge * (1.0 - clampf(t / maxf(hit_end, 0.01), 0.0, 1.0)) if t < hit_end else 0.0
 	if name == "parry" or name == "interact":
 		push = 0.0
-	if lock_target and t < hit_start and name != "interact":
+	var victim: Enemy = _finisher_victim() if name == "finisher" else null
+	if victim and t < hit_start:
+		# Close in on the broken foe so the blow lands at arm's length.
+		var gap: Vector3 = victim.global_position - global_position
+		gap.y = 0.0
+		face_direction(gap, true)
+		push = clampf((gap.length() - float(victim.data.get("radius", 0.4)) - 0.9) / maxf(hit_start - t, 0.08), 0.0, 14.0)
+	elif lock_target and t < hit_start and name != "interact":
 		face_direction(lock_target.global_position - global_position)
 	var target_velocity: Vector3 = facing * push
 	if String(data.get("kind", "")) == "dash" and t >= hit_start and t <= hit_end:
@@ -650,9 +814,11 @@ func _resolve_hits(_name: String, data: Dictionary, t: float, hit_start: float, 
 		SkillRunner.fire(self, data, skill_bonus())
 		if kind == "projectile":
 			emit_signal("footstep", "wind")
+		elif kind == "finisher":
+			_finisher_blow(data)
 	match kind:
-		"projectile", "chain", "strikes", "nova", "field":
-			return  # these deal damage through the nodes SkillRunner spawned, never twice up close
+		"projectile", "chain", "strikes", "nova", "field", "finisher":
+			return  # these deal damage through the nodes SkillRunner spawned (or once, above), never twice up close
 		"tick":
 			action["tick"] = float(action["tick"]) - get_physics_process_delta_time()
 			if float(action["tick"]) <= 0.0:
@@ -739,10 +905,8 @@ func _ultimate_flourish(data: Dictionary) -> void:
 	camera_rig.add_trauma(float(data.get("shake", 0.5)))
 	camera_rig.punch_fov(10.0, 0.45)
 	Vfx.pillar(get_parent(), global_position, SkillRunner.form_color(data), 10.0, 1.2, 0.5)
-	if DisplayServer.get_name() != "headless":
-		# A breath of slow motion sells the ultimate; real time keeps it short at any time scale.
-		Engine.time_scale = 0.35
-		get_tree().create_timer(0.22, true, false, true).timeout.connect(func() -> void: Engine.time_scale = 1.0)
+	# A breath of slow motion sells the ultimate; real time keeps it short at any time scale.
+	_slow_motion(0.35, 0.22)
 
 # ------------------------------------------------------------------ damage
 
@@ -753,8 +917,13 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 	var parry_window: bool = current_action() == "parry" and float(action.get("t", 9.0)) <= float((action["data"] as Dictionary).get("hit_end", 0.2))
 	var parries: bool = parry_window and from_front and not damage.unblockable
 	if invulnerable > 0.0 and not parries:
-		return {"hit": false, "dodged": state == "dodge"}
+		var dodged: bool = state == "dodge"
+		# Caught in the first instant of the roll: a perfect dodge opens Tâm Nhãn.
+		var perfect_dodge: bool = dodged and dodge_time <= float(focus_rule().get("perfect_dodge", 0.15)) and _try_focus("dodge", damage)
+		return {"hit": false, "dodged": dodged, "perfect": perfect_dodge}
 	if parries:
+		# Met in the first instant of the guard: a perfect parry opens Tâm Nhãn as well.
+		var instant: bool = float(action.get("t", 9.0)) <= float(focus_rule().get("perfect_parry", 0.1))
 		visual.hitstop(0.12)
 		camera_rig.add_trauma(0.25)
 		Vfx.burst(get_parent(), global_position + Vector3.UP * 1.2 + facing * 0.6, Color(1.0, 0.95, 0.7), 26, 7.0, 0.07)
@@ -766,7 +935,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		if damage.source and damage.source.has_method("on_parried") and not damage.ranged:
 			damage.source.on_parried(self)
 		emit_signal("parried", damage.source)
-		return {"hit": false, "parried": true}
+		return {"hit": false, "parried": true, "perfect": instant and _try_focus("parry", damage)}
 	if game.stat("damage_taken") != 0.0:
 		damage.amount *= maxf(0.2, 1.0 + game.stat("damage_taken"))
 	# Flat defense, then the blow's element against her matching resistance (both neutral at 0).
@@ -840,6 +1009,7 @@ func _die() -> void:
 	state = "dead"
 	action = {}
 	Engine.time_scale = 1.0
+	end_focus()
 	set_meter(0.0)
 	set_lock(null)
 	statuses.clear()
@@ -865,7 +1035,10 @@ func revive(point: Vector3) -> void:
 	state = "move"
 	action = {}
 	invulnerable = 1.5
-	# Waking at a shrine (or starting over) washes off every buff and debuff.
+	# Waking at a shrine (or starting over, or loading) restores one clock with a fresh Tâm Nhãn
+	# and washes off every buff and debuff.
+	end_focus()
+	focus_cooldown = 0.0
 	statuses.clear()
 	_sync_statuses()
 	visual.stop_action()
