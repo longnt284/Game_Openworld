@@ -92,9 +92,15 @@ static func roll_rates(rates: Dictionary, rng: RandomNumberGenerator) -> String:
 
 static func make_weapon(base: String, rarity: String, rng: RandomNumberGenerator) -> Array:
 	## Distinct weighted affixes for a rolled weapon: [[id, value], ...].
+	return roll_affixes(int(PlayerStats.rarity_data(rarity).get("affixes", 1)), rng, "sword")
+
+static func roll_affixes(wanted: int, rng: RandomNumberGenerator, gear: String, exclude: Array = []) -> Array:
+	## Distinct weighted affixes allowed on `gear` ("sword" or "talisman"; data "gear" lists them,
+	## absent means both), skipping `exclude`. Affixes are only ever filtered out, so a sword rolls
+	## exactly as it did before talisman-only affixes existed.
 	var table: Dictionary = ContentDB.get_data("affixes")
-	var ids: Array = table.keys()
-	var count: int = mini(int(PlayerStats.rarity_data(rarity).get("affixes", 1)), ids.size())
+	var ids: Array = table.keys().filter(func(id: String) -> bool: return PlayerStats.affix_allowed(id, gear) and not exclude.has(id))
+	var count: int = mini(wanted, ids.size())
 	var result: Array = []
 	for index: int in range(count):
 		var total: float = 0.0

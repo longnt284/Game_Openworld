@@ -32,7 +32,6 @@ var state: String = "loading"
 var input_enabled: bool = true
 var health: float = 120.0
 var stamina: float = 100.0
-var max_stamina: float = 100.0
 var stamina_delay: float = 0.0
 var facing: Vector3 = Vector3.FORWARD
 var model_yaw: float = 0.0
@@ -102,6 +101,14 @@ func initialize(config: GameSettings, library: AssetLibrary = null, state_data: 
 
 func max_health() -> float:
 	return game.max_health()
+
+func max_stamina() -> float:
+	## Base 100 plus flat "max_stamina" from gear, blessings and buffs.
+	return game.max_stamina()
+
+func attack_rate() -> float:
+	## Playback rate of attacks and forms from "attack_speed": clip and hit timing scale together.
+	return clampf(1.0 + game.stat("attack_speed"), 0.5, 2.0)
 
 func is_dead() -> bool:
 	return state == "dead"
@@ -235,8 +242,11 @@ func _tick_timers(delta: float) -> void:
 		set_meter(meter - 6.0 * delta)
 	stamina_delay -= delta
 	var draining: bool = (state == "move" and (sprinting or gliding)) or state == "dodge" or (state == "move" and block_held and is_on_floor() and current_action() == "")
-	if stamina_delay <= 0.0 and not draining and stamina < max_stamina:
-		set_stamina(stamina + 32.0 * delta)
+	var top: float = max_stamina()
+	if stamina > top:
+		set_stamina(top)  # a stamina buff ran out
+	elif stamina_delay <= 0.0 and not draining and stamina < top:
+		set_stamina(stamina + 32.0 * maxf(0.2, 1.0 + game.stat("stamina_regen")) * delta)
 	game.play_time += delta
 	if lock_target and (not is_instance_valid(lock_target) or lock_target.is_queued_for_deletion() or (lock_target.has_method("is_dead") and lock_target.is_dead())
 			or lock_target.global_position.distance_to(global_position) > 26.0):
@@ -477,7 +487,7 @@ func consume_item(id: String) -> bool:
 		return false
 	var ratio: float = float(effect.get("heal", 0.0))
 	if ratio > 0.0:
-		heal(max_health() * ratio)
+		heal(max_health() * ratio * maxf(0.0, 1.0 + game.stat("heal_bonus")))
 		Vfx.wisps(self, Color(0.7, 1.0, 0.75), 12, 0.6).emitting = true
 	var cured: Array = effect.get("cleanse", [])
 	if not cured.is_empty() and cleanse(cured) > 0:
@@ -489,12 +499,14 @@ func consume_item(id: String) -> bool:
 	return true
 
 func _start_action(anim_name: String, slot: String = "", skill: String = "") -> void:
-	var data: Dictionary = Combat.attack("player", anim_name)
+	# Attack speed quickens swings and forms; parrying and using items keep their own pace.
+	var rate: float = 1.0 if anim_name in ["parry", "interact"] else attack_rate()
+	var data: Dictionary = Combat.attack("player", anim_name, "", rate)
 	var clip: String = String(data.get("clip", anim_name))
 	if not visual.has_animation(clip) and data.has("fallback_clip"):
 		# The dedicated clip is not in this model yet: play a close cousin with its timings.
 		clip = String(data["fallback_clip"])
-		data = Combat.attack("player", anim_name, clip)
+		data = Combat.attack("player", anim_name, clip, rate)
 	if data.is_empty():
 		data = {"length": visual.animation_length(anim_name), "hit_start": 99.0, "hit_end": 99.0, "combo_open": 99.0, "recover": visual.animation_length(anim_name)}
 	if anim_name == "interact":
@@ -510,10 +522,10 @@ func _start_action(anim_name: String, slot: String = "", skill: String = "") -> 
 	state = "action"
 	if slot != "":
 		data["slot"] = slot
-	action = {"name": anim_name, "data": data, "t": 0.0, "hits": {}, "prev_u": -1.0, "fired": false, "tick": 0.0, "used": false, "skill": skill, "start": global_position}
+	action = {"name": anim_name, "data": data, "t": 0.0, "hits": {}, "prev_u": -1.0, "fired": false, "tick": 0.0, "used": false, "skill": skill, "start": global_position, "rate": rate}
 	combat_timer = 0.0 if anim_name != "interact" else combat_timer
 	visual.set_sheathed(false)
-	visual.play_action(clip, float(data.get("speed", 1.0)))
+	visual.play_action(clip, float(data.get("speed", 1.0)) * rate)
 	var aim: Vector3 = _aim_direction()
 	if aim != Vector3.ZERO:
 		face_direction(aim, true)
@@ -644,7 +656,8 @@ func _resolve_hits(_name: String, data: Dictionary, t: float, hit_start: float, 
 		"tick":
 			action["tick"] = float(action["tick"]) - get_physics_process_delta_time()
 			if float(action["tick"]) <= 0.0:
-				action["tick"] = float(data.get("tick", 0.13))
+				# A quicker channel ticks as often per turn, so it deals the same in less time.
+				action["tick"] = float(data.get("tick", 0.13)) / float(action.get("rate", 1.0))
 				action["hits"] = {}
 				SkillRunner.tick_vfx(self, data)
 				_hit_targets(Combat.sweep(self, facing, data, 0.0, 0.0, Combat.LAYER_HURT_ENEMY, action["hits"]), data, skill_bonus())
@@ -679,6 +692,9 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 		amount *= 1.0 + PlayerStats.CRIT_BASE + game.stat("crit_dmg")
 	var damage: Combat.Damage = Combat.make_damage(self, data, amount, (entity as Node3D).global_position)
 	damage.status_power = game.attack_power()
+	damage.armor_pen = game.stat("armor_pen")
+	damage.reaction_dmg = game.stat("reaction_dmg")
+	damage.poise *= maxf(0.0, 1.0 + game.stat("poise_dmg"))
 	if direction != Vector3.ZERO:
 		damage.direction = direction
 	if float(data.get("knockback", 0.0)) < 0.0:
@@ -702,6 +718,9 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 			camera_rig.add_trauma(damage.shake)
 		Vfx.burst(get_parent(), damage.position, Vfx.element_color(damage.element) if damage.element != "" else Vfx.SPARK, 16, 6.0)
 		set_meter(meter + float(data.get("meter_gain", 0.0 if slot == "x" else (2.0 if slot != "" else 5.0))) * (1.0 + game.stat("meter_gain")))
+		if game.stat("lifesteal") > 0.0 and not is_dead():
+			# Only blows drink: burns and other damage over time never pass through strike.
+			heal(float(result.get("amount", 0.0)) * game.stat("lifesteal"))
 		emit_signal("attack_landed", entity, float(result.get("amount", amount)))
 		if result.has("status") and String(result["status"]) != "":
 			emit_signal("status_applied", String(result["status"]))
@@ -750,6 +769,8 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		return {"hit": false, "parried": true}
 	if game.stat("damage_taken") != 0.0:
 		damage.amount *= maxf(0.2, 1.0 + game.stat("damage_taken"))
+	# Flat defense, then the blow's element against her matching resistance (both neutral at 0).
+	damage.amount *= Combat.defense_mult(game.stat("defense")) * element_damage_mult(damage.element)
 	# A soaked Lâm An conducts thunder just like a soaked bandit.
 	damage.amount *= statuses.taken_mult(damage.element)
 	var blocking: bool = (current_action() == "parry" or (state == "move" and block_held and is_on_floor())) and from_front
@@ -833,14 +854,14 @@ func heal(amount: float) -> void:
 	emit_signal("health_changed", health, max_health())
 
 func set_stamina(value: float) -> void:
-	stamina = clampf(value, 0.0, max_stamina)
-	emit_signal("stamina_changed", stamina, max_stamina)
+	stamina = clampf(value, 0.0, max_stamina())
+	emit_signal("stamina_changed", stamina, max_stamina())
 
 func revive(point: Vector3) -> void:
 	teleport(point)
 	health = max_health()
 	game.health = health
-	stamina = max_stamina
+	stamina = max_stamina()
 	state = "move"
 	action = {}
 	invulnerable = 1.5
@@ -850,7 +871,7 @@ func revive(point: Vector3) -> void:
 	visual.stop_action()
 	visual.set_state("ground")
 	emit_signal("health_changed", health, max_health())
-	emit_signal("stamina_changed", stamina, max_stamina)
+	emit_signal("stamina_changed", stamina, max_stamina())
 
 # ------------------------------------------------------------------ statuses
 
@@ -879,6 +900,10 @@ func status_resistance(element: String) -> float:
 	## 0..0.9 lower chance for an enemy's status to stick: status_resist plus the matching
 	## res_<element> (both 0 until gear or buffs grant them).
 	return clampf(game.stat("status_resist") + (game.stat("res_" + element) if element != "" else 0.0), 0.0, 0.9)
+
+func element_damage_mult(element: String) -> float:
+	## Share of an elemental blow left after res_<element>; plain steel and 0 resistance keep it all.
+	return 1.0 - clampf(game.stat("res_" + element), -1.0, 0.9) if element != "" else 1.0
 
 func move_speed_scale() -> float:
 	## Chill and soak slow Lâm An like they slow enemies; Khinh thân and gear "move_speed" quicken her.

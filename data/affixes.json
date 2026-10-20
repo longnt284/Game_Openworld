@@ -5,5 +5,16 @@
 	"element_dmg": {"name": "Sát thương nguyên tố +%d%%", "range": [6, 15], "weight": 7},
 	"status_chance": {"name": "Tỉ lệ gây trạng thái +%d%%", "range": [5, 15], "weight": 6},
 	"skill_cd": {"name": "Giảm hồi chiêu %d%%", "range": [4, 10], "weight": 6},
-	"meter_gain": {"name": "Nộ khí nhận được +%d%%", "range": [8, 20], "weight": 6}
+	"meter_gain": {"name": "Nộ khí nhận được +%d%%", "range": [8, 20], "weight": 6},
+	"attack_speed": {"name": "Tốc độ ra đòn +%d%%", "range": [4, 10], "weight": 5},
+	"poise_dmg": {"name": "Sức phá thế +%d%%", "range": [10, 25], "weight": 5},
+	"armor_pen": {"name": "Xuyên giáp +%d", "range": [10, 30], "weight": 4, "flat": true},
+	"lifesteal": {"name": "Hút máu %d%%", "range": [2, 5], "weight": 3},
+	"defense": {"name": "Phòng ngự +%d", "range": [8, 20], "weight": 4, "flat": true},
+	"status_resist": {"name": "Kháng trạng thái +%d%%", "range": [8, 20], "weight": 3},
+	"max_stamina": {"name": "Thể lực tối đa +%d", "range": [10, 25], "weight": 3, "flat": true},
+	"stamina_regen": {"name": "Hồi thể lực +%d%%", "range": [10, 25], "weight": 3},
+	"move_speed": {"name": "Tốc độ di chuyển +%d%%", "range": [3, 8], "weight": 3},
+	"heal_bonus": {"name": "Hiệu quả hồi phục +%d%%", "range": [10, 25], "weight": 3},
+	"reaction_dmg": {"name": "Sát thương phản ứng +%d%%", "range": [8, 20], "weight": 4, "gear": ["talisman"]}
 }

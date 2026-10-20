@@ -87,21 +87,9 @@ func _land(point: Vector3, radius: float) -> void:
 	_hit_area(point, radius)
 
 func _hit_area(center: Vector3, radius: float) -> void:
-	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
-	var shape: SphereShape3D = SphereShape3D.new()
-	shape.radius = radius
-	var query: PhysicsShapeQueryParameters3D = PhysicsShapeQueryParameters3D.new()
-	query.shape = shape
-	query.collide_with_areas = true
-	query.collide_with_bodies = false
-	query.collision_mask = mask
-	query.transform = Transform3D(Basis.IDENTITY, center + Vector3.UP * 0.8)
-	var seen: Dictionary = {}
-	for result: Dictionary in space.intersect_shape(query, 24):
-		var entity: Node = Combat.entity_of(result["collider"] as Area3D)
-		if entity == null or entity == caster or seen.has(entity) or not entity.has_method("take_damage"):
+	for entity: Node in Combat.entities_in(self, center + Vector3.UP * 0.8, radius, mask):
+		if entity == caster:
 			continue
-		seen[entity] = true
 		var away: Vector3 = (entity as Node3D).global_position - center
 		away.y = 0.0
 		var direction: Vector3 = away.normalized() if away.length() > 0.05 else _caster_facing()

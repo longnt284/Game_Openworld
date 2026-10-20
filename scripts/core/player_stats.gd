@@ -1,13 +1,16 @@
 class_name PlayerStats
 extends RefCounted
-## Folds the equipped armory weapon (rarity and affixes) and Endless Trial blessings into
-## one flat bonus table for GameState.stats. Every key defaults to 0, which is neutral.
+## Folds the equipped armory weapon (rarity and affixes), the worn talismans (Ngọc bội: main
+## stat, substats, set bonuses) and Endless Trial blessings into one flat bonus table for
+## GameState.stats. Every key defaults to 0, which is neutral.
 ##   attack_bonus  +x attack power        crit_rate / crit_dmg   critical hits (base ×1.5)
 ##   melee_mult    +x basic-hit damage    element_dmg            +x elemental damage
 ##   status_chance +x status chance       skill_cd               -x skill cooldowns
 ##   meter_gain    +x charge gained       damage_taken           ±x damage received
-##   heal_on_kill  heal x of max health per kill (Trial only)
-##   defense       flat: blows keep 100 / (100 + defense)        armor_pen   flat: ignores enemy armor
+##   heal_on_kill  heal x of max health per kill (Trial blessing, Huyết Ngọc set)
+##   reaction_dmg  +x of every elemental reaction bonus: the extra over the blow and the splash
+##                 (Lôi Văn talismans; Reactions.bonus_mult)
+##   defense       flat: blows keep 100 / (100 + defense)        armor_pen   flat: ignores enemy defense
 ##   lifesteal     heal x of the damage each direct hit deals (never damage over time)
 ##   attack_speed  +x speed of attacks and forms (clip and hit timing together)
 ##   res_<element> -x damage of that element and a lower chance of its status (wind, water, …)
@@ -22,30 +25,35 @@ const CRIT_BASE: float = 0.5
 const AFFIX_STATS: Dictionary = {"atk_pct": "attack_bonus", "crit_rate": "crit_rate", "crit_dmg": "crit_dmg", "element_dmg": "element_dmg",
 	"status_chance": "status_chance", "skill_cd": "skill_cd", "meter_gain": "meter_gain", "defense": "defense", "armor_pen": "armor_pen",
 	"max_stamina": "max_stamina", "lifesteal": "lifesteal", "attack_speed": "attack_speed", "stamina_regen": "stamina_regen",
-	"poise_dmg": "poise_dmg", "move_speed": "move_speed", "heal_bonus": "heal_bonus", "status_resist": "status_resist"}
+	"poise_dmg": "poise_dmg", "move_speed": "move_speed", "heal_bonus": "heal_bonus", "status_resist": "status_resist", "reaction_dmg": "reaction_dmg"}
 ## Character sheet (Túi đồ → Nhân vật): groups of [stat, label, unit]. Units: "pct" a signed
 ## percentage (more is better), "less" one where less is better, "rate" a plain percentage,
 ## "flat" plain points; "power", "health", "stamina", "crit" and "defense" show a computed
 ## total; "elements" expands into one resistance row per element in data/elements.json.
 const SHEET: Array = [
 	["Tấn công", [["attack_bonus", "Công lực", "power"], ["melee_mult", "Sát thương đòn thường", "pct"], ["element_dmg", "Sát thương nguyên tố", "pct"],
-		["crit_rate", "Tỉ lệ bạo kích", "rate"], ["crit_dmg", "Sát thương bạo kích", "crit"], ["attack_speed", "Tốc độ ra đòn", "pct"],
+		["reaction_dmg", "Sát thương phản ứng", "pct"], ["crit_rate", "Tỉ lệ bạo kích", "rate"], ["crit_dmg", "Sát thương bạo kích", "crit"], ["attack_speed", "Tốc độ ra đòn", "pct"],
 		["poise_dmg", "Sức phá thế", "pct"], ["armor_pen", "Xuyên giáp", "flat"], ["lifesteal", "Hút máu", "rate"],
 		["status_chance", "Tỉ lệ gây trạng thái", "pct"], ["meter_gain", "Nộ khí nhận được", "pct"], ["skill_cd", "Giảm hồi chiêu", "pct"]]],
 	["Phòng thủ", [["", "Khí huyết tối đa", "health"], ["defense", "Phòng ngự", "defense"], ["damage_taken", "Sát thương phải nhận", "less"],
 		["status_resist", "Kháng trạng thái", "rate"], ["", "", "elements"]]],
-	["Thân pháp", [["max_stamina", "Thể lực tối đa", "stamina"], ["stamina_regen", "Hồi thể lực", "pct"], ["move_speed", "Tốc độ di chuyển", "pct"],
+	["Thân pháp & hồi phục", [["max_stamina", "Thể lực tối đa", "stamina"], ["stamina_regen", "Hồi thể lực", "pct"], ["move_speed", "Tốc độ di chuyển", "pct"],
 		["heal_bonus", "Hiệu quả hồi phục", "pct"], ["heal_on_kill", "Hồi khí huyết khi hạ địch", "rate"]]],
 ]
 const FLAT_UNITS: PackedStringArray = ["flat", "defense", "stamina"]
 
-static func compute(item: Dictionary, buffs: Dictionary = {}) -> Dictionary:
+static func compute(item: Dictionary, buffs: Dictionary = {}, talismans: Array = []) -> Dictionary:
+	## `item` is the armory weapon ({} for a story sword), `buffs` the Trial blessing totals and
+	## `talismans` the worn Ngọc bội (PlayerProfile.equipped_talismans).
 	var result: Dictionary = {}
 	if not item.is_empty():
 		var rarity: Dictionary = rarity_data(String(item.get("rarity", "r")))
 		_add(result, "attack_bonus", float(rarity.get("attack", 0.0)))
 		for affix: Array in item.get("affixes", []):
 			_add(result, String(AFFIX_STATS.get(String(affix[0]), "")), affix_value(affix))
+	var worn: Dictionary = Talismans.stats(talismans)
+	for stat: String in worn:
+		_add(result, stat, float(worn[stat]))
 	for stat: String in buffs:
 		_add(result, stat, float(buffs[stat]))
 	result.erase("")
@@ -60,6 +68,10 @@ static func affix_value(affix: Array) -> float:
 
 static func affix_data(id: String) -> Dictionary:
 	return (ContentDB.get_data("affixes") as Dictionary).get(id, {})
+
+static func affix_allowed(id: String, gear: String) -> bool:
+	## Whether an affix may roll on "sword" or "talisman"; data "gear" narrows it, absent means both.
+	return (affix_data(id).get("gear", ["sword", "talisman"]) as Array).has(gear)
 
 static func rarity_data(rarity: String) -> Dictionary:
 	return ((ContentDB.get_data("gacha") as Dictionary).get("rarity", {}) as Dictionary).get(rarity, {})
@@ -115,7 +127,7 @@ static func _row(state: GameState, stat: String, label: String, unit: String) ->
 		"power":
 			text = "%d" % roundi(state.attack_power())
 			if tone != 0:
-				notes.append(signed_pct(value))
+				notes.append("tổng " + signed_pct(value))
 		"health":
 			text = "%d" % roundi(state.max_health())
 		"stamina":
@@ -123,7 +135,7 @@ static func _row(state: GameState, stat: String, label: String, unit: String) ->
 		"defense":
 			text = "%d" % roundi(value)
 			if value > 0.0:
-				notes.append("giảm %d%% sát thương" % roundi((1.0 - Combat.armor_mult(value)) * 100.0))
+				notes.append("giảm %d%% sát thương" % roundi((1.0 - Combat.defense_mult(value)) * 100.0))
 		"flat":
 			text = "%d" % roundi(value)
 		"rate":
@@ -134,7 +146,7 @@ static func _row(state: GameState, stat: String, label: String, unit: String) ->
 			tone = -tone
 	var live: float = float(state.status_stats.get(stat, 0.0)) if stat != "" else 0.0
 	if not is_zero_approx(live):
-		notes.append("trạng thái " + (signed_flat(live) if FLAT_UNITS.has(unit) else signed_pct(live)))
+		notes.append("từ trạng thái " + (signed_flat(live) if FLAT_UNITS.has(unit) else signed_pct(live)))
 	return {"stat": stat, "label": label, "value": text, "detail": "  •  ".join(notes), "tone": tone}
 
 static func signed_pct(value: float) -> String:

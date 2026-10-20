@@ -5,6 +5,11 @@ extends SceneTree
 ## infrastructure: class factory, enemy-cast areas, camp attack slots, tint, wind-up cues
 ## and damage-over-time numbers. Statuses on Lâm An: poison, bleed, stun, slows, buffs and
 ## debuffs in GameState.stat, cleanse, revive, enemy blows that land or miss, HUD icons.
+## Gear stats: defense, elemental resistance, enemy defense and armor_pen, poise damage,
+## lifesteal, attack speed (clip and hit window together), stamina, move speed, item healing.
+## Elemental reactions: each of the six fires on its combination only, consumes and applies its
+## statuses, splashes other enemies once each without chaining into more reactions, grows with
+## reaction_dmg and grants no lifesteal or meter for its splash.
 
 var failures: int = 0
 var game: Node3D
@@ -48,6 +53,20 @@ func spawn(kind: String, offset: Vector3, hp: float = 5000.0) -> Enemy:
 	enemy.max_health = hp
 	enemy.health = hp
 	return enemy
+
+func blow(target: Enemy, element: String, amount: float = 100.0, extra: Dictionary = {}) -> Combat.Damage:
+	## A still, unstaggering test blow of one element (or plain steel for "").
+	var data: Dictionary = {"poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": element}
+	data.merge(extra, true)
+	return Combat.make_damage(player, data, amount, target.global_position)
+
+func watch(enemies: Array) -> Dictionary:
+	## Counts reaction_hit signals per enemy id, splash hits included.
+	var counts: Dictionary = {}
+	for enemy: Enemy in enemies:
+		enemy.reaction_hit.connect(func(target: Enemy, _reaction: String, _amount: float, _splash: bool) -> void:
+			counts[target.entity_id] = int(counts.get(target.entity_id, 0)) + 1)
+	return counts
 
 func clear_dummies() -> void:
 	for node: Node in get_nodes_in_group("enemy"):
@@ -438,6 +457,301 @@ func _run() -> void:
 	player.cleanse(["poison", "bleed", "buff_atk"])
 	game._refresh_hud()
 	check(game.hud.status_icon_count() == 0, "Cleansed statuses leave the HUD")
+
+	# ---- gear stats: defense and elemental resistance on Lâm An, enemy defense and armor_pen,
+	# poise damage, lifesteal, attack speed, stamina, move speed and item healing
+	var kept_stats: Dictionary = state.stats
+	var kept_sword: String = state.sword
+	state.sword = "sword_old"
+	await reset_player()
+	var brute: Enemy = spawn("tan_binh", Vector3(0, 0, -2))
+	await frames(2)
+	var steel_blow: Dictionary = {"poise": 0, "knockback": 0.0, "hitstop": 0.0}
+	var frost_blow: Dictionary = {"poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": "frost"}
+	var losses: Array[float] = []
+	for trial_case: Array in [[{}, steel_blow], [{"defense": 100.0}, steel_blow], [{"res_frost": 0.5}, frost_blow], [{"res_frost": 0.5}, steel_blow]]:
+		await reset_player()
+		state.stats = trial_case[0]
+		var hp_start: float = player.health
+		player.take_damage(Combat.make_damage(brute, trial_case[1], 20.0, player.global_position))
+		losses.append(hp_start - player.health)
+	check(is_equal_approx(losses[0], 20.0) and is_equal_approx(losses[1], 10.0), "100 defense halves a blow (%.1f → %.1f)" % [losses[0], losses[1]])
+	check(is_equal_approx(losses[2], 10.0) and is_equal_approx(losses[3], 20.0), "Frost resistance halves frost blows only (frost %.1f, steel %.1f)" % [losses[2], losses[3]])
+	await reset_player()
+	state.stats = {}
+	brute.data = brute.data.duplicate(true)
+	brute.data["defense"] = 100.0
+	var pierced: Array[float] = []
+	for pen: float in [0.0, 60.0, 150.0]:
+		var probe: Combat.Damage = Combat.make_damage(player, {"poise": 0, "knockback": 0.0, "hitstop": 0.0, "flinch": false}, 50.0, brute.global_position)
+		probe.armor_pen = pen
+		var brute_start: float = brute.health
+		brute.take_damage(probe)
+		pierced.append(brute_start - brute.health)
+	check(is_equal_approx(pierced[0], 25.0) and is_equal_approx(pierced[1], 50.0 * 100.0 / 140.0) and is_equal_approx(pierced[2], 50.0),
+		"Enemy defense 100 halves a blow; armor_pen 60 leaves 40 of it, 150 ignores it all (%.1f, %.1f, %.1f)" % [pierced[0], pierced[1], pierced[2]])
+	state.stats = {"armor_pen": 40.0}
+	player.counter_bonus = 0.0
+	var through: Dictionary = player.strike(brute, {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0}, 1.0)
+	check(is_equal_approx(float(through.get("amount", 0.0)), state.attack_power() * 100.0 / 160.0), "Lâm An's armor_pen rides on her strikes (%.1f)" % float(through.get("amount", 0.0)))
+	state.stats = {"poise_dmg": 0.5}
+	brute.poise = brute.max_poise
+	player.strike(brute, {"mult": 0.1, "poise": 10, "knockback": 0.0, "hitstop": 0.0}, 1.0)
+	check(is_equal_approx(brute.max_poise - brute.poise, 15.0), "poise_dmg +50%% makes a 10-poise blow break 15 (%.1f)" % (brute.max_poise - brute.poise))
+	state.stats = {"lifesteal": 0.5}
+	player.health = player.max_health() * 0.5
+	var hp_mark: float = player.health
+	var drink: Dictionary = player.strike(brute, {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0}, 1.0)
+	var drank: float = player.health - hp_mark
+	brute.statuses.apply("burn", 2, 30.0)
+	hp_mark = player.health
+	var brute_burning: float = brute.health
+	brute._tick_statuses(0.6)
+	check(drank > 0.0 and is_equal_approx(drank, float(drink.get("amount", 0.0)) * 0.5) and brute.health < brute_burning and is_equal_approx(player.health, hp_mark),
+		"Lifesteal heals half of what a blow dealt (%.1f) and nothing from the burn it left" % drank)
+	await clear_dummies()
+	# Attack speed: the clip and its hit window run faster together, and the blow still lands.
+	state.stats = {"attack_speed": 0.25}
+	await reset_player()
+	player._start_action("attack_3")
+	var quick_data: Dictionary = player.action["data"]
+	var base_data: Dictionary = Combat.attack("player", "attack_3")
+	check(is_equal_approx(float(quick_data["hit_start"]), float(base_data["hit_start"]) / 1.25) and is_equal_approx(float(quick_data["length"]), float(base_data["length"]) / 1.25)
+		and is_equal_approx(player.visual.base_speed, 1.25) and is_equal_approx(player.visual.action_length, player.visual.animation_length("attack_3") / 1.25),
+		"Attack speed +25% plays attack_3 1.25× faster with its hit window scaled alike")
+	await frames(70)
+	var swing_frames: Array[int] = []
+	var hit_frames: Array[int] = []
+	for quick: float in [0.0, 0.25]:
+		state.stats = {"attack_speed": quick} if quick > 0.0 else {}
+		await reset_player()
+		var swing_target: Enemy = spawn("tan_binh", Vector3(0, 0, -1.8))
+		await frames(2)
+		player._start_action("attack_3")
+		var landed: int = -1
+		var count: int = 0
+		while player.state == "action" and count < 240:
+			await frames(1)
+			count += 1
+			if landed < 0 and swing_target.health < swing_target.max_health:
+				landed = count
+		swing_frames.append(count)
+		hit_frames.append(landed)
+		await clear_dummies()
+	check(hit_frames[0] > 0 and hit_frames[1] > 0 and hit_frames[1] < hit_frames[0] and swing_frames[1] < swing_frames[0] and absf(swing_frames[1] - swing_frames[0] / 1.25) <= 4.0,
+		"A quicker attack_3 still lands, sooner (frame %d vs %d) and ends sooner (%d vs %d frames)" % [hit_frames[1], hit_frames[0], swing_frames[1], swing_frames[0]])
+	# Stamina: a flat bonus over the base 100 that shrinks back, and quicker recovery.
+	await reset_player()
+	state.stats = {"max_stamina": 50.0}
+	player.set_stamina(999.0)
+	var topped: float = player.stamina
+	game._refresh_vitals()
+	var bar_max: float = game.hud.stamina_bar.max_value
+	state.stats = {}
+	player._tick_timers(0.01)
+	check(is_equal_approx(topped, 150.0) and is_equal_approx(bar_max, 150.0) and is_equal_approx(player.stamina, 100.0),
+		"max_stamina +50 lifts the bar to 150 and it shrinks back to 100 when the bonus ends")
+	player.set_stamina(10.0)
+	player.stamina_delay = 0.0
+	player._tick_timers(0.5)
+	var base_regen: float = player.stamina - 10.0
+	state.stats = {"stamina_regen": 0.5}
+	player.set_stamina(10.0)
+	player.stamina_delay = 0.0
+	player._tick_timers(0.5)
+	check(is_equal_approx(base_regen, 16.0) and is_equal_approx(player.stamina - 10.0, 24.0), "stamina_regen +50% recovers 24 instead of 16 in half a second")
+	# Move speed: the run itself is faster, not just the factor.
+	var runs: Array[float] = []
+	for bonus: float in [0.0, 0.2]:
+		await reset_player()
+		state.stats = {"move_speed": bonus} if bonus > 0.0 else {}
+		Input.action_press("move_forward")
+		await frames(20)
+		runs.append(Vector2(player.velocity.x, player.velocity.z).length())
+		Input.action_release("move_forward")
+		await frames(10)
+	check(is_equal_approx(player.move_speed_scale(), 1.2) and absf(runs[0] - game.settings.walk_speed) < 0.2 and absf(runs[1] - game.settings.walk_speed * 1.2) < 0.2,
+		"move_speed +20%% runs at %.2f m/s instead of %.2f" % [runs[1], runs[0]])
+	state.stats = {"heal_bonus": 0.5}
+	state.add_item("banh_ngai", 1)
+	player.health = player.max_health() * 0.1
+	player.consume_item("banh_ngai")
+	check(is_equal_approx(player.health, player.max_health() * (0.1 + float(Consumables.effect("banh_ngai")["heal"]) * 1.5)), "heal_bonus +50% makes Bánh ngải restore half again as much")
+	state.stats = kept_stats
+	state.sword = kept_sword
+	await reset_player()
+
+	# ---- elemental reactions: data, then each reaction on its combination, its splash and
+	# what it consumes; wrong combinations stay quiet; splash never sets off another reaction
+	await clear_dummies()
+	var reaction_stats: Dictionary = state.stats
+	state.stats = {}
+	await reset_player()
+	var reactions_ok: bool = true
+	for reaction: Dictionary in Reactions.list():
+		var named: Array = (reaction.get("needs", []) as Array) + (reaction.get("consume", []) as Array)
+		var trigger_ok: bool = String(reaction.get("trigger", "")) == "heavy" or not ContentDB.element(String(reaction.get("element", ""))).is_empty()
+		for id: Variant in named:
+			if ContentDB.status(String(id)).is_empty():
+				trigger_ok = false
+		if String(reaction.get("name", "")) == "" or not reaction.has("color") or (reaction.get("needs", []) as Array).is_empty() or not trigger_ok:
+			reactions_ok = false
+			push_error("Reaction %s lacks a name, a colour, known statuses or a trigger" % reaction.get("id", "?"))
+	check(reactions_ok and Reactions.list().size() == 6 and bool(Combat.attack("player", "heavy").get("heavy", false)) and Combat.make_damage(player, Combat.attack("player", "heavy"), 1.0, player.global_position).heavy,
+		"Six reactions name known statuses and a trigger; the heavy attack carries the heavy tag")
+	var soak_thunder: float = float(ContentDB.status("soak")["taken"]["thunder"])
+
+	# Điện Giật: +40% on the soaked target, shock and a jolt for soaked foes within 5 m only.
+	var wet: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	var wet_near: Enemy = spawn("tan_binh", Vector3(2, 0, -6))
+	var dry_near: Enemy = spawn("tan_binh", Vector3(-2, 0, -6))
+	var wet_far: Enemy = spawn("tan_binh", Vector3(0, 0, -14))
+	await frames(2)
+	for enemy: Enemy in [wet, wet_near]:
+		game.on_enemy_spawned(enemy, {"id": enemy.entity_id})
+	var reacted: Dictionary = watch([wet, wet_near, dry_near, wet_far])
+	for enemy: Enemy in [wet, wet_near, wet_far]:
+		enemy.statuses.apply("soak", 1, 10.0)
+	var floating: Callable = func() -> Array: return game.get_children().filter(func(node: Node) -> bool: return node is Label3D).map(func(node: Node) -> String: return (node as Label3D).text)
+	var floats_before: int = floating.call().size()
+	var rule: Dictionary = Reactions.find("electrocharge")
+	var charged: Dictionary = wet.take_damage(blow(wet, "thunder"))
+	check(String(charged.get("reaction", "")) == "electrocharge" and is_equal_approx(float(charged["amount"]), 100.0 * soak_thunder * float(rule["mult"])) and wet.statuses.has("soak"),
+		"Điện Giật: thunder on a soaked foe deals %.0f of 100 and leaves it wet" % float(charged.get("amount", 0.0)))
+	check(wet_near.statuses.has("shock") and is_equal_approx(wet_near.max_health - wet_near.health, 100.0 * float(rule["splash"]) * soak_thunder)
+		and not dry_near.statuses.has("shock") and is_equal_approx(dry_near.health, dry_near.max_health) and not wet_far.statuses.has("shock") and is_equal_approx(wet_far.health, wet_far.max_health),
+		"Điện Giật spreads shock to soaked foes within 5 m, not to dry or distant ones")
+	check(int(reacted.get(wet.entity_id, 0)) == 1 and int(reacted.get(wet_near.entity_id, 0)) == 1 and not reacted.has(dry_near.entity_id) and not reacted.has(wet_far.entity_id)
+		and is_equal_approx(wet.max_health - wet.health, float(charged["amount"])) and wet_near.statuses.has("soak"),
+		"A reaction's splash hits each foe once and never sets off a reaction of its own")
+	var floats: Array = floating.call()
+	check(floats.size() == floats_before + 2 and floats.has("Điện Giật!") and game.hinted.has("reaction:electrocharge"),
+		"A reaction floats its name, its splash floats a number, and the first one explains itself")
+	await clear_dummies()
+
+	# Hỏa Lốc: gale + flame bursts 4 m, two burn stacks on everyone it reaches, gale used up.
+	var whirled: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	var beside: Enemy = spawn("tan_binh", Vector3(2.5, 0, -6))
+	var aside: Enemy = spawn("tan_binh", Vector3(-7, 0, -6))
+	await frames(2)
+	whirled.statuses.apply("gale", 1, 10.0)
+	rule = Reactions.find("firestorm")
+	var firestorm: Dictionary = whirled.take_damage(blow(whirled, "flame"))
+	check(String(firestorm.get("reaction", "")) == "firestorm" and is_equal_approx(float(firestorm["amount"]), 100.0 * float(rule["mult"])) and not whirled.statuses.has("gale") and whirled.statuses.stacks("burn") == 2,
+		"Hỏa Lốc: flame on a gale-struck foe deals %.0f, uses up the gale and burns it twice" % float(firestorm.get("amount", 0.0)))
+	check(beside.statuses.stacks("burn") == 2 and is_equal_approx(beside.max_health - beside.health, 100.0 * float(rule["splash"])) and is_equal_approx(aside.health, aside.max_health) and not aside.statuses.has("burn"),
+		"Hỏa Lốc's 4 m burst burns a foe beside it, not one 7 m away")
+	await clear_dummies()
+
+	# Bốc Hơi: chill or freeze + flame, ×1.8, melts both.
+	var chilled: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	var iced: Enemy = spawn("tan_binh", Vector3(4, 0, -6))
+	await frames(2)
+	chilled.statuses.apply("chill", 1, 10.0)
+	var steam: Dictionary = chilled.take_damage(blow(chilled, "flame"))
+	iced.apply_status("freeze", 1, 10.0)
+	var melted: Dictionary = iced.take_damage(blow(iced, "flame"))
+	check(String(steam.get("reaction", "")) == "vaporize" and is_equal_approx(float(steam["amount"]), 100.0 * float(Reactions.find("vaporize")["mult"])) and not chilled.statuses.has("chill")
+		and String(melted.get("reaction", "")) == "vaporize" and not iced.statuses.has("freeze"),
+		"Bốc Hơi: flame on a chilled foe deals %.0f and melts chill and freeze alike" % float(steam.get("amount", 0.0)))
+	await clear_dummies()
+
+	# Đông Kết: soak + frost freezes at once (in place of the frost's own chill); a boss chills twice.
+	var drenched: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	var drenched_boss: Enemy = spawn("truc_tuong", Vector3(5, 0, -8))
+	await frames(2)
+	var frost_hit: Dictionary = {"status": {"id": "chill", "chance": 1.0}}
+	drenched.statuses.apply("soak", 1, 10.0)
+	var frozen: Dictionary = drenched.take_damage(blow(drenched, "frost", 10.0, frost_hit))
+	check(String(frozen.get("reaction", "")) == "deep_freeze" and String(frozen.get("status", "")) == "freeze" and drenched.statuses.has("freeze") and drenched.state == "stagger"
+		and not drenched.statuses.has("soak") and not drenched.statuses.has("chill"),
+		"Đông Kết: frost on a soaked foe freezes it at once and dries it")
+	drenched_boss.statuses.apply("soak", 1, 10.0)
+	var boss_frozen: Dictionary = drenched_boss.take_damage(blow(drenched_boss, "frost", 10.0, frost_hit))
+	check(String(boss_frozen.get("reaction", "")) == "deep_freeze" and not drenched_boss.statuses.has("freeze") and drenched_boss.statuses.stacks("chill") == 2 and not drenched_boss.statuses.has("soak"),
+		"Đông Kết on the miniboss adds two chill stacks instead of a freeze")
+	await clear_dummies()
+
+	# Lôi Phong: gale + thunder chains to the two nearest foes in turn, not a third.
+	var storm_eye: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	var link_one: Enemy = spawn("tan_binh", Vector3(3, 0, -6))
+	var link_two: Enemy = spawn("tan_binh", Vector3(6, 0, -6))
+	var link_three: Enemy = spawn("tan_binh", Vector3(9, 0, -6))
+	await frames(2)
+	reacted = watch([storm_eye, link_one, link_two, link_three])
+	storm_eye.statuses.apply("gale", 1, 10.0)
+	rule = Reactions.find("storm_chain")
+	var chained: Dictionary = storm_eye.take_damage(blow(storm_eye, "thunder"))
+	check(String(chained.get("reaction", "")) == "storm_chain" and is_equal_approx(float(chained["amount"]), 100.0 * float(rule["mult"])) and not storm_eye.statuses.has("gale"),
+		"Lôi Phong: thunder on a gale-struck foe deals %.0f and uses up the gale" % float(chained.get("amount", 0.0)))
+	check(is_equal_approx(link_one.max_health - link_one.health, 100.0 * float(rule["splash"])) and is_equal_approx(link_two.max_health - link_two.health, 100.0 * float(rule["splash"]))
+		and link_one.statuses.has("shock") and link_two.statuses.has("shock") and is_equal_approx(link_three.health, link_three.max_health)
+		and int(reacted.get(link_one.entity_id, 0)) == 1 and int(reacted.get(link_two.entity_id, 0)) == 1 and not reacted.has(link_three.entity_id),
+		"Lôi Phong's lightning hops to two more foes, once each, and stops")
+	await clear_dummies()
+
+	# Vỡ Băng: a heavy blow on a frozen foe shatters the ice and knocks it down afresh.
+	var statue: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	await frames(2)
+	statue.apply_status("freeze", 1, 10.0)
+	statue.state_time = 0.5
+	rule = Reactions.find("shatter")
+	var shattered: Dictionary = statue.take_damage(Combat.make_damage(player, Combat.attack("player", "heavy"), 100.0, statue.global_position))
+	check(String(shattered.get("reaction", "")) == "shatter" and is_equal_approx(float(shattered["amount"]), 100.0 * 1.35 * float(rule["mult"])) and not statue.statuses.has("freeze")
+		and statue.state == "stagger" and is_zero_approx(statue.state_time) and is_equal_approx(statue.stagger_time, float(statue.data.get("break_stagger", 1.4))) and is_equal_approx(statue.poise, statue.max_poise),
+		"Vỡ Băng: a heavy blow on a frozen foe deals %.0f, breaks the ice and its poise" % float(shattered.get("amount", 0.0)))
+	await clear_dummies()
+
+	# Wrong combinations: nothing reacts and nothing is consumed.
+	var bystander_dummy: Enemy = spawn("tan_binh", Vector3(0, 0, -6))
+	await frames(2)
+	var quiet: bool = true
+	for case: Array in [["gale", "frost", false], ["chill", "thunder", false], ["soak", "flame", false], ["soak", "", false], ["chill", "", true], ["freeze", "", false], ["burn", "water", false]]:
+		bystander_dummy.statuses.clear()
+		bystander_dummy.state = "idle"
+		bystander_dummy.apply_status(String(case[0]), 1, 10.0)
+		var outcome: Dictionary = bystander_dummy.take_damage(blow(bystander_dummy, String(case[1]), 10.0, {"heavy": bool(case[2])}))
+		if outcome.has("reaction") or not bystander_dummy.statuses.has(String(case[0])):
+			quiet = false
+			push_error("%s + %s%s reacted (%s)" % [case[0], case[1], " heavy" if case[2] else "", outcome.get("reaction", "")])
+	check(quiet, "Wrong combinations set off no reaction and keep their status")
+	await clear_dummies()
+
+	# reaction_dmg grows the bonus and the splash; splash grants no lifesteal or meter.
+	await reset_player()
+	var conductor: Enemy = spawn("tan_binh", Vector3(0, 0, -2))
+	var neighbour: Enemy = spawn("tan_binh", Vector3(2, 0, -2.5))
+	await frames(2)
+	var zap: Dictionary = {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": "thunder"}
+	var direct: Array[float] = []
+	var jolts: Array[float] = []
+	for bonus: float in [0.0, 0.5]:
+		state.stats = {"reaction_dmg": bonus} if bonus > 0.0 else {}
+		for enemy: Enemy in [conductor, neighbour]:
+			enemy.health = enemy.max_health
+			enemy.statuses.clear()
+			enemy.statuses.apply("soak", 1, 10.0)
+		player.counter_bonus = 0.0
+		direct.append(float(player.strike(conductor, zap, 1.0).get("amount", 0.0)))
+		jolts.append(neighbour.max_health - neighbour.health)
+	rule = Reactions.find("electrocharge")
+	var grown: float = (1.0 + (float(rule["mult"]) - 1.0) * 1.5) / float(rule["mult"])
+	check(direct[0] > 0.0 and is_equal_approx(direct[1] / direct[0], grown) and jolts[0] > 0.0 and is_equal_approx(jolts[1] / jolts[0], 1.5),
+		"reaction_dmg +50%% grows Điện Giật's bonus (×%.3f) and its splash (×%.2f)" % [direct[1] / direct[0], jolts[1] / jolts[0]])
+	state.stats = {"lifesteal": 0.5}
+	for enemy: Enemy in [conductor, neighbour]:
+		enemy.health = enemy.max_health
+		enemy.statuses.apply("soak", 1, 10.0)
+	player.health = player.max_health() * 0.5
+	player.set_meter(0.0)
+	var drink_mark: float = player.health
+	player.counter_bonus = 0.0
+	var conducted: Dictionary = player.strike(conductor, zap, 1.0)
+	check(String(conducted.get("reaction", "")) == "electrocharge" and neighbour.health < neighbour.max_health and is_equal_approx(player.health - drink_mark, float(conducted["amount"]) * 0.5) and is_equal_approx(player.meter, 5.0),
+		"Lifesteal and meter come from the reacting blow only, never its splash")
+	state.stats = reaction_stats
+	await clear_dummies()
+	await reset_player()
 
 	# ---- last, because it runs the death screen: poison can kill, and death clears statuses
 	await reset_player()

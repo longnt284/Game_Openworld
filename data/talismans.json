@@ -1,0 +1,59 @@
+{
+	"capacity": 60,
+	"slots": [
+		{"id": "thien", "name": "Thiên", "glyph": "T"},
+		{"id": "dia", "name": "Địa", "glyph": "Đ"},
+		{"id": "nhan", "name": "Nhân", "glyph": "N"}
+	],
+	"rarity": {
+		"r": {"weight": 76, "substats": 1, "main_scale": 1.0, "salvage": 15},
+		"sr": {"weight": 20, "substats": 2, "main_scale": 1.3, "salvage": 40},
+		"ssr": {"weight": 4, "substats": 3, "main_scale": 1.6, "salvage": 100}
+	},
+	"sources": {
+		"enemy": {},
+		"elite": {"weights": {"r": 55, "sr": 35, "ssr": 10}, "chance_mult": 3.0},
+		"boss": {"weights": {"r": 25, "sr": 55, "ssr": 20}}
+	},
+	"chests": {"trial": 0.25, "elite": 0.5, "boss_tier": 1.0},
+	"sets": {
+		"phong_linh": {"name": "Phong Linh", "color": "6fd6b0", "description": "Chuông gió treo mái miếu: ngân một tiếng, chiêu sau nối chiêu trước.",
+			"2": {"desc": "Hồi chiêu nhanh hơn 10%", "stats": {"skill_cd": 0.10}},
+			"3": {"desc": "+25% nộ khí nhận được, hồi chiêu nhanh thêm 5%", "stats": {"meter_gain": 0.25, "skill_cd": 0.05}}},
+		"huyet_ngoc": {"name": "Huyết Ngọc", "color": "d9534a", "description": "Ngọc nhuốm máu kẻ thù, càng đánh càng thấy người ấm lại.",
+			"2": {"desc": "Mỗi đòn trúng hồi lại 3% sát thương gây ra", "stats": {"lifesteal": 0.03}},
+			"3": {"desc": "Hạ một kẻ địch hồi 5% khí huyết, +20% hiệu quả hồi phục", "stats": {"heal_on_kill": 0.05, "heal_bonus": 0.20}}},
+		"kim_cuong": {"name": "Kim Cương", "color": "b9c6cf", "description": "Đá vách Khe Gió mài thành phù hộ thân, cứng như chính vách núi.",
+			"2": {"desc": "+25 phòng ngự", "stats": {"defense": 25}},
+			"3": {"desc": "+30% sức phá thế, +15% kháng trạng thái", "stats": {"poise_dmg": 0.30, "status_resist": 0.15}}},
+		"loi_van": {"name": "Lôi Văn", "color": "f2e45c", "description": "Vân sét khắc chìm trong ngọc, chạm vào nghe tê đầu ngón tay.",
+			"2": {"desc": "+12% sát thương nguyên tố", "stats": {"element_dmg": 0.12}},
+			"3": {"desc": "+25% sát thương phản ứng nguyên tố, +10% tỉ lệ gây trạng thái", "stats": {"reaction_dmg": 0.25, "status_chance": 0.10}}}
+	},
+	"pieces": {
+		"phong_linh_thien": {"name": "Phong Linh Ngọc", "set": "phong_linh", "slot": "thien", "main": ["skill_cd", 4, 8],
+			"description": "Miếng ngọc lam khoét rỗng, gió lùa qua là ngân khẽ như chuông."},
+		"phong_linh_dia": {"name": "Chuông Gió Lam", "set": "phong_linh", "slot": "dia", "main": ["meter_gain", 8, 16],
+			"description": "Chiếc chuông đồng nhỏ tháo từ mái Miếu Gió, vẫn còn rêu xanh."},
+		"phong_linh_nhan": {"name": "Tua Lục Phong", "set": "phong_linh", "slot": "nhan", "main": ["stamina_regen", 10, 20],
+			"description": "Tua lụa xanh lục buộc chuôi kiếm, bay phần phật theo từng bước chân."},
+		"huyet_ngoc_thien": {"name": "Huyết Ngọc Bội", "set": "huyet_ngoc", "slot": "thien", "main": ["lifesteal", 2, 4],
+			"description": "Ngọc bội đỏ sẫm, giữa có vân như giọt máu chưa khô."},
+		"huyet_ngoc_dia": {"name": "Chuỗi Huyết Châu", "set": "huyet_ngoc", "slot": "dia", "main": ["heal_bonus", 10, 20],
+			"description": "Mười tám hạt châu đỏ xâu dây gai, ấm như vừa cầm trong tay người khác."},
+		"huyet_ngoc_nhan": {"name": "Huyết Tâm Thạch", "set": "huyet_ngoc", "slot": "nhan", "main": ["atk_pct", 4, 8],
+			"description": "Viên đá nhỏ đập nhè nhẹ trong lòng bàn tay, như một trái tim thứ hai."},
+		"kim_cuong_thien": {"name": "Kim Cương Hoàn", "set": "kim_cuong", "slot": "thien", "main": ["defense", 10, 20],
+			"description": "Vòng đá xám đeo cổ tay, nặng trĩu mà không hề vướng víu."},
+		"kim_cuong_dia": {"name": "Hộ Phù Kim Cương", "set": "kim_cuong", "slot": "dia", "main": ["poise_dmg", 10, 20],
+			"description": "Lá bùa đá mỏng khắc chữ trấn, chém vào đâu là thế địch vỡ ở đó."},
+		"kim_cuong_nhan": {"name": "Thạch Giáp Phù", "set": "kim_cuong", "slot": "nhan", "main": ["max_stamina", 10, 20],
+			"description": "Mảnh giáp đá cũ của lính gác đền, lót trong áo cho hơi thở dài hơn."},
+		"loi_van_thien": {"name": "Lôi Văn Ngọc", "set": "loi_van", "slot": "thien", "main": ["element_dmg", 6, 12],
+			"description": "Ngọc trắng có vân sét vàng chạy ngoằn ngoèo, đêm giông tự sáng lên."},
+		"loi_van_dia": {"name": "Ấn Lôi Văn", "set": "loi_van", "slot": "dia", "main": ["reaction_dmg", 10, 20],
+			"description": "Con ấn đồng khắc hình mây sấm. Đóng xuống đâu, các luồng khí nơi đó va nhau dữ dội."},
+		"loi_van_nhan": {"name": "Khấu Lôi Văn", "set": "loi_van", "slot": "nhan", "main": ["status_chance", 6, 12],
+			"description": "Khuy áo bằng đá sét, chạm vào kẻ địch là để lại vết tê."}
+	}
+}

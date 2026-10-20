@@ -13,8 +13,8 @@ const LAYER_NPC: int = 8
 const LAYER_HURT_PLAYER: int = 16
 const LAYER_HURT_ENEMY: int = 32
 const LAYER_INTERACT: int = 64
-## Flat armor (enemies) and defense (Lâm An) both leave 100 / (100 + value) of a blow.
-const ARMOR_SCALE: float = 100.0
+## Flat "defense" (enemies and Lâm An alike) leaves 100 / (100 + defense) of a blow.
+const DEFENSE_SCALE: float = 100.0
 
 
 class Damage:
@@ -37,8 +37,16 @@ class Damage:
 	var status_power: float = 0.0
 	## Ticking areas hurt without making the target flinch, flash or freeze the frame.
 	var flinch: bool = true
-	## Flat enemy "armor" this blow ignores (Lâm An's armor_pen).
+	## Flat enemy "defense" this blow ignores (Lâm An's armor_pen).
 	var armor_pen: float = 0.0
+	## Heavy swings (attack data "heavy": the charged attack, later the finisher) shatter ice.
+	var heavy: bool = false
+	## The source's bonus to elemental reaction damage (Lâm An's reaction_dmg).
+	var reaction_dmg: float = 0.0
+	## The reaction this blow set off ("" for none); on a splash packet, the one that threw it.
+	var reaction: String = ""
+	## A reaction's own splash, spread or chain hit: it never sets off another reaction.
+	var reaction_splash: bool = false
 
 static func attack(owner: String, name: String, clip: String = "", rate: float = 1.0) -> Dictionary:
 	## Attack data merged with the timing of the clip it plays (data "clip", else its own
@@ -80,9 +88,27 @@ static func sweep(attacker: Node3D, facing: Vector3, data: Dictionary, u_from: f
 			hits.append(area)
 	return hits
 
-static func armor_mult(armor: float) -> float:
-	## Share of a blow left after flat armor or defense; none (or less than none) is neutral.
-	return ARMOR_SCALE / (ARMOR_SCALE + maxf(0.0, armor))
+static func entities_in(node: Node3D, center: Vector3, radius: float, mask: int, max_results: int = 24) -> Array[Node]:
+	## Every damageable entity (once each) whose hurtbox overlaps a sphere: area attacks and
+	## the splash of elemental reactions.
+	var shape: SphereShape3D = SphereShape3D.new()
+	shape.radius = radius
+	var query: PhysicsShapeQueryParameters3D = PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	query.collision_mask = mask
+	query.transform = Transform3D(Basis.IDENTITY, center)
+	var found: Array[Node] = []
+	for result: Dictionary in node.get_world_3d().direct_space_state.intersect_shape(query, max_results):
+		var entity: Node = entity_of(result["collider"] as Area3D)
+		if entity != null and not found.has(entity) and entity.has_method("take_damage"):
+			found.append(entity)
+	return found
+
+static func defense_mult(defense: float) -> float:
+	## Share of a blow left after flat defense; none (or less than none) is neutral.
+	return DEFENSE_SCALE / (DEFENSE_SCALE + maxf(0.0, defense))
 
 static func make_damage(source: Node3D, data: Dictionary, amount: float, target_position: Vector3) -> Damage:
 	var damage: Damage = Damage.new()
@@ -97,6 +123,7 @@ static func make_damage(source: Node3D, data: Dictionary, amount: float, target_
 	damage.element = String(data.get("element", ""))
 	damage.status = data.get("status", {}) as Dictionary
 	damage.flinch = bool(data.get("flinch", true))
+	damage.heavy = bool(data.get("heavy", false))
 	var direction: Vector3 = target_position - source.global_position
 	direction.y = 0.0
 	damage.direction = direction.normalized() if direction.length() > 0.01 else Vector3.FORWARD

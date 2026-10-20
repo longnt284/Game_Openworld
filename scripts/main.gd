@@ -415,7 +415,7 @@ func _marker_world() -> Variant:
 
 func _refresh_vitals() -> void:
 	if player:
-		hud.set_vitals(player.health, player.max_health(), player.stamina, player.max_stamina)
+		hud.set_vitals(player.health, player.max_health(), player.stamina, player.max_stamina())
 
 func _refresh_hud() -> void:
 	_refresh_vitals()
@@ -833,7 +833,7 @@ func _use_shrine(item: Interactable) -> void:
 	audio.play("shrine_bell", item.global_position)
 	Vfx.ring(self, item.global_position + Vector3.UP * 0.5, 4.0, Vfx.WIND, 0.8)
 	player.heal(player.max_health())
-	player.set_stamina(player.max_stamina)
+	player.set_stamina(player.max_stamina())
 	state.reset_camps()
 	_reset_enemies(false)
 	quests.notify("interact:" + item.entity_id)
@@ -895,6 +895,7 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 		var sound: String = String(Combat.attack(attacker.owner_key, attack).get("start_sfx", "sabre_swing"))
 		audio.play(sound, attacker.global_position, 0.0))
 	enemy.status_damage.connect(_on_status_damage)
+	enemy.reaction_hit.connect(_on_reaction_hit)
 
 func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	var id: String = String(data["id"])
@@ -910,12 +911,21 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 		spawn_reward_chest("elite", enemy.global_position)
 	audio.play("enemy_down", enemy.global_position)
 	_add_xp(int(enemy.data.get("xp", 10)))
+	# heal_on_kill (the Huyết Ngọc set) works on world kills too; Trial kills heal in TrialDirector.
+	var heal: float = state.stat("heal_on_kill")
+	if heal > 0.0 and not player.is_dead():
+		player.heal(player.max_health() * heal)
 	var drops: Array = []
+	var talisman_chance: float = 0.0
 	for drop: Array in enemy.data.get("drops", []):
-		if randf() <= float(drop[3]):
+		if drop[0] == Talismans.DROP:
+			talisman_chance = float(drop[3])
+		elif randf() <= float(drop[3]):
 			drops.append([drop[0], randi_range(int(drop[1]), int(drop[2]))])
 	if not drops.is_empty():
 		give_items(drops)
+	if talisman_chance > 0.0:
+		_drop_talisman(enemy, talisman_chance)
 	quests.notify("kill:" + enemy.kind)
 	quests.notify("kill:" + id)
 	var camp: String = String(data.get("camp", ""))
@@ -1050,6 +1060,20 @@ func _on_status_damage(enemy: Enemy, amount: float, status: String) -> void:
 	if user_settings.damage_numbers and amount >= 0.5:
 		Vfx.number(self, enemy.global_position + Vector3.UP, amount, Color(String(ContentDB.status(status).get("color", "ffd0a0"))))
 
+func _on_reaction_hit(enemy: Enemy, reaction: String, amount: float, splash: bool) -> void:
+	## The blow that sets a reaction off sounds it (the hit number comes from attack_landed) and
+	## explains it the first time; its splash floats numbers in the reaction colour.
+	var rule: Dictionary = Reactions.find(reaction)
+	if splash:
+		if user_settings.damage_numbers and amount >= 0.5:
+			Vfx.number(self, enemy.global_position + Vector3.UP, amount, Color(String(rule.get("color", "ffd0a0"))))
+		return
+	audio.play(String(rule.get("sfx", "hit_heavy")), enemy.global_position)
+	var hint: String = String(rule.get("hint", ""))
+	if hint != "" and not hinted.has("reaction:" + reaction):
+		hinted["reaction:" + reaction] = true
+		hud.show_hint(hint, 8.0)
+
 func _epilogue() -> void:
 	audio.set_music("title", 3.0)
 	hud.fade_to(0.85, 1.5)
@@ -1173,9 +1197,10 @@ func load_game() -> bool:
 # ------------------------------------------------------------------ retention: trial, tiers, gacha, armory, missions
 
 func refresh_stats() -> void:
-	## Bonuses from the equipped armory weapon and this run's Trial blessings (neutral otherwise).
+	## Bonuses from the equipped armory weapon, the worn talismans and this run's Trial
+	## blessings (neutral otherwise).
 	var item: Dictionary = profile.weapon(state.equipped_uid) if state.equipped_uid >= 0 else {}
-	state.stats = PlayerStats.compute(item, trial.buff_stats() if trial and trial.active else {})
+	state.stats = PlayerStats.compute(item, trial.buff_stats() if trial and trial.active else {}, profile.equipped_talismans())
 
 func _equip_visuals() -> void:
 	## Re-attaches the equipped sword with its skins and stats. An armory weapon from another
@@ -1216,6 +1241,74 @@ func equip_skin(target: String, id: String) -> void:
 	if player:
 		_apply_skins()
 	save_profile()
+
+# ------------------------------------------------------------------ talismans (Ngọc bội)
+
+func can_change_talismans() -> bool:
+	## Like swords: only while standing free in play. The title screen may change them freely.
+	return not playing or (player != null and player.state == "move")
+
+func equip_talisman(uid: int) -> bool:
+	if not can_change_talismans() or not profile.equip_talisman(uid):
+		return false
+	_talismans_changed()
+	audio.ui("ui_confirm")
+	return true
+
+func unequip_talisman(slot: int) -> bool:
+	if not can_change_talismans() or not profile.unequip_talisman(slot):
+		return false
+	_talismans_changed()
+	audio.ui("ui_close")
+	return true
+
+func salvage_talisman(uid: int) -> String:
+	## Turns an unworn talisman into Đồng for this save. Returns why it was refused ("" when done).
+	if not playing:
+		return "Vào hành trình để phân giải Ngọc bội lấy Đồng"
+	if profile.is_worn(uid):
+		return "Tháo Ngọc bội ra trước khi phân giải"
+	var coins: int = Talismans.salvage(profile, uid)
+	if coins <= 0:
+		return "Không phân giải được Ngọc bội này"
+	state.add_item("coins", coins)
+	save_profile()
+	audio.play("coins")
+	return ""
+
+func _talismans_changed() -> void:
+	if initialized:
+		refresh_stats()
+	save_profile()
+
+func _drop_talisman(enemy: Enemy, chance: float) -> void:
+	## An enemy's "talisman" drop entry: bosses and elites roll better rarities (data/talismans.json).
+	var source: String = "boss" if enemy.boss else ("elite" if enemy.data.has("elite") else "enemy")
+	var rolled: Dictionary = Talismans.drop(profile, source, chance)
+	if rolled.is_empty():
+		return
+	_receive_talisman(Talismans.grant(profile, rolled), enemy.global_position)
+	save_profile()
+
+func _receive_talisman(outcome: Dictionary, at: Vector3, quiet: bool = false) -> void:
+	## Pays the Đồng of a talisman a full pouch salvaged and announces the drop in its rarity colour.
+	var coins: int = int(outcome.get("coins", 0))
+	if coins > 0:
+		state.add_item("coins", coins)
+	if quiet:
+		return
+	var item: Dictionary = outcome["item"]
+	var color: Color = PlayerStats.rarity_color(String(item.get("rarity", "r")))
+	if outcome.get("kept", false):
+		hud.show_message("Nhận Ngọc bội: %s" % Talismans.label(item), 4.0, color)
+		Vfx.pillar(self, at, color, 6.0, 0.6, 0.5)
+		audio.play("glint", at)
+	var salvaged: Dictionary = outcome.get("salvaged", {})
+	if not salvaged.is_empty():
+		hud.show_message("Túi Ngọc bội đã đầy (%d): phân giải %s → +%d Đồng" % [Talismans.capacity(), Talismans.label(salvaged), coins], 4.5,
+			PlayerStats.rarity_color(String(salvaged.get("rarity", "r"))))
+	if outcome.get("kept", false) and profile.talismans.size() == 1:
+		hud.show_hint("Nhận Ngọc bội đầu tiên. Vào Kho kiếm & trang phục (menu tạm dừng), thẻ Ngọc bội, để đeo vào ô Thiên, Địa, Nhân. Đeo 2 hoặc 3 món cùng bộ sẽ mở hiệu ứng bộ.", 10.0)
 
 func tier_cap() -> int:
 	## Highest World Tier this save may choose; none before the story slice is complete.
@@ -1293,7 +1386,12 @@ func _on_trial_finished(summary: Dictionary) -> void:
 		player.teleport(point)
 		player.heal(player.max_health())
 	hud.fade_to(0.0, 0.8)
-	hud.show_banner("Rời Ải Vô Tận", "Vượt %d đợt  •  +%d Ngọc Gió  •  +%d Đồng" % [int(summary["wave"]), int(summary.get("ngoc", 0)), int(summary.get("coins", 0))], 5.0)
+	var line: String = "Vượt %d đợt  •  +%d Ngọc Gió  •  +%d Đồng" % [int(summary["wave"]), int(summary.get("ngoc", 0)), int(summary.get("coins", 0))]
+	# Unopened Trial chests were opened quietly; name any Ngọc bội they held.
+	var found: int = (summary.get("chests", []) as Array).filter(func(opened: Dictionary) -> bool: return opened.get("talisman", {}).get("kept", false)).size()
+	if found > 0:
+		line += "  •  +%d Ngọc bội" % found
+	hud.show_banner("Rời Ải Vô Tận", line, 5.0)
 	save_game(true)
 
 func spawn_reward_chest(table: String, at: Vector3, parent: Node = null) -> Interactable:
@@ -1328,6 +1426,11 @@ func open_reward_chest(chest: Interactable, silent: bool = false) -> Dictionary:
 		give_items(supplies)
 	if not result.is_empty():
 		result["supplies"] = supplies
+	var talisman: Dictionary = Talismans.from_chest(profile, String(chest.entity.get("table", "trial")), rarity)
+	if not talisman.is_empty():
+		var outcome: Dictionary = Talismans.grant(profile, talisman)
+		_receive_talisman(outcome, chest.global_position, silent)
+		result["talisman"] = outcome
 	_mission("chest")
 	save_profile()
 	if not silent and not result.is_empty():

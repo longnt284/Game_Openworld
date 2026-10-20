@@ -9,6 +9,9 @@ signal defeated(enemy: Enemy)
 signal health_changed(enemy: Enemy, current: float, maximum: float)
 signal attack_started(enemy: Enemy, attack: String)
 signal status_damage(enemy: Enemy, amount: float, status: String)
+## A blow set off an elemental reaction on this enemy (splash false), or a reaction's splash,
+## spread or chain hit it (splash true); amount is what this enemy lost.
+signal reaction_hit(enemy: Enemy, reaction: String, amount: float, splash: bool)
 
 ## Attack slots per camp when the enemy data has no "max_attackers".
 const MAX_ATTACKERS: int = 2
@@ -383,8 +386,13 @@ func _stagger(duration: float) -> void:
 func take_damage(damage: Combat.Damage) -> Dictionary:
 	if state == "dead" or invulnerable:
 		return {"hit": false}
-	var amount: float = damage.amount * (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
-	amount *= Combat.armor_mult(armor() - damage.armor_pen)
+	# Judged on what the blow found: a reaction may consume the status that made this target take
+	# more of the element, and a freeze it starts is no stagger for the blow that started it.
+	var multiplier: float = (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
+	var reaction: Dictionary = Reactions.check(statuses, damage)
+	if not reaction.is_empty():
+		Reactions.apply(self, damage, reaction)
+	var amount: float = damage.amount * multiplier * Combat.defense_mult(defense() - damage.armor_pen)
 	health = maxf(0.0, health - amount)
 	emit_signal("health_changed", self, health, max_health)
 	if damage.flinch:
@@ -392,20 +400,24 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		visual.hitstop(damage.hitstop)
 	if state in ["idle", "return"]:
 		_alert_camp()
+	var result: Dictionary = {"hit": true, "amount": amount}
+	if damage.reaction != "":
+		result["reaction"] = damage.reaction
+		emit_signal("reaction_hit", self, damage.reaction, amount, damage.reaction_splash)
 	if health <= 0.0:
 		_die(damage)
-		return {"hit": true, "amount": amount, "killed": true}
-	var started: String = _roll_status(damage)
+		result["killed"] = true
+		return result
+	# A reaction's own status (Đông Kết's freeze, Hỏa Lốc's burn) replaces the blow's roll.
+	var started: String = Reactions.apply_status(self, reaction, damage.status_power) if reaction.has("apply") else _roll_status(damage)
+	result["status"] = started
 	if started == "freeze":
-		velocity = Vector3.ZERO
-		_stagger(statuses.stun_time("freeze"))
-		Vfx.shards(get_parent(), global_position, Color("dff8ff"), 7, float(data.get("radius", 0.5)) + 0.4, float(data.get("height", 1.8)) * 0.7, statuses.stun_time("freeze"))
-		return {"hit": true, "amount": amount, "status": started}
-	if not damage.flinch:
-		poise -= damage.poise * statuses.poise_mult()
-		return {"hit": true, "amount": amount, "status": started}
+		return result
 	poise -= damage.poise * statuses.poise_mult()
-	if poise <= 0.0 and state != "stagger":
+	if not damage.flinch:
+		return result
+	# A reaction that breaks (Vỡ Băng) knocks down a foe the ice was already holding.
+	if poise <= 0.0 and (state != "stagger" or reaction.get("break", false)):
 		poise = max_poise
 		velocity = damage.direction * damage.knockback
 		_stagger(float(data.get("break_stagger", 1.4)))
@@ -416,15 +428,15 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		state = "hit"
 		state_time = 0.0
 		visual.play_action("hit")
-	return {"hit": true, "amount": amount, "status": started}
+	return result
 
 func element_mult(element: String) -> float:
 	return float((data.get("resist", {}) as Dictionary).get(element, 1.0)) if element != "" else 1.0
 
-func armor() -> float:
-	## Flat damage reduction from data "armor" (0 by default) plus any status that grants it;
-	## blows keep 100 / (100 + armor − their armor_pen). Not "super_armor", which only stops flinching.
-	return float(data.get("armor", 0.0)) + statuses.stat_bonus("armor")
+func defense() -> float:
+	## Flat damage reduction from data "defense" (0 by default) plus any status that grants it;
+	## blows keep 100 / (100 + defense − their armor_pen). Not "super_armor", which only stops flinching.
+	return float(data.get("defense", 0.0)) + statuses.stat_bonus("defense")
 
 func _roll_status(damage: Combat.Damage) -> String:
 	var status: String = String(damage.status.get("id", ""))
@@ -432,7 +444,17 @@ func _roll_status(damage: Combat.Damage) -> String:
 		return ""
 	if randf() >= float(damage.status.get("chance", 1.0)) * (1.0 - statuses.resist * 0.5):
 		return ""
-	return statuses.apply(status, int(damage.status.get("stacks", 1)), damage.status_power)
+	return apply_status(status, int(damage.status.get("stacks", 1)), damage.status_power)
+
+func apply_status(id: String, stacks: int = 1, power: float = 0.0) -> String:
+	## Puts a status on this enemy (a blow's roll, a reaction); a freeze holds it in place at once.
+	## Returns the status that started, like StatusEffects.apply.
+	var started: String = statuses.apply(id, stacks, power)
+	if started == "freeze":
+		velocity = Vector3.ZERO
+		_stagger(statuses.stun_time("freeze"))
+		Vfx.shards(get_parent(), global_position, Color("dff8ff"), 7, float(data.get("radius", 0.5)) + 0.4, float(data.get("height", 1.8)) * 0.7, statuses.stun_time("freeze"))
+	return started
 
 func _die(damage: Combat.Damage) -> void:
 	_release_token()

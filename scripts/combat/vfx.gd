@@ -158,21 +158,28 @@ static func glint(parent: Node, position: Vector3, color: Color = SPARK, size: f
 	tween.tween_callback(instance.queue_free)
 
 static func number(parent: Node, position: Vector3, value: float, color: Color = Color(1, 0.95, 0.8)) -> void:
-	var label: Label3D = Label3D.new()
-	label.text = str(roundi(value))
-	label.font_size = 52
-	label.outline_size = 10
-	label.modulate = color
-	label.outline_modulate = Color(0.15, 0.1, 0.12, 0.9)
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.pixel_size = 0.006
-	parent.add_child(label)
-	label.global_position = position + Vector3(randf_range(-0.3, 0.3), 0.4, randf_range(-0.3, 0.3))
-	var tween: Tween = label.create_tween().set_parallel(true)
-	tween.tween_property(label, "global_position", label.global_position + Vector3.UP * 0.9, 0.7).set_ease(Tween.EASE_OUT)
-	tween.tween_property(label, "modulate:a", 0.0, 0.7).set_delay(0.25)
-	tween.chain().tween_callback(label.queue_free)
+	_float_text(parent, position + Vector3(randf_range(-0.3, 0.3), 0.4, randf_range(-0.3, 0.3)), str(roundi(value)), color, 52, 0.7)
+
+static func label(parent: Node, position: Vector3, text: String, color: Color = SPARK) -> void:
+	## A word that floats up and fades, larger and slower than a damage number ("Điện Giật!").
+	_float_text(parent, position, text, color, 64, 1.0)
+
+static func _float_text(parent: Node, position: Vector3, text: String, color: Color, font_size: int, life: float) -> void:
+	var pop: Label3D = Label3D.new()
+	pop.text = text
+	pop.font_size = font_size
+	pop.outline_size = 10
+	pop.modulate = color
+	pop.outline_modulate = Color(0.15, 0.1, 0.12, 0.9)
+	pop.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	pop.no_depth_test = true
+	pop.pixel_size = 0.006
+	parent.add_child(pop)
+	pop.global_position = position
+	var tween: Tween = pop.create_tween().set_parallel(true)
+	tween.tween_property(pop, "global_position", pop.global_position + Vector3.UP * 0.9 * life / 0.7, life).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pop, "modulate:a", 0.0, life).set_delay(0.25 * life / 0.7)
+	tween.chain().tween_callback(pop.queue_free)
 
 static func wisps(parent: Node3D, color: Color = WIND, amount: int = 14, radius: float = 0.6) -> CPUParticles3D:
 	## Persistent drifting motes (memory echoes, shrines, wind barrier).

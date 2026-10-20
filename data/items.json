@@ -11,7 +11,7 @@
 		"effect": {"buff": "buff_speed", "duration": 60}},
 	"giai_doc_thao": {"name": "Giải Độc Thảo", "kind": "consumable", "description": "Bó cỏ đắng mọc ven suối Trúc Hải. Nhai nát đắp lên vết thương: giải trúng độc và cầm máu ngay.", "icon": "bamboo", "price": 18,
 		"effect": {"cleanse": ["poison", "bleed"]}},
-	"hoa_on_dan": {"name": "Hỏa Ôn Đan", "kind": "consumable", "description": "Viên đan ấm như than hồng ngậm trong miệng. Xua tan lạnh cóng, rồi giữ ấm thân: hàn khí khó bám hơn một nửa trong 45 giây.", "icon": "spirit", "price": 30,
+	"hoa_on_dan": {"name": "Hỏa Ôn Đan", "kind": "consumable", "description": "Viên đan ấm như than hồng ngậm trong miệng. Xua tan lạnh cóng, rồi giữ ấm thân trong 45 giây: hàn khí khó bám hơn một nửa, đòn băng cũng chỉ còn nửa sức.", "icon": "spirit", "price": 30,
 		"effect": {"cleanse": ["chill", "freeze"], "buff": "buff_warm", "duration": 45}},
 	"tinh_tam_tra": {"name": "Tịnh Tâm Trà", "kind": "consumable", "description": "Trà lá sen non pha nước mưa đầu mùa, uống vào lòng lặng như mặt hồ. Hiệu ứng xấu khó bám hơn một nửa và tan nhanh hơn trong 60 giây.", "icon": "jade", "price": 35,
 		"effect": {"buff": "buff_resist", "duration": 60}},

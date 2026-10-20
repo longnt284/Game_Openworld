@@ -37,6 +37,10 @@ var panel_note: String = ""
 var panel_note_ok: bool = false
 ## Inventory row kept selected across refreshes; the shop the counter panel shows.
 var selected_item: String = ""
+## Inventory right-hand tab (0 Võ học, 1 Nhân vật), kept across refreshes.
+var inventory_tab: int = 0
+## Armory tab (0 Kiếm & trang phục, 1 Ngọc bội), kept across refreshes.
+var armory_tab: int = 0
 var shop_id: String = ""
 ## Panels opened from the world (a shop counter) close straight back into play, not to the pause menu.
 var resume_on_close: bool = false
@@ -236,7 +240,7 @@ func open_panel(name: String) -> void:
 			panel_title.text = "Kỳ Ngộ"
 			panel_body.add_child(RetentionPanels.gacha(self))
 		"armory":
-			panel_title.text = "Kho kiếm & trang phục"
+			panel_title.text = "Kho kiếm, Ngọc bội & trang phục"
 			panel_body.add_child(RetentionPanels.armory(self))
 		"daily":
 			panel_title.text = "Nhiệm vụ ngày & điểm danh"
@@ -464,14 +468,15 @@ func _inventory_view() -> Control:
 	var style: String = StyleBook.style_of(state.sword)
 	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ContentDB.style(style).get("name", "")], 16, UiTheme.JADE_LIGHT, true))
 	right.add_child(UiTheme.label("Tơ ký ức đã kết: %d" % state.count("to_ky_uc"), 16, UiTheme.CREAM))
-	var spacer: Control = Control.new()
-	spacer.custom_minimum_size.y = 10
-	right.add_child(spacer)
-	right.add_child(UiTheme.label("Võ học", 20, UiTheme.GOLD, true))
+	# Cultivation and the character sheet share the rest of the column as two tabs.
+	var tabs: TabContainer = TabContainer.new()
+	tabs.name = "InventoryTabs"
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right.add_child(tabs)
 	var scroll: ScrollContainer = ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.name = "Võ học"
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	right.add_child(scroll)
+	tabs.add_child(scroll)
 	var list: VBoxContainer = VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 6)
@@ -489,7 +494,43 @@ func _inventory_view() -> Control:
 				String(form.get("description", "")) + ("  Tốn đầy nộ khí." if slot == "x" else "  Mỗi bậc: +25% sát thương, -15% hồi chiêu."),
 				String(StyleBook.form(shown_style, "q").get("skill", "")) if slot == "x" else "")
 	_skill_row(list, "khinh_cong", "Khinh công", "Nhảy trên không (Space) và lướt gió (giữ Space). Mỗi bậc giảm thể lực tiêu hao.", "")
+	tabs.add_child(_character_view())
+	tabs.current_tab = clampi(inventory_tab, 0, tabs.get_tab_count() - 1)
+	tabs.tab_changed.connect(func(tab: int) -> void: inventory_tab = tab)
 	return split
+
+func _character_view() -> Control:
+	## Nhân vật: every stat as one total (PlayerStats.sheet reads GameState.stat, so the sword,
+	## talismans, Trial blessings and live buffs all count), bonuses in jade, penalties in vermilion.
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.name = "Nhân vật"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var list: VBoxContainer = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 3)
+	scroll.add_child(list)
+	for row: Dictionary in PlayerStats.sheet(main.state):
+		if row.has("header"):
+			list.add_child(UiTheme.label(String(row["header"]), 17, UiTheme.GOLD, true))
+			continue
+		var line: HBoxContainer = HBoxContainer.new()
+		line.add_theme_constant_override("separation", 10)
+		var name_label: Label = UiTheme.label(String(row["label"]), 15)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(name_label)
+		if String(row["detail"]) != "":
+			line.add_child(UiTheme.label(String(row["detail"]), 13, UiTheme.MUTED))
+		var tone: int = int(row["tone"])
+		var idle: bool = tone == 0 and String(row["value"]) in ["0", "0%"]
+		var value: Label = UiTheme.label(String(row["value"]), 15, UiTheme.JADE_LIGHT if tone > 0 else (UiTheme.VERMILION if tone < 0 else (UiTheme.MUTED if idle else UiTheme.CREAM)), true)
+		value.custom_minimum_size.x = 80
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		line.add_child(value)
+		list.add_child(line)
+	var note: Label = UiTheme.label("Chỉ số tổng của cấp, kiếm, Ngọc bội (cả hiệu ứng bộ), phúc lành Ải và các trạng thái đang có.", 13, UiTheme.MUTED)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	list.add_child(note)
+	return scroll
 
 func _skill_row(list: VBoxContainer, skill: String, title: String, description: String, ultimate_needs: String) -> void:
 	## One cultivation line. Ultimates (ultimate_needs = the style's Q skill) are learned with points.

@@ -46,6 +46,8 @@ var fade_sub: Label
 var hint_panel: PanelContainer
 var hint_label: Label
 var toast_queue: Array[String] = []
+## Colour of a queued toast by its text (a talisman drop shows in its rarity colour); cream otherwise.
+var toast_tints: Dictionary = {}
 var toast_remaining: float = 0.0
 var banner_remaining: float = 0.0
 var typing: float = 0.0
@@ -389,12 +391,18 @@ func update_reticle(camera: Camera3D, target: Node3D) -> void:
 func show_prompt(text: String) -> void:
 	prompt.text = text
 
-func show_message(message: String, duration: float = 3.5) -> void:
+func show_message(message: String, duration: float = 3.5, tint: Color = UiTheme.CREAM) -> void:
+	toast_tints[message] = tint
 	if toast_remaining > 0.0 and toast.text != message:
 		if not toast_queue.has(message):
 			toast_queue.append(message)
 		return
+	_show_toast(message, duration)
+
+func _show_toast(message: String, duration: float) -> void:
 	toast.text = message
+	toast.add_theme_color_override("font_color", toast_tints.get(message, UiTheme.CREAM))
+	toast_tints.erase(message)
 	toast_remaining = duration
 
 func show_banner(title: String, subtitle: String = "", duration: float = 3.5) -> void:
@@ -493,8 +501,7 @@ func _process(delta: float) -> void:
 		dialogue_text.visible_ratio = clampf(typing * 55.0 / maxf(1.0, float(dialogue_text.get_total_character_count())), 0.0, 1.0)
 	toast_remaining = maxf(0.0, toast_remaining - delta)
 	if toast_remaining <= 0.0 and not toast_queue.is_empty():
-		toast.text = toast_queue.pop_front()
-		toast_remaining = 3.0
+		_show_toast(toast_queue.pop_front(), 3.0)
 	toast.visible = toast_remaining > 0.0
 	toast.modulate.a = clampf(toast_remaining * 3.0, 0.0, 1.0)
 	banner_remaining = maxf(0.0, banner_remaining - delta)

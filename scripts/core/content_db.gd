@@ -23,6 +23,8 @@ const FILES: Dictionary = {
 	"skins": "res://data/skins.json",
 	"daily": "res://data/daily.json",
 	"shops": "res://data/shops.json",
+	"talismans": "res://data/talismans.json",
+	"reactions": "res://data/reactions.json",
 }
 
 static var _cache: Dictionary = {}
