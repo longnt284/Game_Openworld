@@ -107,7 +107,7 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "statuses", "reactions", "finisher", "focus", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
+	var scenes: Array[String] = ["dock", "village", "clock", "dialogue", "combat", "statuses", "reactions", "finisher", "focus", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -120,6 +120,37 @@ func _run() -> void:
 				await place(2, 26, 15, -0.22)
 				await frames(40)
 				await shot("village")
+			"clock":
+				# The double hour and weather icon beside the region name for each sky (the world does
+				# not follow the clock yet: this is the HUD only), then a lit shrine's rest prompt.
+				await place(6, 25.5, 210, -0.2)
+				var sky: WeatherDirector = game.weather
+				for entry: Array in [["clear", 0.5], ["clear", 0.95], ["cloudy", 0.4], ["cloudy", 0.9], ["rain", 0.6], ["storm", 0.8], ["fog", 0.22], ["wind", 0.7]]:
+					sky.set_weather(entry[0])
+					sky.set_time(entry[1])
+					game._refresh_hud()
+					await frames(2)
+					await shot("clock_%s_%s" % [entry[0], "night" if sky.is_night() else "day"])
+				sky.set_weather("cloudy")
+				sky.set_time(0.6)
+				var shrine: Interactable = game.spawner.node_for("shrine_village") as Interactable
+				if shrine:
+					game.state.set_flag(shrine.flag_key())
+					shrine.refresh()
+					game.on_interact(shrine)
+				game._refresh_hud()
+				await frames(20)
+				await shot("shrine_rest")
+				# "Nghỉ đến sáng": fade out, the clock jumps to dawn, the banner names the new day.
+				if game.dialogue.has("choices"):
+					game._choose_dialogue(0)
+				await create_timer(2.4).timeout
+				game._refresh_hud()
+				await frames(2)
+				await shot("shrine_rest_dawn")
+				game._close_dialogue()
+				sky.set_weather("clear")
+				sky.set_time(float(WeatherDirector.data()["start"]["time"]))
 			"dialogue":
 				await place(-16.3, 6.2, 0, -0.2)
 				var npc: Npc = game.spawner.node_for("npc_ba_luc") as Npc

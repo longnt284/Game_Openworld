@@ -16,6 +16,7 @@ var quests: QuestManager
 var audio: AudioDirector
 var atmosphere: Atmosphere
 var ambient: AmbientFx
+var weather: WeatherDirector
 var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
@@ -165,6 +166,10 @@ func _start_world() -> void:
 	ambient.name = "AmbientFx"
 	add_child(ambient)
 	ambient.target = player
+	weather = WeatherDirector.new()
+	weather.name = "Weather"
+	add_child(weather)
+	quests.weather = weather
 	player.health_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.stamina_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.died.connect(_on_player_died)
@@ -235,6 +240,7 @@ func _begin_play() -> void:
 
 func start_new_game() -> void:
 	death_serial += 1
+	_close_dialogue()
 	_abort_trial()
 	_clear_reward_chests()
 	if spawner.arena.fighting:
@@ -243,6 +249,7 @@ func start_new_game() -> void:
 	hud.fade_to(0.0, 0.3)
 	state.from_dict(GameState.new().to_dict())
 	state.health = state.max_health()
+	weather.reset()
 	chime_sequence.clear()
 	spawner.clear_all()
 	_equip_visuals()
@@ -344,6 +351,7 @@ func _update_region() -> void:
 		current_region = id
 		atmosphere.set_region(id)
 		ambient.set_region(id)
+		weather.set_region(id)
 		audio.set_area(String(region.get("music", "explore")), String(region.get("ambience", "wind")))
 		if first:
 			state.set_flag("visited:" + id)
@@ -449,6 +457,7 @@ func _refresh_hud() -> void:
 	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
 	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
 	hud.set_statuses(player.statuses.list_for_hud())
+	hud.set_clock(weather.clock_text(), weather.weather_name(), weather.icon(), weather.is_night())
 	var boss: Enemy = _fighting_boss()
 	if boss:
 		hud.set_boss_poise(boss.poise_ratio(), boss.is_broken(), boss.is_finishable())
@@ -472,11 +481,11 @@ func _refresh_hud() -> void:
 		hud.set_tracker(region_name, "", "")
 	if hud.debug_enabled:
 		var memory_mb: float = Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
-		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d" % [
+		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d\nNgày %d  •  %s  •  %s %.0f s" % [
 			Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), world.active.size(), settings.chunk_capacity(), world.last_build_ms,
 			player.global_position.x, player.global_position.y, player.global_position.z, current_region, memory_mb,
-			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed]
+			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed, weather.day, weather.clock_hhmm(), weather.world, weather.remaining]
 
 # ------------------------------------------------------------------ input
 
@@ -546,12 +555,13 @@ func start_dialogue(npc: Npc) -> void:
 	audio.ui("ui_select")
 	_run_dialogue(dialogue_id, npc)
 
-func _run_dialogue(dialogue_id: String, npc: Npc) -> void:
+func _run_dialogue(dialogue_id: String, npc: Npc, choices_first: bool = false) -> void:
+	## choices_first opens straight on the last line with its choices (a prompt, not a talk).
 	var node: Dictionary = ContentDB.dialogue_node(dialogue_id)
 	if node.is_empty():
 		_end_dialogue()
 		return
-	dialogue = {"id": dialogue_id, "node": node, "index": 0, "npc": npc}
+	dialogue = {"id": dialogue_id, "node": node, "index": (node.get("lines", []) as Array).size() if choices_first else 0, "npc": npc}
 	_show_line()
 
 func _show_line() -> void:
@@ -598,6 +608,11 @@ func _end_dialogue() -> void:
 	dialogue = {}
 	player.input_enabled = true
 
+func _close_dialogue() -> void:
+	## A new game or a load drops any conversation or prompt still on screen.
+	if not dialogue.is_empty():
+		_end_dialogue()
+
 func show_vision(title: String, lines: Array, callback: Callable = Callable()) -> void:
 	vision_callback = callback
 	player.input_enabled = false
@@ -643,6 +658,9 @@ func run_action(action: String) -> void:
 			_add_xp(int(parts[1]))
 		"shop":
 			open_shop(parts[1])
+		"rest":
+			# After the prompt has closed, so the fade keeps the controls locked.
+			_rest.call_deferred(parts[1])
 
 func unlock_skill(skill: String) -> void:
 	state.unlock_skill(skill)
@@ -869,6 +887,43 @@ func _use_shrine(item: Interactable) -> void:
 		hud.show_banner(name, "Miếu Gió đã thắp sáng")
 	hud.show_message("Nghỉ chân: hồi đầy khí huyết • Đã lưu hành trình • Quái trong trại xuất hiện lại")
 	save_game(true)
+	if not first and can_rest():
+		# A shrine already lit also lets Lâm An wait for the next dawn or dusk.
+		player.input_enabled = false
+		audio.ui("ui_open")
+		_run_dialogue("shrine_rest", null, true)
+
+func can_rest() -> bool:
+	## Waiting at a shrine for dawn or dusk: never in a fight or inside the Trial.
+	return playing and not player.is_dead() and not trial.active and engaged == 0 and not spawner.arena.fighting
+
+func _rest(target: String) -> void:
+	## "Nghỉ đến sáng / tối": the screen fades out, the clock skips to the next dawn or dusk
+	## (WeatherDirector.rest_until), the journey is saved and the screen fades back in.
+	if not can_rest() or not weather.can_rest_until(target):
+		return
+	var serial: int = death_serial
+	player.input_enabled = false
+	var wake: Callable = func() -> void:
+		# A death, load, new game or the title screen in between cancels the rest (and only the
+		# title leaves the screen to lift here: the others run their own fades).
+		if serial != death_serial or not playing:
+			if not playing:
+				hud.fade_to(0.0, 0.4)
+			return
+		player.input_enabled = true
+		hud.fade_to(0.0, 1.0)
+		if not can_rest():
+			hud.show_message("Không thể nghỉ khi đang giao chiến")
+			return
+		weather.rest_until(target)
+		hud.show_banner(weather.phase_name(), "Ngày %d  •  %s  •  %s" % [weather.day, weather.clock_text(), weather.weather_name()])
+		save_game(true)
+	if DisplayServer.get_name() == "headless":
+		wake.call()
+		return
+	hud.fade_to(1.0, 0.6, "", "Ngồi nghỉ bên ngọn đèn miếu…")
+	get_tree().create_timer(0.9).timeout.connect(wake)
 
 func _ring_chime(item: Interactable) -> void:
 	var note: int = int(item.entity.get("note", 1))
@@ -1150,6 +1205,8 @@ func apply_settings() -> void:
 	var viewport: Viewport = get_viewport()
 	viewport.msaa_3d = preset["msaa"]
 	viewport.scaling_3d_scale = float(preset["scale"])
+	if weather:
+		weather.set_dynamic(user_settings.dynamic_weather)
 	if world:
 		world.configure(int(preset["view_radius"]), float(preset["density"]))
 		ambient.set_budget(float(preset["ambient"]))
@@ -1186,6 +1243,7 @@ func save_game(silent: bool = false) -> bool:
 		"yaw": player.model_yaw, "checkpoint": SaveStore.to_array(_checkpoint_position()), "state": state.to_dict(),
 		"label": String(world.layout.region_at(player.global_position.z).get("name", "")), "saved_at": int(Time.get_unix_time_from_system()),
 	}
+	data.merge(weather.to_save())
 	var error: Error = SaveStore.write_save(data, save_path)
 	if error == OK:
 		save_profile()
@@ -1210,6 +1268,7 @@ func load_game() -> bool:
 		hud.show_message("Chưa có bản lưu hợp lệ")
 		return false
 	death_serial += 1
+	_close_dialogue()
 	_abort_trial()
 	_clear_reward_chests()
 	hud.fade_to(0.0, 0.4)
@@ -1218,6 +1277,7 @@ func load_game() -> bool:
 		world.reset_seed(int(data["seed"]))
 		spawner.reset_navzones()
 	state.from_dict(data["state"])
+	weather.from_save(data)
 	_check_echo_skill(false)
 	spawner.clear_all()
 	chime_sequence.clear()

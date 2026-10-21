@@ -1,8 +1,9 @@
 class_name GameHUD
 extends CanvasLayer
-## In-game HUD: vitals with buff/debuff icons, skills, quest tracker with world marker,
-## interaction prompt, toasts/banners, boss bar with its poise gauge, the Tâm Nhãn veil,
-## dialogue box, memory visions, fade/death screen and the optional technical overlay (F3).
+## In-game HUD: vitals with buff/debuff icons, skills, quest tracker with world marker and the
+## clock and weather beside the region name, interaction prompt, toasts/banners, boss bar with
+## its poise gauge, the Tâm Nhãn veil, dialogue box, memory visions, fade/death screen and the
+## optional technical overlay (F3).
 
 signal dialogue_advanced
 signal choice_selected(index: int)
@@ -15,6 +16,12 @@ const FOCUS_TITLE_TIME: float = 1.3
 var root: Control
 var status: Label
 var region_label: Label
+## Double hour and weather name beside the region, with a drawn icon (sun, moon, cloud, rain,
+## storm, fog, wind) so no glyph depends on the font.
+var clock_label: Label
+var clock_icon: Control
+var clock_kind: String = ""
+var clock_night: bool = false
 var quest_title: Label
 var objective: Label
 var prompt: Label
@@ -128,8 +135,21 @@ func _build_tracker() -> void:
 	box.add_theme_constant_override("separation", 2)
 	_anchored(box, Control.PRESET_TOP_LEFT, Vector2(28, 20), Vector2(560, 160))
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var heading: HBoxContainer = HBoxContainer.new()
+	heading.add_theme_constant_override("separation", 10)
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(heading)
 	region_label = UiTheme.title("", 22, UiTheme.CREAM)
-	box.add_child(region_label)
+	heading.add_child(region_label)
+	clock_icon = Control.new()
+	clock_icon.custom_minimum_size = Vector2(24, 24)
+	clock_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clock_icon.draw.connect(_draw_clock_icon)
+	heading.add_child(clock_icon)
+	clock_label = UiTheme.label("", 15, UiTheme.CREAM, true)
+	clock_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	heading.add_child(clock_label)
 	quest_title = UiTheme.label("", 15, UiTheme.GOLD, true)
 	box.add_child(quest_title)
 	objective = UiTheme.label("", 16, UiTheme.CREAM)
@@ -276,6 +296,8 @@ func _build_boss() -> void:
 func _build_dialogue() -> void:
 	dialogue_panel = PanelContainer.new()
 	_anchored(dialogue_panel, Control.PRESET_CENTER_BOTTOM, Vector2(-470, -230), Vector2(470, -32))
+	# Extra choices push the box up from its bottom edge instead of off the screen.
+	dialogue_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	var box: VBoxContainer = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	dialogue_panel.add_child(box)
@@ -401,6 +423,79 @@ func set_tracker(region: String, title: String, text: String) -> void:
 	region_label.text = region
 	quest_title.text = title
 	objective.text = text
+
+func set_clock(hour: String, weather: String, icon: String, night: bool) -> void:
+	## From main's 10 Hz refresh: "Giờ Thìn  •  Mưa" and its icon, redrawn only when they change.
+	var text: String = "%s  •  %s" % [hour, weather]
+	if clock_label.text != text:
+		clock_label.text = text
+	if icon != clock_kind or night != clock_night:
+		clock_kind = icon
+		clock_night = night
+		clock_icon.queue_redraw()
+
+func _draw_clock_icon() -> void:
+	## 24 × 24 px: a sun or moon for a clear sky, a cloud (with the sun or moon behind it), rain
+	## streaks, a storm bolt, fog bands or wind gusts. An ink rim keeps it readable on a bright sky.
+	var ink: Color = Color(UiTheme.INK, 0.55)
+	var orb: Color = Color("f7e3a1") if clock_night else UiTheme.GOLD
+	var cloud: Color = Color("c9d3d8") if clock_kind != "storm" else Color("8a96a3")
+	match clock_kind:
+		"sun", "cloud":
+			var center: Vector2 = Vector2(12, 12) if clock_kind == "sun" else Vector2(16, 8)
+			var radius: float = 5.5 if clock_kind == "sun" else 4.5
+			if clock_night:
+				_draw_moon(center, radius + 1.0, orb, ink)
+			else:
+				for ray: int in range(8):
+					var direction: Vector2 = Vector2.RIGHT.rotated(TAU * ray / 8.0)
+					clock_icon.draw_line(center + direction * (radius + 2.0), center + direction * (radius + 4.5), orb, 2.0, true)
+				clock_icon.draw_circle(center, radius + 1.2, ink)
+				clock_icon.draw_circle(center, radius, orb)
+			if clock_kind == "cloud":
+				_draw_cloud(Vector2(11, 15), cloud, ink)
+		"rain":
+			_draw_cloud(Vector2(12, 10), cloud, ink)
+			for x: float in [7.0, 12.0, 17.0]:
+				clock_icon.draw_line(Vector2(x, 17), Vector2(x - 2.0, 22), Color("7ec8f2"), 2.0, true)
+		"storm":
+			_draw_cloud(Vector2(12, 9), cloud, ink)
+			var bolt: PackedVector2Array = PackedVector2Array([Vector2(13, 13), Vector2(9, 18.5), Vector2(12.5, 18.5), Vector2(10, 23.5)])
+			clock_icon.draw_polyline(bolt, ink, 4.0, true)
+			clock_icon.draw_polyline(bolt, UiTheme.GOLD, 2.0, true)
+		"fog":
+			for row: int in range(4):
+				var y: float = 6.0 + row * 4.5
+				var inset: float = 3.0 if row % 2 == 0 else 6.0
+				clock_icon.draw_line(Vector2(inset, y), Vector2(24.0 - inset * 0.6, y), ink, 4.0, true)
+				clock_icon.draw_line(Vector2(inset, y), Vector2(24.0 - inset * 0.6, y), cloud, 2.2, true)
+		"wind":
+			for row: int in range(3):
+				var y: float = 6.0 + row * 6.0
+				var length: float = [16.0, 20.0, 12.0][row]
+				clock_icon.draw_line(Vector2(2, y), Vector2(2.0 + length, y), ink, 3.6, true)
+				clock_icon.draw_line(Vector2(2, y), Vector2(2.0 + length, y), UiTheme.JADE_LIGHT, 2.0, true)
+				clock_icon.draw_arc(Vector2(2.0 + length, y - 2.0), 2.0, -PI * 0.5, PI * 0.5, 6, UiTheme.JADE_LIGHT, 2.0, true)
+
+func _draw_moon(center: Vector2, radius: float, color: Color, ink: Color) -> void:
+	## A crescent: the disc minus a smaller disc offset toward the upper right.
+	var points: PackedVector2Array = PackedVector2Array()
+	for step: int in range(13):
+		points.append(center + Vector2.from_angle(PI * 0.35 + PI * 1.3 * step / 12.0) * radius)
+	var cut: Vector2 = center + Vector2(radius * 0.55, -radius * 0.35)
+	for step: int in range(13):
+		var point: Vector2 = center + Vector2.from_angle(PI * 1.65 - PI * 1.3 * step / 12.0) * radius
+		points.append(cut + (point - cut) * 0.62)
+	clock_icon.draw_polyline(points + PackedVector2Array([points[0]]), ink, 2.4, true)
+	clock_icon.draw_colored_polygon(points, color)
+
+func _draw_cloud(center: Vector2, color: Color, ink: Color) -> void:
+	for part: Array in [[Vector2(-5, 2), 4.0], [Vector2(0, -1.5), 5.5], [Vector2(5, 2), 4.0]]:
+		clock_icon.draw_circle(center + part[0], part[1] + 1.2, ink)
+	clock_icon.draw_rect(Rect2(center + Vector2(-9.5, 1.5), Vector2(19, 5.2)), ink)
+	for part: Array in [[Vector2(-5, 2), 4.0], [Vector2(0, -1.5), 5.5], [Vector2(5, 2), 4.0]]:
+		clock_icon.draw_circle(center + part[0], part[1], color)
+	clock_icon.draw_rect(Rect2(center + Vector2(-8.5, 2.0), Vector2(17, 4.0)), color)
 
 func update_marker(camera: Camera3D, point: Variant, origin: Vector3) -> void:
 	if point == null or camera == null:
@@ -551,7 +646,7 @@ func set_debug(enabled: bool) -> void:
 	status.visible = enabled
 
 func set_gameplay_visible(value: bool) -> void:
-	for node: Control in [region_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, quick_label, prompt, status_row]:
+	for node: Control in [region_label, clock_icon, clock_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, quick_label, prompt, status_row]:
 		node.visible = value
 	for skill: String in skill_boxes:
 		(skill_boxes[skill]["panel"] as Control).visible = value
@@ -595,10 +690,12 @@ func _process(delta: float) -> void:
 		pulse_time += delta
 		boss_poise.modulate.a = 0.55 + 0.45 * sin(pulse_time * 11.0)
 	_fade_focus(delta)
-	toast_remaining = maxf(0.0, toast_remaining - delta)
-	if toast_remaining <= 0.0 and not toast_queue.is_empty():
-		_show_toast(toast_queue.pop_front(), 3.0)
-	toast.visible = toast_remaining > 0.0
+	# A message raised behind the dialogue box (a shrine's prompt) waits until it closes.
+	if not dialogue_panel.visible:
+		toast_remaining = maxf(0.0, toast_remaining - delta)
+		if toast_remaining <= 0.0 and not toast_queue.is_empty():
+			_show_toast(toast_queue.pop_front(), 3.0)
+	toast.visible = toast_remaining > 0.0 and not dialogue_panel.visible
 	toast.modulate.a = clampf(toast_remaining * 3.0, 0.0, 1.0)
 	banner_remaining = maxf(0.0, banner_remaining - delta)
 	var banner_alpha: float = clampf(banner_remaining * 1.5, 0.0, 1.0)

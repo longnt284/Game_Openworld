@@ -625,13 +625,16 @@ func _settings_view() -> Control:
 	video.add_child(_check_row("Hiện số sát thương", settings.damage_numbers, func(value: bool) -> void:
 		settings.damage_numbers = value
 		_changed()))
+	video.add_child(_check_row("Thời tiết động", settings.dynamic_weather, func(value: bool) -> void:
+		settings.dynamic_weather = value
+		_changed()))
 	video.add_child(_check_row("Bảng thông số kỹ thuật (F3)", settings.debug_hud, func(value: bool) -> void:
 		settings.debug_hud = value
 		_changed()))
 	video.add_child(_slider_row("Độ rung camera", 0.0, 1.0, settings.camera_shake, func(value: float) -> void:
 		settings.camera_shake = value
 		_changed()))
-	var note: Label = UiTheme.label("Thấp: tắt bóng đổ, giảm cỏ cây và độ phân giải dựng hình. Cao: bóng đổ xa hơn, khử răng cưa 4x.", 14, UiTheme.MUTED)
+	var note: Label = UiTheme.label("Thấp: tắt bóng đổ, giảm cỏ cây và độ phân giải dựng hình. Cao: bóng đổ xa hơn, khử răng cưa 4x.\nTắt Thời tiết động: trời luôn quang, ngày đêm vẫn luân chuyển.", 14, UiTheme.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	video.add_child(note)
 	return tabs

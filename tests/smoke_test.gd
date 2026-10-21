@@ -122,6 +122,7 @@ func _run() -> void:
 	await settle(game)
 	check(player.is_on_floor(), "Loaded game rebuilds playable terrain")
 	var data: Dictionary = {"version": SaveStore.SCHEMA_VERSION, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [4.0, 5.0, 6.0], "yaw": 0.0, "state": GameState.new().to_dict()}
+	data.merge(WeatherDirector.initial_save(284))
 	check(SaveStore.write_save(data, TEST_SAVE) == OK, "Save writes successfully")
 	var restored: Dictionary = SaveStore.read_save(TEST_SAVE)
 	check(not restored.is_empty() and SaveStore.to_vector(restored["position"]) == Vector3(1, 2, 3), "Save restores position and schema")

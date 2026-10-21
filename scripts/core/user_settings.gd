@@ -35,6 +35,8 @@ var quality: String = "medium"
 var debug_hud: bool = false
 var fullscreen: bool = false
 var damage_numbers: bool = true
+## "Thời tiết động": off keeps the sky clear (the day still turns); WeatherDirector.set_dynamic.
+var dynamic_weather: bool = true
 var bindings: Dictionary = {}
 
 func load_file(path: String = PATH) -> void:
@@ -55,6 +57,7 @@ func load_file(path: String = PATH) -> void:
 	fullscreen = bool(config.get_value("video", "fullscreen", fullscreen))
 	debug_hud = bool(config.get_value("video", "debug_hud", debug_hud))
 	damage_numbers = bool(config.get_value("video", "damage_numbers", damage_numbers))
+	dynamic_weather = bool(config.get_value("world", "dynamic_weather", dynamic_weather))
 	var stored: Variant = config.get_value("controls", "bindings", {})
 	bindings = stored if stored is Dictionary else {}
 
@@ -71,6 +74,7 @@ func save_file(path: String = PATH) -> Error:
 	config.set_value("video", "fullscreen", fullscreen)
 	config.set_value("video", "debug_hud", debug_hud)
 	config.set_value("video", "damage_numbers", damage_numbers)
+	config.set_value("world", "dynamic_weather", dynamic_weather)
 	return config.save(path)
 
 func apply_input() -> void:

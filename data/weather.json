@@ -1,0 +1,43 @@
+{
+	"day_length": 1440,
+	"start": {"time": 0.29, "weather": "clear", "remaining": 600},
+	"phases": {
+		"dawn": {"start": 0.17, "name": "Bình minh"},
+		"day": {"start": 0.25, "name": "Ban ngày"},
+		"dusk": {"start": 0.75, "name": "Hoàng hôn"},
+		"night": {"start": 0.83, "name": "Ban đêm"}
+	},
+	"rest": {"dawn": 0.18, "dusk": 0.76},
+	"hours": ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"],
+	"transition": 30,
+	"default": "clear",
+	"night": {"detect_mult": 0.8, "reward_mult": 1.25},
+	"weathers": {
+		"clear": {"name": "Trời quang", "icon": "sun", "duration": [300, 600],
+			"rain": 0.0, "fog": 0.0, "wind": 0.15, "storm": 0.0, "lightning": 0, "darken": 0.0, "desaturate": 0.0, "clouds": 0.25,
+			"gameplay": {}},
+		"cloudy": {"name": "Nhiều mây", "icon": "cloud", "duration": [180, 420],
+			"rain": 0.0, "fog": 0.15, "wind": 0.3, "storm": 0.0, "lightning": 0, "darken": 0.15, "desaturate": 0.15, "clouds": 0.75,
+			"gameplay": {}},
+		"rain": {"name": "Mưa", "icon": "rain", "duration": [180, 360],
+			"rain": 0.65, "fog": 0.3, "wind": 0.35, "storm": 0.0, "lightning": 0, "darken": 0.35, "desaturate": 0.3, "clouds": 0.9,
+			"gameplay": {"element_mult": {"thunder": 1.2, "flame": 0.8}, "soak_interval": 8.0}},
+		"storm": {"name": "Giông bão", "icon": "storm", "duration": [120, 240],
+			"rain": 1.0, "fog": 0.4, "wind": 0.9, "storm": 1.0, "lightning": 12, "darken": 0.55, "desaturate": 0.4, "clouds": 1.0,
+			"gameplay": {"element_mult": {"thunder": 1.3, "wind": 1.15, "flame": 0.8}, "soak_interval": 5.0}},
+		"fog": {"name": "Sương mù", "icon": "fog", "duration": [150, 300],
+			"rain": 0.0, "fog": 1.0, "wind": 0.05, "storm": 0.0, "lightning": 0, "darken": 0.15, "desaturate": 0.35, "clouds": 0.5,
+			"gameplay": {"detect_mult": 0.6}},
+		"wind": {"name": "Gió lớn", "icon": "wind", "duration": [120, 240],
+			"rain": 0.0, "fog": 0.0, "wind": 1.0, "storm": 0.0, "lightning": 0, "darken": 0.05, "desaturate": 0.05, "clouds": 0.55,
+			"gameplay": {}}
+	},
+	"regions": {
+		"default": {"clear": 5, "cloudy": 3, "rain": 2, "storm": 1, "fog": 1, "wind": 1},
+		"ben_van_khe": {"clear": 6, "cloudy": 3, "rain": 2, "storm": 0.25, "fog": 1, "wind": 1},
+		"doi_gio": {"clear": 5, "cloudy": 3, "rain": 2, "storm": 1, "fog": 0.5, "wind": 3},
+		"truc_hai": {"clear": 4, "cloudy": 3, "rain": 3, "storm": 1, "fog": 2, "wind": 1},
+		"den_tich_phong": {"clear": 3, "cloudy": 3, "rain": 2, "storm": 2.5, "fog": 3, "wind": 2},
+		"ao_canh": {"fixed": "clear"}
+	}
+}

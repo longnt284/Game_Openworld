@@ -13,7 +13,7 @@ MODE=${1:-game}
 case "$MODE" in
   test)
     "$GODOT" --headless --path "$ROOT" --editor --import
-    for suite in smoke_test gameplay_test combat_test progression_test; do
+    for suite in smoke_test gameplay_test combat_test progression_test world_test; do
       [ -f "$ROOT/tests/$suite.gd" ] || continue
       "$GODOT" --headless --render-thread safe --path "$ROOT" --script "res://tests/$suite.gd"
     done
