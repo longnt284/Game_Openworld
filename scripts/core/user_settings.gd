@@ -15,14 +15,16 @@ const ACTION_NAMES: Dictionary = {
 	"open_journal": "Nhật ký", "open_inventory": "Túi đồ",
 }
 ## Distances in metres. density thins grass, flowers and ground cover only (trees never move);
-## view_radius is the streamed area in chunks around the player; ambient is the particle budget.
+## view_radius is the streamed area in chunks around the player; ambient is the particle budget;
+## sky_hz caps how often the sky and light are rewritten while they change (each sky write
+## re-renders its radiance).
 const QUALITY: Dictionary = {
 	"low": {"shadow": 0.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_DISABLED, "scale": 0.85, "view_radius": 2, "tree_distance": 60.0, "bamboo": 48.0,
-		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "label": "Thấp"},
+		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "sky_hz": 5.0, "label": "Thấp"},
 	"medium": {"shadow": 70.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_2X, "scale": 1.0, "view_radius": 2, "tree_distance": 82.0, "bamboo": 64.0,
-		"grass": 44.0, "clutter": 36.0, "rock": 90.0, "density": 1.0, "glow": true, "ambient": 0.5, "label": "Trung bình"},
+		"grass": 44.0, "clutter": 36.0, "rock": 90.0, "density": 1.0, "glow": true, "ambient": 0.5, "sky_hz": 10.0, "label": "Trung bình"},
 	"high": {"shadow": 120.0, "shadow_atlas": 4096, "msaa": Viewport.MSAA_4X, "scale": 1.0, "view_radius": 3, "tree_distance": 120.0, "bamboo": 90.0,
-		"grass": 62.0, "clutter": 50.0, "rock": 120.0, "density": 1.4, "glow": true, "ambient": 1.0, "label": "Cao"},
+		"grass": 62.0, "clutter": 50.0, "rock": 120.0, "density": 1.4, "glow": true, "ambient": 1.0, "sky_hz": 10.0, "label": "Cao"},
 }
 
 var mouse_sensitivity: float = 0.0025

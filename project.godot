@@ -64,3 +64,26 @@ save_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194
 load_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194340)]}
 toggle_debug={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194334)]}
 pause_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194305),Object(InputEventKey,"physical_keycode":80)]}
+
+[shader_globals]
+
+vk_wind={
+"type": "vec2",
+"value": Vector2(1, 0)
+}
+vk_wet={
+"type": "float",
+"value": 0.0
+}
+vk_night={
+"type": "float",
+"value": 0.0
+}
+vk_gloom={
+"type": "float",
+"value": 0.0
+}
+vk_sky={
+"type": "color",
+"value": Color(0.72, 0.88, 0.95, 1)
+}

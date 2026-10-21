@@ -46,6 +46,8 @@ var previous: String = FALLBACK
 var blend: float = 1.0
 var blend_time: float = 0.0
 var from_levels: Dictionary = {}
+## Each weather's share of the sky when the current blend began (see weight()).
+var from_weights: Dictionary = {}
 var region: String = ""
 var fixed: String = ""
 var dynamic: bool = true
@@ -143,16 +145,20 @@ func is_time(id: String) -> bool:
 
 func night_level() -> float:
 	## 0 in full daylight, 1 in full night, easing across dusk and dawn.
-	var dawn: float = phase_starts[0]
-	var morning: float = phase_starts[1]
-	var dusk: float = phase_starts[2]
-	var night: float = phase_starts[3]
-	if clock >= night or clock < dawn:
+	return night_curve(clock, phase_starts)
+
+static func night_curve(fraction: float, starts: PackedFloat32Array) -> float:
+	## night_level() at any fraction of the day for phase starts in PHASES order.
+	var dawn: float = starts[0]
+	var morning: float = starts[1]
+	var dusk: float = starts[2]
+	var night: float = starts[3]
+	if fraction >= night or fraction < dawn:
 		return 1.0
-	if clock < morning:
-		return 1.0 - smoothstep(dawn, morning, clock)
-	if clock >= dusk:
-		return smoothstep(dusk, night, clock)
+	if fraction < morning:
+		return 1.0 - smoothstep(dawn, morning, fraction)
+	if fraction >= dusk:
+		return smoothstep(dusk, night, fraction)
 	return 0.0
 
 func phase_name(id: String = "") -> String:
@@ -279,6 +285,12 @@ func _refresh_shown(seconds: float) -> void:
 	from_levels = {}
 	for key: String in LEVELS:
 		from_levels[key] = level(key)
+	var shares: Dictionary = {}
+	for id: String in rules:
+		var share: float = weight(id)
+		if share > 0.0:
+			shares[id] = share
+	from_weights = shares
 	previous = shown
 	shown = target
 	blend_time = seconds
@@ -306,6 +318,14 @@ func level(key: String) -> float:
 	if blend >= 1.0:
 		return goal
 	return lerpf(float(from_levels.get(key, goal)), goal, smoothstep(0.0, 1.0, blend))
+
+func weight(id: String) -> float:
+	## Share of weather id in the sky now (0..1, all shares sum to 1), eased like level(): the
+	## Atmosphere mixes each weather's colour overlay by it.
+	var goal: float = 1.0 if id == shown else 0.0
+	if blend >= 1.0:
+		return goal
+	return lerpf(float(from_weights.get(id, 0.0)), goal, smoothstep(0.0, 1.0, blend))
 
 func rain() -> float:
 	return level("rain")

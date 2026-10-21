@@ -2,8 +2,10 @@ extends SceneTree
 ## World systems of Phase 2: the day–night clock and its phases, weather draws by region
 ## weights from a saved RNG, the Trial pocket's fixed weather, the "Thời tiết động" setting,
 ## smoothed levels and gameplay multipliers, the time:/weather: conditions, save schema v4 and
-## its step-by-step migration; then in the running game: pausing, the HUD clock, the setting,
-## shrine rest to dawn or dusk, the Trial pocket and saving and loading the clock.
+## its step-by-step migration; the layered atmosphere (data/world/moods.json, the sun and moon
+## arc, deterministic blending, settling, global shader uniforms); then in the running game:
+## pausing, the HUD clock, the setting, shrine rest to dawn or dusk, the Trial pocket, saving and
+## loading the clock, and the sky following the clock in play but not on the title screen.
 
 var failures: int = 0
 const SAVE: String = "user://world_test_save.json"
@@ -35,6 +37,8 @@ func _run() -> void:
 	_clock()
 	_weather()
 	_levels()
+	_moods()
+	_atmosphere()
 	_conditions()
 	_saves()
 	await _scene()
@@ -193,6 +197,13 @@ func _weather() -> void:
 	var halfway: float = first.remaining
 	first.advance(6.0)
 	check(is_equal_approx(halfway, 5.0) and first.rng.state != state and first.remaining > 0.0, "A weather counts down its seconds, then the next one is drawn")
+	# A shrine rest runs the valley's weather through the skipped hours and shows the result at once.
+	first.set_time(0.5)
+	first.set_weather("fog", 0.0, 10.0)
+	state = first.rng.state
+	var skipped: float = first.rest_until("dusk")
+	check(is_equal_approx(skipped, (float(WeatherDirector.data()["rest"]["dusk"]) - 0.5) * first.day_length) and first.rng.state != state and first.settled() and first.weather_id() == first.world and first.day_phase() == "dusk"
+		and is_zero_approx(first.rest_until("dusk")), "Resting skips the hours (%.0f s), draws the weather they would have brought and shows it settled; no rest into the phase already here" % skipped)
 	first.free()
 
 func _levels() -> void:
@@ -226,6 +237,150 @@ func _levels() -> void:
 	check(is_equal_approx(night_reward, 1.25) and director.reward_mult() == 1.0 and dark == 1.0 and director.darkness() == 0.0 and director.soak_interval() == 0.0,
 		"Night pays ×1.25; a clear noon is neither dark nor wet")
 	director.free()
+
+func _moods() -> void:
+	var data: Dictionary = ContentDB.get_data("moods")
+	var keys: Array = data["keys"]
+	var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/world/layout.json"))
+	var complete: bool = keys.size() >= 10
+	var missing: Array[String] = []
+	for region: Dictionary in layout["regions"]:
+		var mood: Dictionary = data["regions"].get(String(region["id"]), {})
+		for key: String in keys:
+			if not mood.has(key):
+				missing.append("%s.%s" % [region["id"], key])
+	for group: String in ["regions", "times"]:
+		for id: String in data[group]:
+			complete = complete and (data[group][id] as Dictionary).size() == keys.size()
+	check(complete and missing.is_empty() and (data["times"] as Dictionary).has_all(["dawn", "dusk", "night"]),
+		"moods.json: every region and the dawn, dusk and night palettes have every key %s" % str(missing))
+	var overlays_ok: bool = true
+	for id: String in data["weathers"]:
+		overlays_ok = overlays_ok and WeatherDirector.data()["weathers"].has(id)
+		for key: String in data["weathers"][id]:
+			overlays_ok = overlays_ok and keys.has(key) and data["weathers"][id][key] is String
+	check(overlays_ok and (data["weathers"] as Dictionary).has_all(["rain", "storm", "fog"]) and not (data["weathers"] as Dictionary).has("clear"),
+		"Weather overlays name real weathers and only recolour mood keys; clear has none (a fair day is the region's own mood)")
+	var palettes: Dictionary = Atmosphere.moods()
+	var old_village: Dictionary = {"top": Color("2b78cc"), "horizon": Color("c4e2f0"), "fog": Color("cfe5ee"), "sun": Color("fff0cc"), "sun_energy": 1.12,
+		"ambient": Color("b9d2e2"), "ambient_energy": 0.55, "pitch": -50.0, "clouds": 0.5, "saturation": 1.04}
+	var same: bool = true
+	for key: String in old_village:
+		same = same and palettes["regions"]["ben_van_khe"][key] == old_village[key]
+	check(same and palettes["regions"]["ben_van_khe"]["top"] is Color, "The village's fair-day mood is the old one, colours parsed once")
+
+func _atmosphere() -> void:
+	# Pure functions of the hour: deterministic, night 1 at midnight and 0 at noon.
+	var midnight: Vector3 = Atmosphere.time_weights(0.0)
+	var noon: Vector3 = Atmosphere.time_weights(0.5)
+	var sunset: Vector3 = Atmosphere.time_weights(0.785)
+	var sunrise: Vector3 = Atmosphere.time_weights(0.215)
+	check(is_equal_approx(midnight.z, 1.0) and is_zero_approx(noon.z) and noon == Atmosphere.time_weights(0.5) and is_zero_approx(noon.x + noon.y + midnight.x + midnight.y)
+		and sunset.y > 0.95 and sunrise.x > 0.95 and sunset.z > 0.2 and sunset.z < 0.8,
+		"Hour weights: night %.2f at midnight and %.2f at noon; dusk peaks at sunset, dawn at sunrise; same hour, same weights" % [midnight.z, noon.z])
+	var reference: float = Atmosphere.reference_clock()
+	var old_sun: Vector4 = Atmosphere.light_arc(reference, -50.0)
+	var high: Vector4 = Atmosphere.light_arc(0.5, -50.0)
+	var morning: Vector4 = Atmosphere.light_arc(0.29, -50.0)
+	var moon: Vector4 = Atmosphere.light_arc(0.0, -48.0)
+	var rise: Vector4 = Atmosphere.light_arc(float(Atmosphere.moods()["light"]["rise"]), -50.0)
+	check(reference > 0.5 and reference < 0.75 and is_equal_approx(old_sun.x, -50.0) and is_equal_approx(old_sun.y, -35.0) and old_sun.z == 1.0 and old_sun.w == 0.0,
+		"At the reference hour (%s) the sun stands where the old fixed sun stood (pitch -50, yaw -35)" % _hhmm(reference))
+	check(high.x < -50.0 and is_zero_approx(high.y) and morning.y > 0.0 and morning.x > -50.0 and moon.w == 1.0 and is_equal_approx(moon.x, -48.0) and is_zero_approx(moon.y)
+		and rise.z == 0.0 and morning.z == 1.0,
+		"The sun climbs from the east to its noon height in the south; at midnight the moon is high in the south; light fades out on the horizon")
+	# A standalone atmosphere and director: fair noon is the region's mood, night is moonlit blue.
+	var atmosphere: Atmosphere = Atmosphere.new()
+	root.add_child(atmosphere)
+	var region: Dictionary = Atmosphere.moods()["regions"]["ben_van_khe"]
+	var fair: bool = (atmosphere.time_of_day() == reference and is_equal_approx(atmosphere.sun.light_energy, float(region["sun_energy"])) and atmosphere.environment.fog_light_color == region["fog"]
+		and is_equal_approx(atmosphere.environment.ambient_light_energy, float(region["ambient_energy"])) and atmosphere.sky_material.get_shader_parameter("top_color") == region["top"]
+		and atmosphere.sun.rotation_degrees.is_equal_approx(Vector3(-50.0, -35.0, 0.0)) and atmosphere.written[&"vk_wind"] == Vector2(1.0, 0.0)
+		and atmosphere.written[&"vk_wet"] == 0.0 and atmosphere.written[&"vk_night"] == 0.0 and atmosphere.written[&"vk_gloom"] == 0.0
+		and atmosphere.light_tint().is_equal_approx(Color.WHITE) and (atmosphere.written[&"vk_sky"] as Color).is_equal_approx(Atmosphere.moods()["shading"]["water_sky"]))
+	check(fair, "Without a clock (the title) the village shows exactly its old fair afternoon, and every global uniform is neutral")
+	var director: WeatherDirector = _director(77, "ben_van_khe")
+	director.set_time(0.5)
+	director.set_weather("clear")
+	atmosphere.follow(director)
+	var noon_ambient: float = atmosphere.ambient_energy
+	var noon_tint: float = atmosphere.light_tint().get_luminance()
+	var noon_goal: Dictionary = atmosphere.goal.duplicate()
+	atmosphere._compose()
+	check(atmosphere.goal == noon_goal and atmosphere.current["top"] == region["top"] and atmosphere.current["fog"] == region["fog"] and is_zero_approx(atmosphere.current["night"]),
+		"A clear noon composes to the region's own mood, the same every time")
+	director.set_time(0.0)
+	var night_tint: float = atmosphere.light_tint().get_luminance()
+	check(is_equal_approx(atmosphere.current["night"], 1.0) and atmosphere.arc.w == 1.0 and atmosphere.written[&"moon"] == 1.0 and is_equal_approx(atmosphere.written[&"vk_night"], 1.0)
+		and atmosphere.ambient_energy > noon_ambient and night_tint > 0.15 and night_tint < 0.6 * noon_tint and (atmosphere.current["ambient"] as Color).b > (atmosphere.current["ambient"] as Color).r,
+		"Midnight: the night factor is 1, the moon lights the valley, the light is moonlit blue and dim (%.2f of noon) but never black" % (night_tint / noon_tint))
+	director.set_time(0.5)
+	director.set_weather("storm")
+	var storm_sun: float = atmosphere.sun.light_energy
+	var storm_wind: Vector2 = atmosphere.written[&"vk_wind"]
+	check(storm_sun < 0.6 * float(region["sun_energy"]) and atmosphere.written[&"storm"] == 1.0 and float(atmosphere.written[&"cloud_coverage"]) < 0.2 and storm_wind.x > 1.5 and storm_wind.y > 0.5
+		and float(atmosphere.written[&"vk_gloom"]) > 0.0 and is_equal_approx(atmosphere.wet, 1.0) and atmosphere.sun.shadow_opacity < 0.6,
+		"A storm at noon: a dim sun with faint shadows, a full dark deck, gusting foliage, soaked ground, gloom")
+	director.set_weather("fog")
+	var fog_end: float = atmosphere.environment.fog_depth_end
+	director.set_weather("clear")
+	check(fog_end < 0.5 * atmosphere.environment.fog_depth_end and atmosphere.written[&"vk_wind"] == Vector2(1.0, 0.0) and atmosphere.written[&"storm"] == 0.0,
+		"Fog pulls the depth fog in (ends at %.0f m instead of %.0f m); a clear sky puts everything back" % [fog_end, atmosphere.environment.fog_depth_end])
+	# Settling: nothing is written once the mood has arrived; a change writes at most UPDATE_HZ a second.
+	atmosphere.snap()
+	var writes: int = atmosphere.sky_writes
+	for tick: int in range(30):
+		atmosphere.step(0.1)
+	var still: bool = atmosphere.settled and atmosphere.sky_writes == writes
+	atmosphere.set_region("truc_hai")
+	var updates: int = atmosphere.updates
+	for frame: int in range(60):
+		atmosphere._process(1.0 / 60.0)
+	var per_second: int = atmosphere.updates - updates
+	var moving: int = atmosphere.sky_writes - writes
+	var ticks: int = 0
+	while not atmosphere.settled and ticks < 1000:
+		atmosphere.step(0.1)
+		ticks += 1
+	var arrived: int = atmosphere.sky_writes
+	for tick: int in range(30):
+		atmosphere.step(0.1)
+	var target: Dictionary = Atmosphere.moods()["regions"]["truc_hai"]
+	check(still and per_second <= 10 and per_second >= 5 and moving > 0 and atmosphere.settled and atmosphere.sky_writes == arrived and ticks < 1000
+		and atmosphere.current["top"] == target["top"] and atmosphere.sky_material.get_shader_parameter("horizon_color") == target["horizon"],
+		"The atmosphere settles and stops writing; walking into Trúc Hải eases over %.1f s at %d updates a second, lands exactly on its mood and stops again" % [ticks * 0.1, per_second])
+	# Rain soaks the ground over seconds and it dries slowly after.
+	director.set_weather("rain", 0.0)
+	atmosphere.wet = 0.0
+	atmosphere.settled = false
+	for tick: int in range(50):
+		atmosphere.step(0.1)
+	var soaking: float = atmosphere.wet
+	director.set_weather("clear", 0.0)
+	atmosphere.wet = 0.65
+	atmosphere.settled = false
+	for tick: int in range(50):
+		atmosphere.step(0.1)
+	check(soaking > 0.1 and soaking < 0.65 and atmosphere.wet > 0.5 and atmosphere.wet < 0.65 and absf(float(atmosphere.written[&"vk_wet"]) - atmosphere.wet) <= Atmosphere.VALUE_STEP,
+		"Rain soaks the ground over seconds (%.2f after 5 s) and it dries more slowly (%.2f)" % [soaking, atmosphere.wet])
+	# A lightning flash lights the sky and lifts the ambient, then fades back exactly.
+	var calm_ambient: float = atmosphere.environment.ambient_light_energy
+	atmosphere.flash(1.0)
+	atmosphere._process(0.016)
+	var lit: float = atmosphere.environment.ambient_light_energy
+	for frame: int in range(40):
+		atmosphere._process(0.016)
+	check(lit > calm_ambient + 1.0 and atmosphere.flash_level == 0.0 and is_equal_approx(atmosphere.environment.ambient_light_energy, calm_ambient)
+		and atmosphere.sky_material.get_shader_parameter("flash") == 0.0, "A lightning flash lifts the ambient and fades back")
+	atmosphere.follow(null)
+	check(atmosphere.weather == null and atmosphere.time_of_day() == reference and not director.changed.is_connected(atmosphere._on_weather_changed),
+		"Letting go of the clock returns to the reference hour")
+	atmosphere.free()
+	director.free()
+
+func _hhmm(fraction: float) -> String:
+	var minutes: int = int(fraction * 1440.0)
+	return "%02d:%02d" % [minutes / 60, minutes % 60]
 
 func _conditions() -> void:
 	var quests: QuestManager = QuestManager.new()
@@ -349,6 +504,9 @@ func _scene() -> void:
 	check(weather != null and weather.process_mode == Node.PROCESS_MODE_PAUSABLE and game.quests.weather == weather and weather.day == 1
 		and since >= 0.0 and since < 0.05 and weather.weather_id() == "clear" and weather.region == "ben_van_khe",
 		"A new game runs the clock from a clear morning, wired to the quests and fed the region")
+	var sky: Atmosphere = game.atmosphere
+	check(sky.weather == weather and sky.target_id == "ben_van_khe" and absf(sky.time_of_day() - weather.time_of_day()) < 0.0001 and sky.arc.w == 0.0 and sky.arc.y > 0.0,
+		"In play the atmosphere follows the clock: a morning sun in the east")
 	# Pausing stops the clock; play moves it.
 	var before: float = weather.time_of_day()
 	await frames(30)
@@ -407,6 +565,9 @@ func _scene() -> void:
 		check(absf(weather.time_of_day() - float(rest["dawn"])) < 0.001 and weather.day == day + 1 and weather.day_phase() == "dawn" and game.dialogue.is_empty() and player.input_enabled
 			and not on_disk.is_empty() and is_equal_approx(float(on_disk["time_of_day"]), float(rest["dawn"])) and int(on_disk["day"]) == day + 1,
 			"Resting to dawn from noon wakes at dawn the next day and saves the journey (%s)" % weather.clock_hhmm())
+		var weights: Vector3 = Atmosphere.time_weights(weather.time_of_day())
+		check(absf(float(game.atmosphere.current["night"]) - weights.z) < 0.02 and weights.x > 0.5 and weights.z > 0.1 and game.atmosphere.settled and game.atmosphere.arc.w == 0.0,
+			"The sky jumps with the rest: at once into sunrise, no slow fade from noon")
 		game.on_interact(shrine)
 		var at_dawn: Array = _choices(game)
 		game._choose_dialogue(0)
@@ -453,8 +614,13 @@ func _scene() -> void:
 		and is_equal_approx(weather.remaining, float(kept["weather"]["remaining"])) and str(weather.rng.state) == String(kept["weather"]["state"]) and int(kept["version"]) == 4,
 		"Loading restores the night, day 5, the storm with its seconds left and the RNG")
 	await frames(2)
+	weather.set_time(0.0)
+	game.return_to_title()
+	await frames(2)
+	var title_sky: bool = game.atmosphere.weather == null and game.atmosphere.time_of_day() == Atmosphere.reference_clock() and game.atmosphere.arc.w == 0.0
 	game.start_new_game()
 	await frames(2)
+	check(title_sky and game.atmosphere.weather == weather, "The title shows the fair reference afternoon whatever the hour; play follows the clock again")
 	check(weather.day == 1 and absf(weather.time_of_day() - float(start["time"])) < 0.01 and weather.weather_id() == "clear", "A new game starts the clock over on a clear morning")
 	game.audio.stop_all()
 	await create_timer(0.2, true, false, true).timeout

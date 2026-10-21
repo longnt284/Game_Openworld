@@ -7,7 +7,7 @@
 		"dusk": {"start": 0.75, "name": "Hoàng hôn"},
 		"night": {"start": 0.83, "name": "Ban đêm"}
 	},
-	"rest": {"dawn": 0.18, "dusk": 0.76},
+	"rest": {"dawn": 0.22, "dusk": 0.76},
 	"hours": ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"],
 	"transition": 30,
 	"default": "clear",

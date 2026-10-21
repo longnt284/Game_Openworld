@@ -37,6 +37,14 @@ func place(x: float, z: float, yaw_deg: float, camera_pitch: float = -0.28) -> v
 	await frames(2)
 	await settle()
 
+func sky(weather_id: String, time: float) -> void:
+	## Holds the clock at a fraction of the day under a weather and shows the atmosphere's target
+	## mood at once, so shots of the hours and skies are deterministic.
+	game.weather.set_process(false)
+	game.weather.set_weather(weather_id)
+	game.weather.set_time(time)
+	game.atmosphere.snap()
+
 func measure(label: String, frame_count: int) -> void:
 	## Frame-to-frame wall time while the scene keeps running; prints p50/p95/FPS and memory.
 	var samples: Array[float] = []
@@ -107,7 +115,8 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "clock", "dialogue", "combat", "statuses", "reactions", "finisher", "focus", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
+	var scenes: Array[String] = ["dock", "village", "village_day", "village_dusk", "village_night", "village_rain", "clock", "dialogue", "combat", "statuses",
+		"reactions", "finisher", "focus", "moves", "bamboo", "bamboo_storm", "gorge", "gorge_fog", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -117,12 +126,48 @@ func _run() -> void:
 				await frames(30)
 				await shot("dock")
 			"village":
+				# The reference hour: a fair afternoon with the sun where the old fixed sun stood.
 				await place(2, 26, 15, -0.22)
+				sky("clear", Atmosphere.reference_clock())
 				await frames(40)
 				await shot("village")
+			"village_day":
+				# Same framing at noon, then at the hour a new game starts (morning sun in the east).
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.5)
+				await frames(30)
+				await shot("village_day")
+				sky("clear", float(WeatherDirector.data()["start"]["time"]))
+				await frames(30)
+				await shot("village_morning")
+			"village_dusk":
+				# Golden hour with the sun low in the west, then just after sunset.
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.77)
+				await frames(30)
+				await shot("village_dusk")
+				sky("clear", 0.805)
+				await frames(30)
+				await shot("village_twilight")
+			"village_night":
+				# Midnight under a high moon (lanterns glow brighter), then a cloudy night facing the plaza.
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.0)
+				await frames(30)
+				await shot("village_night")
+				await place(6, 25.5, 210, -0.2)
+				sky("cloudy", 0.92)
+				await frames(30)
+				await shot("village_night_cloudy")
+			"village_rain":
+				# Rain by day: grey sky, soaked ground with a sheen, foliage swaying harder.
+				await place(2, 26, 15, -0.22)
+				sky("rain", 0.45)
+				await frames(30)
+				await shot("village_rain")
 			"clock":
-				# The double hour and weather icon beside the region name for each sky (the world does
-				# not follow the clock yet: this is the HUD only), then a lit shrine's rest prompt.
+				# The double hour and weather icon beside the region name for each sky (the world follows
+				# the clock and the weather too), then a lit shrine's rest prompt.
 				await place(6, 25.5, 210, -0.2)
 				var sky: WeatherDirector = game.weather
 				for entry: Array in [["clear", 0.5], ["clear", 0.95], ["cloudy", 0.4], ["cloudy", 0.9], ["rain", 0.6], ["storm", 0.8], ["fog", 0.22], ["wind", 0.7]]:
@@ -356,10 +401,26 @@ func _run() -> void:
 				await place(4, -128, 0, -0.18)
 				await frames(30)
 				await shot("bamboo")
+			"bamboo_storm":
+				# A storm over Trúc Hải at midday: a dark, heavy deck with scud and gusting bamboo (the
+				# rain itself comes with the effects), then a lightning flash lighting the clouds.
+				await place(4, -128, 0, -0.1)
+				sky("storm", 0.5)
+				await frames(30)
+				await shot("bamboo_storm")
+				game.atmosphere.flash(1.0)
+				await frames(2)
+				await shot("bamboo_storm_flash")
 			"gorge":
 				await place(1, -243, 0, -0.3)
 				await frames(30)
 				await shot("gorge")
+			"gorge_fog":
+				# Thick fog in Khe Gió: the depth fog closes in, pale and grey.
+				await place(1, -243, 0, -0.3)
+				sky("fog", 0.4)
+				await frames(30)
+				await shot("gorge_fog")
 			"arena":
 				await place(3, -300, 0, -0.2)
 				await frames(30)

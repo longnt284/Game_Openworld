@@ -3,6 +3,8 @@ extends Node3D
 ## Drifting particles around the camera that give each region its air: blossom petals by
 ## the village, leaves and seed fluff on the hills, bamboo leaves in Trúc Hải, spirit
 ## motes near the temple. The quality preset scales the particle budget (0 turns it off).
+## Petals and leaves take the Atmosphere's light tint (they are unlit), so they dim at night;
+## glowing motes do not.
 
 const MOODS: Dictionary = {
 	"ben_van_khe": {"colors": ["ffd3e0", "fff6f8", "f2a9bd"], "amount": 70, "size": 0.09, "fall": 0.5, "spin": true},
@@ -16,6 +18,7 @@ var particles: CPUParticles3D
 var material: StandardMaterial3D
 var budget: float = 0.5
 var region: String = ""
+var light: Color = Color.WHITE
 var target: Node3D
 
 func _ready() -> void:
@@ -67,6 +70,16 @@ func set_budget(value: float) -> void:
 	budget = value
 	_configure()
 
+func set_light(tint: Color) -> void:
+	## Atmosphere.light_changed: a linear tint, white on a fair day.
+	light = tint
+	if material and particles.emitting:
+		_tint()
+
+func _tint() -> void:
+	var mood: Dictionary = MOODS.get(region, {})
+	material.albedo_color = light.linear_to_srgb() if mood.get("spin", false) else Color.WHITE
+
 func set_region(id: String) -> void:
 	if id != region:
 		region = id
@@ -90,6 +103,7 @@ func _configure() -> void:
 	ramp.add_point(0.85, Color(String(colors[mini(1, colors.size() - 1)])))
 	particles.color_ramp = ramp
 	material.blend_mode = BaseMaterial3D.BLEND_MODE_MIX if mood["spin"] else BaseMaterial3D.BLEND_MODE_ADD
+	_tint()
 	particles.angular_velocity_max = 140.0 if mood["spin"] else 0.0
 	particles.angular_velocity_min = -140.0 if mood["spin"] else 0.0
 	particles.emitting = true

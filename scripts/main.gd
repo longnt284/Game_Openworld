@@ -144,7 +144,9 @@ func _start_world() -> void:
 	add_child(backdrop)
 	backdrop.build(Vector2(0, -180), settings.world_seed, assets)
 	atmosphere.haze_changed.connect(backdrop.set_haze)
+	atmosphere.light_changed.connect(backdrop.set_light)
 	backdrop.set_haze(atmosphere.haze())
+	backdrop.set_light(atmosphere.light_tint())
 	props = PropPlacer.new()
 	props.name = "Props"
 	props.add_to_group(EntitySpawner.NAV_SOURCE)
@@ -166,6 +168,8 @@ func _start_world() -> void:
 	ambient.name = "AmbientFx"
 	add_child(ambient)
 	ambient.target = player
+	atmosphere.light_changed.connect(ambient.set_light)
+	ambient.set_light(atmosphere.light_tint())
 	weather = WeatherDirector.new()
 	weather.name = "Weather"
 	add_child(weather)
@@ -215,6 +219,8 @@ func show_title() -> void:
 	player.state = "disabled"
 	hud.set_gameplay_visible(false)
 	hud.close_dialogue()
+	# The title always shows the valley's fair reference afternoon, whatever the clock says.
+	atmosphere.follow(null)
 	title_camera.current = true
 	menus.show_title(SaveStore.has_save(save_path))
 	audio.set_music("title", 1.5)
@@ -234,6 +240,7 @@ func _begin_play() -> void:
 	if player.state == "disabled":
 		player.state = "move"
 	player.camera_rig.camera.current = true
+	atmosphere.follow(weather)
 	current_region = ""
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -481,11 +488,11 @@ func _refresh_hud() -> void:
 		hud.set_tracker(region_name, "", "")
 	if hud.debug_enabled:
 		var memory_mb: float = Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
-		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d\nNgày %d  •  %s  •  %s %.0f s" % [
+		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d\nNgày %d  •  %s  •  %s %.0f s  •  ghi trời %d" % [
 			Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), world.active.size(), settings.chunk_capacity(), world.last_build_ms,
 			player.global_position.x, player.global_position.y, player.global_position.z, current_region, memory_mb,
-			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed, weather.day, weather.clock_hhmm(), weather.world, weather.remaining]
+			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed, weather.day, weather.clock_hhmm(), weather.world, weather.remaining, atmosphere.sky_writes]
 
 # ------------------------------------------------------------------ input
 
@@ -1200,6 +1207,7 @@ func apply_settings() -> void:
 		settings.mouse_sensitivity = user_settings.mouse_sensitivity
 	var preset: Dictionary = user_settings.preset()
 	atmosphere.set_shadow_distance(float(preset["shadow"]))
+	atmosphere.set_update_rate(float(preset["sky_hz"]))
 	atmosphere.environment.glow_enabled = bool(preset["glow"])
 	RenderingServer.directional_shadow_atlas_set_size(int(preset["shadow_atlas"]), true)
 	var viewport: Viewport = get_viewport()
