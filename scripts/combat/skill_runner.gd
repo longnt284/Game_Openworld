@@ -64,7 +64,7 @@ static func _projectiles(player: PlayerController, data: Dictionary, scale: floa
 		player.get_parent().add_child(missile)
 		var direction: Vector3 = player.facing.rotated(Vector3.UP, offset)
 		var height: float = 0.2 if shape == "wave" else 1.1
-		missile.launch(player.global_position + Vector3.UP * height + direction * 0.8, direction, float(data.get("speed", 22.0)), 0.0, data, Combat.LAYER_HURT_ENEMY, player, color, shape)
+		missile.launch(player.global_position + Vector3.UP * height + direction * 0.8, direction, float(data.get("missile_speed", 22.0)), 0.0, data, Combat.LAYER_HURT_ENEMY, player, color, shape)
 
 static func _living_enemies(player: PlayerController) -> Array[Node3D]:
 	var result: Array[Node3D] = []

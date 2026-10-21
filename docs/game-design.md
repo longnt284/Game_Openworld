@@ -109,4 +109,4 @@ Tiền, bảo hiểm, kho kiếm, Ngọc bội, trang phục, kỷ lục Ải v�
 
 ## Giao diện
 
-Toàn bộ tiếng Việt. Màn hình chính (Mới / Tiếp tục / Kỳ Ngộ / Nhiệm vụ ngày / Kho kiếm & trang phục), tạm dừng (thêm Cảnh giới thế giới, Rời Ải Vô Tận), bản đồ, nhật ký nhiệm vụ, túi đồ (kỹ năng theo hệ, kiếm), cài đặt (đổi phím, độ nhạy chuột, đảo trục Y, âm lượng Nhạc/Hiệu ứng/Âm nền, giảm rung camera, chất lượng Thấp/Trung bình/Cao, toàn màn hình, số sát thương, HUD gỡ lỗi F3). HUD co giãn theo độ phân giải (cơ sở 1280 × 720).
+Toàn bộ tiếng Việt. Màn hình chính (Mới / Tiếp tục / Kỳ Ngộ / Nhiệm vụ ngày / Kiếm, Ngọc bội & trang phục), tạm dừng (thêm Cảnh giới thế giới, Rời Ải Vô Tận), bản đồ, nhật ký nhiệm vụ, túi đồ (kỹ năng theo hệ, kiếm), cài đặt (đổi phím, độ nhạy chuột, đảo trục Y, âm lượng Nhạc/Hiệu ứng/Âm nền, giảm rung camera, chất lượng Thấp/Trung bình/Cao, toàn màn hình, số sát thương, HUD gỡ lỗi F3). HUD co giãn theo độ phân giải (cơ sở 1280 × 720).

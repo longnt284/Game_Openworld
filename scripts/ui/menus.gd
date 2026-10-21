@@ -113,7 +113,7 @@ func _build_title() -> void:
 	box.add_child(new_game_button)
 	box.add_child(UiTheme.button("Kỳ Ngộ", func() -> void: open_panel("gacha"), 300))
 	box.add_child(UiTheme.button("Nhiệm vụ ngày", func() -> void: open_panel("daily"), 300))
-	box.add_child(UiTheme.button("Kho kiếm & trang phục", func() -> void: open_panel("armory"), 300))
+	box.add_child(UiTheme.button("Kiếm, Ngọc bội & trang phục", func() -> void: open_panel("armory"), 300))
 	box.add_child(UiTheme.button("Thiết lập", func() -> void: open_panel("settings"), 300))
 	box.add_child(UiTheme.button("Ghi công", func() -> void: open_panel("credits"), 300))
 	if not OS.has_feature("web"):
@@ -158,7 +158,7 @@ func _build_pause() -> void:
 	box.add_child(grid)
 	for entry: Array in [["Tiếp tục", func() -> void: emit_signal("resume_requested")], ["Bản đồ  (M)", func() -> void: open_panel("map")],
 			["Nhật ký  (J)", func() -> void: open_panel("journal")], ["Túi đồ & tu luyện  (I)", func() -> void: open_panel("inventory")],
-			["Kho kiếm & trang phục", func() -> void: open_panel("armory")], ["Kỳ Ngộ", func() -> void: open_panel("gacha")],
+			["Kiếm, Ngọc bội & trang phục", func() -> void: open_panel("armory")], ["Kỳ Ngộ", func() -> void: open_panel("gacha")],
 			["Nhiệm vụ ngày", func() -> void: open_panel("daily")], ["Cảnh giới thế giới", func() -> void: open_panel("tier")],
 			["Thiết lập", func() -> void: open_panel("settings")], ["Về Miếu Gió gần nhất", func() -> void: emit_signal("checkpoint_requested")],
 			["Lưu hành trình  (F5)", func() -> void: emit_signal("save_requested")], ["Tải lần lưu gần nhất  (F9)", func() -> void: emit_signal("load_requested")],

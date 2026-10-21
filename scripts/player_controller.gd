@@ -213,7 +213,8 @@ func _physics_process(delta: float) -> void:
 	if state == "loading":
 		state = "move"
 	_tick_timers(delta)
-	if state not in ["dead", "disabled"]:
+	# Dialogue and visions lock input: statuses hold still so poison cannot drain a conversation.
+	if state not in ["dead", "disabled"] and input_enabled:
 		_tick_statuses(delta)
 	# Button releases can be missed while paused, in dialogue or dead: trust the real button state.
 	if not (input_enabled and Input.is_action_pressed("block")):
