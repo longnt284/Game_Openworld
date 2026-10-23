@@ -1,7 +1,8 @@
 class_name AudioDirector
 extends Node
 ## Music state machine with crossfades, area ambience, a river layer that follows
-## the distance to water, and pooled 2D/3D sound effects routed to separate buses.
+## the distance to water, weather beds (rain, storm wind, night insects) that follow the
+## sky, and pooled 2D/3D sound effects routed to separate buses.
 
 const MUSIC_DIR: String = "res://assets/audio/music/%s.ogg"
 const AMBIENCE_DIR: String = "res://assets/audio/ambience/%s.ogg"
@@ -20,6 +21,10 @@ var combat_level: int = 0
 var combat_linger: float = 0.0
 var pool_2d: Array[AudioStreamPlayer] = []
 var pool_3d: Array[AudioStreamPlayer3D] = []
+## Weather beds on the Ambience bus and their level at full strength (dB): each fades toward
+## the share main asks for (set_weather), starts on first need and stops once silent.
+const WEATHER_BEDS: Dictionary = {"rain_light": -9.0, "rain_heavy": -5.0, "storm_wind": -8.0, "night_insects": -13.0}
+var weather_players: Dictionary = {}
 var cache: Dictionary = {}
 var variants: Dictionary = {}
 var silenced: bool = false
@@ -120,6 +125,7 @@ func stop_all() -> void:
 	## Stops every stream and refuses new ones so the audio server releases its playbacks before shutdown.
 	silenced = true
 	var players: Array[Node] = [river_player]
+	players.append_array(weather_players.values())
 	players.append_array(music_players)
 	players.append_array(ambience_players)
 	players.append_array(pool_2d)
@@ -156,6 +162,35 @@ func set_river_distance(distance: float) -> void:
 		river_player.play()
 	var loudness: float = clampf(1.0 - (distance - 4.0) / 40.0, 0.0, 1.0)
 	river_player.volume_db = lerpf(river_player.volume_db, linear_to_db(maxf(loudness, 0.001)) - 4.0, 0.1)
+
+func set_weather(levels: Dictionary) -> void:
+	## levels: weather bed -> share 0..1 (missing means silent). Called every frame by main.
+	if silenced:
+		return
+	for name: String in WEATHER_BEDS:
+		var level: float = clampf(float(levels.get(name, 0.0)), 0.0, 1.0)
+		var player: AudioStreamPlayer = weather_players.get(name)
+		if player == null:
+			if level <= 0.0:
+				continue
+			player = _player("Ambience")
+			player.stream = _stream(AMBIENCE_DIR % name, true)
+			player.volume_db = -60.0
+			weather_players[name] = player
+		if player.stream == null:
+			continue
+		if level > 0.0 and not player.playing:
+			player.play()
+		elif level <= 0.0 and player.playing and player.volume_db < -55.0:
+			player.stop()
+			continue
+		var goal: float = linear_to_db(maxf(level, 0.001)) + float(WEATHER_BEDS[name])
+		player.volume_db = lerpf(player.volume_db, maxf(goal, -60.0), 0.05)
+
+func weather_volume(name: String) -> float:
+	## The bed's current level in dB, -80 when it is not playing (tests, the F3 overlay).
+	var player: AudioStreamPlayer = weather_players.get(name)
+	return player.volume_db if player and player.playing else -80.0
 
 # ------------------------------------------------------------------ effects
 

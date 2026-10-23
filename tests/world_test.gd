@@ -7,7 +7,8 @@ extends SceneTree
 ## pausing, the HUD clock, the setting, shrine rest to dawn or dusk, the Trial pocket, saving and
 ## loading the clock, and the sky following the clock in play but not on the title screen; then
 ## the effects: the rain curtain and its presets, shelter and the Trial, the gale, the lantern
-## light pool, lightning intervals and flashes, and strikes with their safe rule.
+## light pool, lightning intervals and flashes, and strikes with their safe rule; the weather
+## sound beds and thunder.
 
 var failures: int = 0
 const SAVE: String = "user://world_test_save.json"
@@ -653,6 +654,7 @@ func _scene() -> void:
 		"The title shows the fair reference afternoon whatever the hour, dry and calm; play follows the clock again")
 	check(weather.day == 1 and absf(weather.time_of_day() - float(start["time"])) < 0.01 and weather.weather_id() == "clear", "A new game starts the clock over on a clear morning")
 	await _effects(game)
+	_audio(game)
 	game.audio.stop_all()
 	await create_timer(0.2, true, false, true).timeout
 	game.queue_free()
@@ -691,6 +693,45 @@ func _run_storm(storm: StormDirector, seconds: float, times: Array[float], warne
 			break
 	storm.bolt_fell.disconnect(on_bolt)
 	storm.strike_warned.disconnect(on_warn)
+
+func _settle_audio(game: Node, region: Dictionary) -> void:
+	## The beds fade a little each frame; run enough updates for them to arrive.
+	for index: int in range(240):
+		game._update_weather_audio(region)
+
+func _audio(game: Node) -> void:
+	## Phase 2.4: the weather beds follow the sky, crickets come out at night, thunder has variants.
+	var weather: WeatherDirector = game.weather
+	var audio: AudioDirector = game.audio
+	var region: Dictionary = game.world.layout.region_at(game.player.global_position.z)
+	weather.set_time(0.5)
+	weather.set_weather("clear")
+	_settle_audio(game, region)
+	var dry: bool = audio.weather_volume("rain_light") < -50.0 and audio.weather_volume("rain_heavy") < -50.0 and audio.weather_volume("night_insects") < -50.0
+	weather.set_weather("rain")
+	_settle_audio(game, region)
+	var drizzle: float = audio.weather_volume("rain_light")
+	var drizzle_heavy: float = audio.weather_volume("rain_heavy")
+	weather.set_weather("storm")
+	_settle_audio(game, region)
+	var downpour: float = audio.weather_volume("rain_heavy")
+	var gale: float = audio.weather_volume("storm_wind")
+	check(dry and drizzle > -20.0 and drizzle_heavy < drizzle and downpour > drizzle_heavy and gale > -20.0,
+		"Rain beds follow the sky: silent when clear, a light patter in rain (%.0f dB), the heavy roar and gale in a storm (%.0f / %.0f dB)" % [drizzle, downpour, gale])
+	_settle_audio(game, {"indoor": true})
+	var sheltered: float = audio.weather_volume("rain_heavy")
+	weather.set_weather("clear")
+	weather.set_time(0.95)
+	_settle_audio(game, region)
+	var crickets: float = audio.weather_volume("night_insects")
+	weather.set_time(0.5)
+	_settle_audio(game, region)
+	check(sheltered < -45.0 and crickets > -25.0 and audio.weather_volume("night_insects") < -50.0,
+		"No rain is heard under a roof; crickets sing at night (%.0f dB) and fall silent by day" % crickets)
+	var thunder: int = 0
+	audio._pick("thunder")
+	thunder = (audio.variants.get("thunder", []) as Array).size()
+	check(thunder >= 4, "Thunder has %d variants for the storm to pick from" % thunder)
 
 func _effects(game: Node) -> void:
 	## Phase 2.3 in the running game: the rain curtain, the gale, lantern light, lightning and its

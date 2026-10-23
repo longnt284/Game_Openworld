@@ -20,6 +20,8 @@ var weather: WeatherDirector
 var rain: RainFx
 var storm: StormDirector
 var night_lights: NightLights
+## Weather bed shares handed to the AudioDirector every frame (reused, no allocation).
+var weather_beds: Dictionary = {"rain_light": 0.0, "rain_heavy": 0.0, "storm_wind": 0.0, "night_insects": 0.0}
 var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
@@ -396,6 +398,18 @@ func _update_region() -> void:
 	for water: Dictionary in world.layout.waters:
 		river_distance = minf(river_distance, world.layout._line_query(water, player.global_position.x, player.global_position.z).x - float(water["width"]) * 0.5)
 	audio.set_river_distance(river_distance)
+	_update_weather_audio(region)
+
+func _update_weather_audio(region: Dictionary) -> void:
+	## Rain on the leaves (light, then a heavy roar), storm wind, and crickets after dark; nothing
+	## under a roof or in the Trial's fixed afternoon (its sky is always clear and day).
+	var outside: bool = playing and not trial.active and not bool(region.get("indoor", false))
+	var wet: float = weather.rain() if outside else 0.0
+	weather_beds["rain_light"] = clampf(wet * 1.8, 0.0, 1.0) * (1.0 - 0.6 * smoothstep(0.55, 1.0, wet))
+	weather_beds["rain_heavy"] = smoothstep(0.45, 1.0, wet)
+	weather_beds["storm_wind"] = weather.wind() if outside else 0.0
+	weather_beds["night_insects"] = weather.night_level() * (1.0 - wet) if outside else 0.0
+	audio.set_weather(weather_beds)
 
 func _update_focus() -> void:
 	focus = null
