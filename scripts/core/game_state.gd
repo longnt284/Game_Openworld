@@ -22,6 +22,9 @@ var sword: String = "sword_old"
 var swords: Array = ["sword_old"]
 ## Armory weapon (PlayerProfile.armory uid) equipped over the base sword, or -1.
 var equipped_uid: int = -1
+## Secondary sword on the swap key ("" none): a base sword id, with its armory uid or -1.
+var sword_alt: String = ""
+var alt_uid: int = -1
 ## Post-story difficulty loop: 0 is the story; higher tiers respawn stronger camps and bosses.
 var world_tier: int = 0
 var max_tier: int = 0
@@ -156,9 +159,43 @@ func learn_style(id: String) -> void:
 func equip_sword(id: String, uid: int = -1) -> void:
 	if not swords.has(id) and uid < 0:
 		return
+	if sword_alt == id and alt_uid == uid:
+		# Drawing the secondary sword as the main one swaps the two.
+		sword_alt = sword
+		alt_uid = equipped_uid
 	sword = id
 	equipped_uid = uid
 	changed.emit("equip", id)
+
+func has_alt() -> bool:
+	return sword_alt != ""
+
+func set_alt(id: String, uid: int = -1) -> bool:
+	## Hangs a sword at the hip for the swap key; "" clears it. Never the sword in hand.
+	if id == "":
+		sword_alt = ""
+		alt_uid = -1
+		changed.emit("equip", "")
+		return true
+	if (not swords.has(id) and uid < 0) or (id == sword and uid == equipped_uid):
+		return false
+	sword_alt = id
+	alt_uid = uid
+	changed.emit("equip", id)
+	return true
+
+func swap_swords() -> bool:
+	## The secondary sword to hand and the main one to the hip.
+	if not has_alt():
+		return false
+	var held: String = sword
+	var held_uid: int = equipped_uid
+	sword = sword_alt
+	equipped_uid = alt_uid
+	sword_alt = held
+	alt_uid = held_uid
+	changed.emit("equip", sword)
+	return true
 
 func record_camp_kill(entity_id: String) -> void:
 	camp_kills[entity_id] = true
@@ -184,7 +221,7 @@ func to_dict() -> Dictionary:
 	return {
 		"flags": flags.duplicate(true), "camp_kills": camp_kills.duplicate(), "inventory": inventory.duplicate(), "quests": quests.duplicate(true),
 		"level": level, "xp": xp, "skill_points": skill_points, "skills": skills.duplicate(), "sword": sword, "coins": coins,
-		"swords": swords.duplicate(), "equipped_uid": equipped_uid, "world_tier": world_tier, "max_tier": max_tier,
+		"swords": swords.duplicate(), "equipped_uid": equipped_uid, "sword_alt": sword_alt, "alt_uid": alt_uid, "world_tier": world_tier, "max_tier": max_tier,
 		"health": health, "checkpoint_id": checkpoint_id, "checkpoints": checkpoints.duplicate(), "discovered": discovered.duplicate(),
 		"play_time": play_time, "tracked_quest": tracked_quest, "quick_item": quick_item,
 	}
@@ -214,6 +251,12 @@ func from_dict(data: Dictionary) -> void:
 	equipped_uid = int(data.get("equipped_uid", -1))
 	if equipped_uid < 0 and not swords.has(sword):
 		swords.append(sword)
+	# Older saves have no secondary sword; one that is no longer owned is dropped.
+	sword_alt = String(data.get("sword_alt", ""))
+	alt_uid = int(data.get("alt_uid", -1))
+	if ContentDB.weapon(sword_alt).is_empty() or (alt_uid < 0 and not swords.has(sword_alt)) or (sword_alt == sword and alt_uid == equipped_uid):
+		sword_alt = ""
+		alt_uid = -1
 	world_tier = maxi(0, int(data.get("world_tier", 0)))
 	max_tier = maxi(world_tier, int(data.get("max_tier", 0)))
 	coins = int(data.get("coins", 0))

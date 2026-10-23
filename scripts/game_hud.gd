@@ -36,6 +36,8 @@ var stamina_bar: ProgressBar
 var level_label: Label
 var heal_label: Label
 var quick_label: Label
+## Secondary sword above the skill boxes: swap key, its name, dim while cooling down or absent.
+var alt_label: Label
 var status_row: HBoxContainer
 ## Reused status icons, one per active status: {"root", "style", "glyph", "stacks", "time"}
 var status_icons: Array[Dictionary] = []
@@ -267,6 +269,8 @@ func _build_skills() -> void:
 		inner.add_child(cooldown)
 		row.add_child(panel)
 		skill_boxes[slot] = {"panel": panel, "key": key, "name": name_label, "bar": cooldown, "action": StyleBook.SLOT_ACTIONS[slot]}
+	alt_label = _anchored(UiTheme.label("", 14, UiTheme.JADE_LIGHT), Control.PRESET_BOTTOM_RIGHT, Vector2(-560, -142), Vector2(-28, -116))
+	alt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 func _build_center() -> void:
 	prompt = _anchored(UiTheme.label("", 20, UiTheme.CREAM, true), Control.PRESET_CENTER_BOTTOM, Vector2(-320, -170), Vector2(320, -136))
@@ -386,6 +390,12 @@ func set_level(level: int, xp: int, next_xp: int, skill_points: int) -> void:
 
 func set_heal_count(text: String) -> void:
 	heal_label.text = text
+
+func set_alt_sword(text: String, ready: bool) -> void:
+	## "V  •  Kiếm phụ: Thủy Nguyệt Kiếm", dimmed while the swap cools down or no sword is set.
+	if alt_label.text != text:
+		alt_label.text = text
+	alt_label.modulate.a = 1.0 if ready else 0.5
 
 func set_quick_item(text: String, stocked: bool) -> void:
 	## The quick slot dims while it is empty or its stack has run out.

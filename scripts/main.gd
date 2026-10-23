@@ -211,6 +211,7 @@ func _start_world() -> void:
 	player.status_applied.connect(func(_status: String) -> void: _mission("status"))
 	player.finisher_landed.connect(_on_finisher_landed)
 	player.focus_started.connect(_on_focus_started)
+	player.swap_requested.connect(_swap_swords)
 	player.focus_ended.connect(func() -> void: hud.set_focus(false))
 	player.statuses_changed.connect(_on_player_statuses)
 	_equip_visuals()
@@ -547,6 +548,8 @@ func _refresh_hud() -> void:
 	var quick: String = state.quick_item
 	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
 	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
+	var alt: String = "Kiếm phụ: " + PlayerStats.weapon_label(profile.weapon(state.alt_uid) if state.alt_uid >= 0 else {"base": state.sword_alt}) if state.has_alt() else "Chưa có kiếm phụ"
+	hud.set_alt_sword("%s  •  %s" % [UserSettings.event_label("swap_sword"), alt], state.has_alt() and player.swap_cooldown <= 0.0)
 	hud.set_statuses(player.statuses.list_for_hud())
 	# The icon shows the moon once the sun is down (halfway through dusk), as the sky does.
 	hud.set_clock(weather.clock_text(), weather.weather_name(), weather.icon(), weather.night_level() >= 0.5)
@@ -1415,6 +1418,8 @@ func _equip_visuals() -> void:
 	## profile falls back to the best story sword of this save.
 	if state.equipped_uid >= 0 and profile.weapon(state.equipped_uid).is_empty():
 		state.equip_sword(String(state.swords[-1]))
+	if state.alt_uid >= 0 and profile.weapon(state.alt_uid).is_empty():
+		state.set_alt("")
 	player.visual.attach_weapon(assets, state.sword)
 	_apply_skins()
 	refresh_stats()
@@ -1441,6 +1446,34 @@ func equip_armory(uid: int) -> void:
 	state.equip_sword(base, uid)
 	_equip_visuals()
 	audio.play("sword_draw")
+
+func set_alt_sword(id: String, uid: int = -1) -> bool:
+	## Armory "Kiếm phụ": hangs a story or armory sword at the hip for the swap key ("" clears).
+	if not playing or player.state != "move":
+		return false
+	if not state.set_alt(id, uid):
+		return false
+	if uid >= 0:
+		state.learn_style(id)
+	audio.ui("ui_confirm")
+	return true
+
+func _swap_swords() -> void:
+	## The swap key: the secondary sword to hand (its style, element, stats and skins), a flash
+	## of its element, and the next blow empowered (PlayerController.on_swapped).
+	if not state.swap_swords():
+		return
+	_equip_visuals()
+	player.on_swapped()
+	var rule: Dictionary = player.swap_rule()
+	audio.play(String(rule.get("sfx", "sword_draw")), player.global_position, -2.0)
+	var element: String = String(ContentDB.weapon(state.sword).get("element", ""))
+	var color: Color = Vfx.element_color(element) if element != "" else Vfx.WIND
+	Vfx.ring(self, player.global_position + Vector3.UP * 0.2, 1.6, color, 0.35, 0.15)
+	Vfx.burst(self, player.global_position + Vector3.UP * 1.1, color, 14, 4.0, 0.08, 0.4)
+	if not hinted.has("swap"):
+		hinted["swap"] = true
+		hud.show_hint("Đổi kiếm! Đòn trúng đầu tiên trong 2 giây sau khi đổi mạnh hơn 30%% và chắc chắn gây trạng thái của kiếm mới — đổi giữa hai hệ để tự tạo phản ứng nguyên tố (Ướt rồi Lôi: Điện Giật…). Mỗi lần đổi cần nghỉ %.1f giây." % float(rule.get("cooldown", 2.5)), 10.0)
 
 func equip_skin(target: String, id: String) -> void:
 	if id != "" and not profile.skins.has(id):

@@ -467,6 +467,9 @@ func _inventory_view() -> Control:
 	right.add_child(UiTheme.label("Khí huyết tối đa: %d   •   Công lực: %d" % [roundi(state.max_health()), roundi(state.attack_power())], 16))
 	var style: String = StyleBook.style_of(state.sword)
 	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ContentDB.style(style).get("name", "")], 16, UiTheme.JADE_LIGHT, true))
+	if state.has_alt():
+		right.add_child(UiTheme.label("Kiếm phụ (%s): %s  •  %s" % [UserSettings.event_label("swap_sword"), ContentDB.weapon(state.sword_alt).get("name", state.sword_alt),
+			ContentDB.style(StyleBook.style_of(state.sword_alt)).get("name", "")], 15, UiTheme.MUTED))
 	right.add_child(UiTheme.label("Tơ ký ức đã kết: %d" % state.count("to_ky_uc"), 16, UiTheme.CREAM))
 	# Cultivation and the character sheet share the rest of the column as two tabs.
 	var tabs: TabContainer = TabContainer.new()

@@ -252,6 +252,9 @@ static func _swords(menus: Menus) -> Control:
 			left.add_child(_weapon_row(String(data.get("name", id)), "Kiếm cốt truyện  •  Công lực %d  •  %s" % [int(data.get("attack", 10)), ContentDB.style(StyleBook.style_of(id)).get("name", "")],
 				[], UiTheme.CREAM, equipped, can_equip, func() -> void:
 					main.equip_story_sword(id)
+					menus.refresh_panel(),
+				state.sword_alt == id and state.alt_uid < 0, func() -> void:
+					main.set_alt_sword("" if state.sword_alt == id and state.alt_uid < 0 else id)
 					menus.refresh_panel()))
 	var items: Array = profile.armory.duplicate()
 	var order: Dictionary = {"ssr": 0, "sr": 1, "r": 2}
@@ -268,6 +271,9 @@ static func _swords(menus: Menus) -> Control:
 		left.add_child(_weapon_row(String(ContentDB.weapon(base).get("name", base)), subtitle, item.get("affixes", []), PlayerStats.rarity_color(rarity),
 			main.playing and state.equipped_uid == uid, can_equip, func() -> void:
 				main.equip_armory(uid)
+				menus.refresh_panel(),
+			main.playing and state.alt_uid == uid, func() -> void:
+				main.set_alt_sword("" if state.alt_uid == uid else base, -1 if state.alt_uid == uid else uid)
 				menus.refresh_panel()))
 	var right: VBoxContainer = VBoxContainer.new()
 	right.add_theme_constant_override("separation", 8)
@@ -447,7 +453,9 @@ static func _talisman_icon(color: Color, glyph: String) -> Control:
 	icon.add_child(letter)
 	return icon
 
-static func _weapon_row(title: String, subtitle: String, affixes: Array, color: Color, equipped: bool, can_equip: bool, on_equip: Callable) -> Control:
+static func _weapon_row(title: String, subtitle: String, affixes: Array, color: Color, equipped: bool, can_equip: bool, on_equip: Callable,
+		alt: bool = false, on_alt: Callable = Callable()) -> Control:
+	## A sword card: "Trang bị" to hold it, "Kiếm phụ" to hang it at the hip for the swap key.
 	var card: PanelContainer = _card(color if equipped else color.darkened(0.45))
 	var row: HBoxContainer = HBoxContainer.new()
 	card.add_child(row)
@@ -458,12 +466,19 @@ static func _weapon_row(title: String, subtitle: String, affixes: Array, color: 
 	text.add_child(UiTheme.label(subtitle, 14, UiTheme.MUTED))
 	for affix: Array in affixes:
 		text.add_child(UiTheme.label("◆ " + PlayerStats.affix_text(affix), 14, UiTheme.JADE_LIGHT))
+	var buttons: VBoxContainer = VBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 4)
+	row.add_child(buttons)
 	if equipped:
-		row.add_child(UiTheme.label("Đang dùng", 15, UiTheme.GOLD, true))
+		buttons.add_child(UiTheme.label("Đang dùng", 15, UiTheme.GOLD, true))
 	else:
 		var button: Button = UiTheme.button("Trang bị", on_equip, 120)
 		button.disabled = not can_equip
-		row.add_child(button)
+		buttons.add_child(button)
+	if on_alt.is_valid() and not equipped:
+		var hip: Button = UiTheme.button("Bỏ kiếm phụ" if alt else "Kiếm phụ", on_alt, 120)
+		hip.disabled = not can_equip
+		buttons.add_child(hip)
 	return card
 
 static func _skin_row(title: String, description: String, worn: bool, owned: bool, color: Color, on_wear: Callable) -> Control:

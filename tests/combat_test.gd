@@ -1030,6 +1030,59 @@ func _run() -> void:
 	await clear_dummies()
 	await reset_player()
 
+	# ---- kiếm phụ: the swap key trades swords; the first blow after a swap is empowered
+	await reset_player()
+	var sword_before: String = state.sword
+	var uid_before: int = state.equipped_uid
+	state.set_alt("")
+	var refused: bool = not player.try_swap()
+	state.grant_sword("sword_water")
+	state.grant_sword("sword_thunder")
+	state.equip_sword("sword_water")
+	game._equip_visuals()
+	var set_ok: bool = game.set_alt_sword("sword_thunder") and not state.set_alt("sword_water")
+	var water_style: String = player.style_id()
+	var swapped: bool = player.try_swap()
+	await frames(1)
+	check(refused and set_ok and swapped and state.sword == "sword_thunder" and state.sword_alt == "sword_water" and water_style == "thuy" and player.style_id() == "loi",
+		"The swap key trades the Thủy sword for the Lôi one at the hip (style %s → %s); no secondary sword, no swap" % [water_style, player.style_id()])
+	var swap_blocked: bool = not player.try_swap()
+	var swap_data: Dictionary = player.swap_rule()
+	var soaked: Enemy = spawn("tan_binh", Vector3(0, 0, -2.2))
+	soaked.statuses.apply("soak", 1, 10.0)
+	var plain: Enemy = spawn("tan_binh", Vector3(2.5, 0, -2.2))
+	var hit_data: Dictionary = Combat.attack("player", "attack_1")
+	var before_swap_hit: float = soaked.health
+	var swap_hit: Dictionary = player.strike(soaked, hit_data, 1.0)
+	var empowered: float = before_swap_hit - soaked.health
+	var spent: bool = player.swap_window == 0.0
+	var before_plain: float = plain.health
+	player.strike(plain, hit_data, 1.0)
+	var normal: float = before_plain - plain.health
+	check(swap_blocked and swap_hit.get("reaction", "") == "electrocharge" and spent and empowered > normal * 1.3,
+		"Right after a swap: no second swap for %.1f s; the first Lôi blow lands +30%% with its Tê liệt for certain, sets off Điện Giật on the soaked foe (%.0f vs %.0f), and spends the bonus" % [float(swap_data["cooldown"]), empowered, normal])
+	player._tick_timers(float(swap_data["cooldown"]) + 0.01)
+	player._start_dodge()
+	var mid_dodge: bool = not player.try_swap()
+	await reset_player()
+	player.input_enabled = false
+	var in_talk: bool = not player.try_swap()
+	player.input_enabled = true
+	var saved: Dictionary = state.to_dict()
+	var reloaded: GameState = GameState.new()
+	reloaded.from_dict(saved)
+	var legacy: Dictionary = saved.duplicate(true)
+	legacy.erase("sword_alt")
+	legacy.erase("alt_uid")
+	var old: GameState = GameState.new()
+	old.from_dict(legacy)
+	check(mid_dodge and in_talk and reloaded.sword_alt == state.sword_alt and reloaded.sword == state.sword and not old.has_alt(),
+		"No swap mid-dodge or in a conversation; both swords survive a save, and an older save has no secondary sword")
+	state.set_alt("")
+	state.equip_sword(sword_before, uid_before)
+	game._equip_visuals()
+	await clear_dummies()
+
 	# ---- last, because it runs the death screen: poison can kill, and death clears statuses
 	await reset_player()
 	player.apply_status("poison", 3)

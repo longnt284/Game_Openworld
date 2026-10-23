@@ -49,6 +49,9 @@ static func validate(data: Variant) -> bool:
 	# Optional since v3 (added with the quick-use slot): absent means an empty slot.
 	if not state.get("quick_item", "") is String:
 		return false
+	# Optional in v4 (the secondary sword): absent means none.
+	if not state.get("sword_alt", "") is String or not _is_number(state.get("alt_uid", -1)):
+		return false
 	return _valid_clock(data)
 
 static func _valid_clock(data: Dictionary) -> bool:

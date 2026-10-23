@@ -24,6 +24,8 @@ signal finisher_landed(target: Node, amount: float, killed: bool)
 ## Tâm Nhãn opened after a perfect "dodge" or "parry", and later closed again.
 signal focus_started(kind: String)
 signal focus_ended
+## The swap key asked for the secondary sword (main makes the swap, then calls on_swapped).
+signal swap_requested
 
 const METER_MAX: float = 100.0
 ## Stamina a dodge costs (a perfect dodge that opens Tâm Nhãn gives it back).
@@ -79,6 +81,10 @@ var slow_serial: int = 0
 ## perfect dodge or parry can open it again. Both count Lâm An's own time, so pausing holds them.
 var focus_time: float = 0.0
 var focus_cooldown: float = 0.0
+## Kiếm phụ (data/attacks.json player "swap"): seconds before the next swap, and how long the
+## first blow after one stays empowered (more damage, the new sword's status for certain).
+var swap_cooldown: float = 0.0
+var swap_window: float = 0.0
 
 func initialize(config: GameSettings, library: AssetLibrary = null, state_data: GameState = null) -> void:
 	settings = config
@@ -180,6 +186,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		queue_input("heal")
 	elif event.is_action_pressed("use_item"):
 		queue_input("item")
+	elif event.is_action_pressed("swap_sword"):
+		try_swap()
 	elif event.is_action_pressed("lock_on"):
 		toggle_lock()
 	elif event.is_action_pressed("jump"):
@@ -251,6 +259,8 @@ func _tick_timers(delta: float) -> void:
 	hit_cooldown = maxf(0.0, hit_cooldown - delta)
 	counter_bonus = maxf(0.0, counter_bonus - delta)
 	focus_cooldown = maxf(0.0, focus_cooldown - delta)
+	swap_cooldown = maxf(0.0, swap_cooldown - delta)
+	swap_window = maxf(0.0, swap_window - delta)
 	if focus_time > 0.0:
 		focus_time -= delta
 		if focus_time <= 0.0:
@@ -597,6 +607,39 @@ func _finisher_blow(data: Dictionary) -> void:
 	_slow_motion(float(data.get("slow_motion", 0.3)), float(data.get("slow_time", 0.25)))
 	emit_signal("finisher_landed", victim, float(result.get("amount", 0.0)), bool(result.get("killed", false)))
 
+# ------------------------------------------------------------------ kiếm phụ
+
+func swap_rule() -> Dictionary:
+	## Cooldown, empowered window and bonus of a sword swap (data/attacks.json player "swap").
+	return Combat.attack("player", "swap")
+
+func can_swap() -> bool:
+	## On her feet and free, or once the current swing has landed: a swap cancels its recovery.
+	if not input_enabled or swap_cooldown > 0.0 or not game.has_alt():
+		return false
+	if state == "move":
+		return true
+	if state != "action" or current_action() in ["finisher", "interact", "parry"]:
+		return false
+	return float(action.get("t", 0.0)) >= float((action["data"] as Dictionary).get("hit_end", 0.0))
+
+func try_swap() -> bool:
+	if input_enabled and not game.has_alt():
+		emit_signal("notice", "Chưa có kiếm phụ — chọn trong Kho kiếm")
+		return false
+	if not can_swap():
+		return false
+	emit_signal("swap_requested")
+	return true
+
+func on_swapped() -> void:
+	## The secondary sword is in hand: the next blow that lands within the window is empowered.
+	var rule: Dictionary = swap_rule()
+	swap_cooldown = float(rule.get("cooldown", 2.5))
+	swap_window = float(rule.get("window", 2.0))
+	if state == "action":
+		_finish_action()
+
 # ------------------------------------------------------------------ Tâm Nhãn
 
 func focus_rule() -> Dictionary:
@@ -857,6 +900,10 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 	var critical: bool = game.stat("crit_rate") > 0.0 and randf() < game.stat("crit_rate")
 	if critical:
 		amount *= 1.0 + PlayerStats.CRIT_BASE + game.stat("crit_dmg")
+	# The first blow after a sword swap lands harder and always leaves the new sword's mark.
+	var swapped: bool = swap_window > 0.0
+	if swapped:
+		amount *= 1.0 + float(swap_rule().get("bonus", 0.3))
 	var damage: Combat.Damage = Combat.make_damage(self, data, amount, (entity as Node3D).global_position)
 	damage.status_power = game.attack_power()
 	damage.armor_pen = game.stat("armor_pen")
@@ -870,6 +917,10 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 	damage.ranged = ranged
 	if damage.element == "":
 		_apply_sword_element(damage)
+	if swapped and damage.element != "":
+		var mark: String = String(ContentDB.element(damage.element).get("status", ""))
+		if mark != "":
+			damage.status = {"id": mark, "chance": 1.0, "stacks": maxi(1, int(damage.status.get("stacks", 1)))}
 	if damage.element != "":
 		damage.amount *= 1.0 + game.stat("element_dmg")
 	if not damage.status.is_empty() and game.stat("status_chance") > 0.0:
@@ -880,6 +931,8 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 	if critical:
 		result["critical"] = true
 	if result.get("hit", false):
+		if swapped:
+			swap_window = 0.0
 		if not ranged:
 			visual.hitstop(damage.hitstop)
 			camera_rig.add_trauma(damage.shake)
@@ -1040,6 +1093,8 @@ func revive(point: Vector3) -> void:
 	# and washes off every buff and debuff.
 	end_focus()
 	focus_cooldown = 0.0
+	swap_cooldown = 0.0
+	swap_window = 0.0
 	statuses.clear()
 	_sync_statuses()
 	visual.stop_action()
