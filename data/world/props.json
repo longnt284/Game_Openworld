@@ -167,5 +167,19 @@
 		{"model": "pagoda_bell_tower", "pos": [0, 262], "yaw": 180},
 		{"model": "incense_burner", "pos": [-8, 205], "yaw": 0},
 		{"model": "incense_burner", "pos": [8, 205], "yaw": 0}
-	]
+	],
+	"lights": {
+		"default": {"color": "ffb25a", "energy": 2.2, "range": 8.0},
+		"models": {
+			"lantern_stone": {"points": [[0, 1.34, 0]]},
+			"lantern_post": {"points": [[0.75, 2.05, 0]]},
+			"lantern_string": {"points": [[0, 2.0, 0]]},
+			"gate_village": {"points": [[-1.6, 2.85, 0.3], [1.6, 2.85, 0.3]]},
+			"house_small": {"points": [[3.2, 2.15, 2.85], [-3.2, 2.15, 2.85]]},
+			"house_long": {"points": [[4.7, 2.15, 3.35], [-4.7, 2.15, 3.35]]},
+			"house_teal": {"points": [[3.45, 2.15, 3.0], [-3.45, 2.15, 3.0]]},
+			"smithy": {"points": [[-1.2, 1.5, -1.1]], "color": "ff8a3c", "energy": 2.4},
+			"campfire": {"points": [[0, 0.7, 0]], "color": "ff8a3c", "energy": 3.0, "range": 10.0}
+		}
+	}
 }

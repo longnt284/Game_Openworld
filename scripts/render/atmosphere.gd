@@ -8,14 +8,17 @@ extends Node3D
 ## is the sun by day and a cool, dim moon by night: it crosses the sky from east to west, and
 ## light and shadows fade out near the horizon so the swap never pops. Depth fog ends at the edge
 ## of the streamed terrain and matches the horizon, so the world fades into the sky while the
-## distant karst backdrop (fog-free) stays crisp. Values are recomposed at most UPDATE_HZ times a
-## second and written only when they moved meaningfully; once the mood has arrived nothing is
-## written ("settled"), since each sky uniform write re-renders the radiance. Global shader
+## distant karst backdrop (fog-free) stays crisp. (GL Compatibility also renders Environment height
+## fog, max-combined with depth fog, but it ignores distance and greys the ground at the player's
+## feet; weather fog stays depth fog.) Values are recomposed at most UPDATE_HZ times a second and
+## written only when they moved meaningfully; once the mood has arrived nothing is written
+## ("settled"), since each sky uniform write re-renders the radiance. Global shader
 ## uniforms (project.godot [shader_globals]) carry the sky to every material: vk_wind (foliage
 ## sway, gusts), vk_wet (rain-soaked ground), vk_night (a moonlit grade; lanterns glow brighter),
 ## vk_gloom (grey weather and dark regions) and vk_sky (what the water reflects); light_changed
-## tints what is unlit. Without a WeatherDirector (the title screen) it shows the fair reference
-## hour: the valley's old fixed afternoon sun.
+## tints what is unlit. Without a WeatherDirector (the title screen), and in regions outside the
+## valley's hours (the Trial pocket), it shows the fair reference hour: the valley's old fixed
+## afternoon sun.
 
 signal haze_changed(color: Color)
 ## How the light on the world compares with the region's fair day, per channel and linear: white
@@ -66,6 +69,9 @@ var written: Dictionary = {}
 ## Levels of the default weather (data/weather.json "clear"): neutral, the look before weather.
 var calm: Dictionary = {}
 var target_id: String = FALLBACK
+## True in a region outside the valley's hours ("still" in moods.json "light": the Trial's illusion
+## keeps its fair afternoon at any hour, as its weather stays clear).
+var still: bool = false
 var shadow_distance: float = 60.0
 ## Streamed terrain radius in metres; depth fog finishes just inside it.
 var view_distance: float = 64.0
@@ -234,6 +240,11 @@ func set_region(region_id: String) -> void:
 	if (moods()["regions"] as Dictionary).has(region_id) and region_id != target_id:
 		target_id = region_id
 		settled = false
+		var outside: bool = (moods()["light"].get("still", []) as Array).has(region_id)
+		if outside != still:
+			# Into or out of a pocket outside the valley's hours: a teleport, behind a fade.
+			still = outside
+			snap()
 
 func set_update_rate(hz: float) -> void:
 	update_interval = 1.0 / clampf(hz, 1.0, UPDATE_HZ)
@@ -254,13 +265,17 @@ func haze() -> Color:
 	return current.get("fog", Color.WHITE)
 
 func time_of_day() -> float:
-	## The hour shown: the director's clock, or the reference hour without one.
-	return weather.time_of_day() if weather else reference_clock()
+	## The hour shown: the director's clock, or the reference hour without one or where time stands
+	## still.
+	return weather.time_of_day() if weather and not still else reference_clock()
 
 func flash(strength: float = 1.0) -> void:
-	## A lightning stroke: lights the cloud deck and lifts the ambient for a moment. Written every
-	## frame while it fades (a fraction of a second), outside the UPDATE_HZ budget.
+	## A lightning stroke: lights the cloud deck and lifts the ambient for a moment, from this
+	## frame on. Written every frame while it fades (a fraction of a second), outside the UPDATE_HZ
+	## budget.
 	flash_level = maxf(flash_level, clampf(strength, 0.0, 1.0))
+	if environment:
+		_write_flash()
 
 func _process(delta: float) -> void:
 	if flash_level > 0.0:

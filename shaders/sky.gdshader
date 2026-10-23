@@ -73,11 +73,12 @@ void sky() {
 		float n = density(uv);
 		// Clouds bank up toward the horizon like summer cumulus.
 		float cover = cloud_coverage - (1.0 - smoothstep(0.0, 0.35, h)) * 0.07;
-		// A storm softens the crisp edges into one heavy deck.
+		// A storm softens the crisp edges into one heavy deck: few sunlit crowns, and cores that
+		// darken gradually instead of in cel bands.
 		float body = smoothstep(cover, cover + 0.03 + storm * 0.22, n);
 		vec2 toward_sun = normalize(LIGHT0_DIRECTION.xz + vec2(0.0001)) * 0.025;
-		float lit = step(density(uv + toward_sun), n - 0.012);
-		float core = smoothstep(cover + 0.05, cover + 0.2, n);
+		float lit = step(density(uv + toward_sun), n - 0.012) * (1.0 - storm * 0.8);
+		float core = smoothstep(cover + 0.05, cover + 0.2 + storm * 0.35, n);
 		vec3 cloud = mix(cloud_light.rgb, cloud_shadow.rgb, clamp(core * 0.85 - lit * 0.6, 0.0, 1.0));
 		if (storm > 0.0) {
 			// Low scud racing under the deck.

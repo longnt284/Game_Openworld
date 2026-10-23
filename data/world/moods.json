@@ -31,7 +31,8 @@
 		"rise": 0.21, "set": 0.79, "east_yaw": 90.0, "west_yaw": -90.0, "reference_yaw": -35.0, "arc_power": 0.5, "fade": 0.04,
 		"dawn": {"from": 0.16, "peak": 0.215, "to": 0.29, "strength": 0.85},
 		"dusk": {"from": 0.7, "peak": 0.785, "to": 0.85, "strength": 0.9},
-		"night": {"strength": 0.95, "shadow": 0.55}
+		"night": {"strength": 0.95, "shadow": 0.55},
+		"still": ["ao_canh"]
 	},
 	"levels": {
 		"sun_dim": 1.1, "ambient_dim": 0.12, "shadow_dim": 1.0, "desaturate": 0.45, "cloud_gain": 0.55,

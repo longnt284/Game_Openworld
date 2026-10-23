@@ -9,7 +9,8 @@ render_mode blend_mix, depth_draw_opaque, cull_back;
 // vk_wind (x: sway amplitude, 1 when calm; y: gusts, a quick flutter and a lean
 // downwind), vk_wet (rain-soaked ground and roofs: darker, with a sheen of the sky),
 // vk_night (a moonlit grade; emissive lanterns glow brighter), vk_gloom (grey weather,
-// dark regions).
+// dark regions). The sun or moon gets the two-tone cel shade; lantern lights at night
+// (omni lights) get a soft pool instead.
 global uniform vec2 vk_wind;
 global uniform float vk_wet;
 global uniform float vk_night;
@@ -112,25 +113,38 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT);
-	if (double_sided_light) {
-		ndl = abs(ndl) * 0.8;
-	}
-	float lit = smoothstep(shade_threshold - shade_softness, shade_threshold + shade_softness, ndl) * ATTENUATION;
-	if (dapple > 0.0 && canopy > 0.01) {
-		vec2 drift = world_pos.xz * 0.42 + vec2(TIME * 0.045, TIME * 0.03);
-		float leaves = texture(paint_noise, drift).r * 0.6 + texture(paint_noise, drift * 2.3 + 0.5).r * 0.4;
-		float flecks = smoothstep(0.5, 0.56, leaves);
-		lit *= mix(1.0, flecks, clamp(canopy * 1.7, 0.0, 1.0) * dapple);
-	}
-	vec3 shade = mix(shade_tint.rgb, vec3(1.0), lit);
-	DIFFUSE_LIGHT += ALBEDO * shade * LIGHT_COLOR / PI;
-	if (spec_strength > 0.0) {
-		float highlight = dot(reflect(-LIGHT, NORMAL), VIEW);
-		SPECULAR_LIGHT += LIGHT_COLOR * spec_strength * smoothstep(1.0 - spec_size, 1.0 - spec_size + 0.03, highlight) * lit;
-	}
-	if (soaked > 0.0) {
-		// Wet glint: a small hard highlight of the sun or moon on soaked ground.
-		float glint = dot(reflect(-LIGHT, NORMAL), VIEW);
-		SPECULAR_LIGHT += LIGHT_COLOR * soaked * 0.3 * smoothstep(0.93, 0.96, glint) * lit;
+	if (!LIGHT_IS_DIRECTIONAL) {
+		// Lantern light (NightLights: shadowless omni lights): a soft pool wrapped a little past the
+		// terminator, all of it fading with distance (ATTENUATION, which grows past 1 right by the
+		// flame). The paper or stone right around the flame (within about half a metre) glows
+		// whichever way it faces, so a hanging lantern's shell lights up from inside. Not divided by
+		// PI like the sun: a lantern's energy reads as the light it pours on the ground under it.
+		float wrap = smoothstep(-0.35, 0.55, double_sided_light ? abs(ndl) : ndl);
+		float through = 0.45 * smoothstep(2.0, 4.0, ATTENUATION);
+		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * ATTENUATION * max(wrap, through);
+	} else {
+		if (double_sided_light) {
+			ndl = abs(ndl) * 0.8;
+		}
+		float lit = smoothstep(shade_threshold - shade_softness, shade_threshold + shade_softness, ndl) * ATTENUATION;
+		if (dapple > 0.0 && canopy > 0.01) {
+			vec2 drift = world_pos.xz * 0.42 + vec2(TIME * 0.045, TIME * 0.03);
+			float leaves = texture(paint_noise, drift).r * 0.6 + texture(paint_noise, drift * 2.3 + 0.5).r * 0.4;
+			float flecks = smoothstep(0.5, 0.56, leaves);
+			lit *= mix(1.0, flecks, clamp(canopy * 1.7, 0.0, 1.0) * dapple);
+		}
+		vec3 shade = mix(shade_tint.rgb, vec3(1.0), lit);
+		DIFFUSE_LIGHT += ALBEDO * shade * LIGHT_COLOR / PI;
+		if (spec_strength > 0.0) {
+			float highlight = dot(reflect(-LIGHT, NORMAL), VIEW);
+			SPECULAR_LIGHT += LIGHT_COLOR * spec_strength * smoothstep(1.0 - spec_size, 1.0 - spec_size + 0.03, highlight) * lit;
+		}
+		if (soaked > 0.0) {
+			// Wet glint: a small, faint highlight of the sun or moon on soaked ground, only as strong
+			// as the light breaking through the clouds (vk_sky.a). Broad terrain facets catch a wide
+			// window, so it stays tight and dim or whole slopes would flash white.
+			float glint = dot(reflect(-LIGHT, NORMAL), VIEW);
+			SPECULAR_LIGHT += LIGHT_COLOR * soaked * 0.08 * vk_sky.a * smoothstep(0.985, 0.995, glint) * lit;
+		}
 	}
 }

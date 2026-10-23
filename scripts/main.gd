@@ -17,6 +17,9 @@ var audio: AudioDirector
 var atmosphere: Atmosphere
 var ambient: AmbientFx
 var weather: WeatherDirector
+var rain: RainFx
+var storm: StormDirector
+var night_lights: NightLights
 var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
@@ -174,6 +177,20 @@ func _start_world() -> void:
 	weather.name = "Weather"
 	add_child(weather)
 	quests.weather = weather
+	rain = RainFx.new()
+	rain.name = "Rain"
+	add_child(rain)
+	rain.target = player
+	atmosphere.light_changed.connect(rain.set_light)
+	rain.set_light(atmosphere.light_tint())
+	storm = StormDirector.new()
+	storm.name = "Storm"
+	add_child(storm)
+	storm.setup(self)
+	night_lights = NightLights.new()
+	night_lights.name = "NightLights"
+	add_child(night_lights)
+	night_lights.setup(props.lights, atmosphere, player)
 	player.health_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.stamina_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.died.connect(_on_player_died)
@@ -220,7 +237,7 @@ func show_title() -> void:
 	hud.set_gameplay_visible(false)
 	hud.close_dialogue()
 	# The title always shows the valley's fair reference afternoon, whatever the clock says.
-	atmosphere.follow(null)
+	_follow_weather(null)
 	title_camera.current = true
 	menus.show_title(SaveStore.has_save(save_path))
 	audio.set_music("title", 1.5)
@@ -240,10 +257,18 @@ func _begin_play() -> void:
 	if player.state == "disabled":
 		player.state = "move"
 	player.camera_rig.camera.current = true
-	atmosphere.follow(weather)
+	_follow_weather(weather)
 	current_region = ""
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _follow_weather(director: WeatherDirector) -> void:
+	## The sky, the rain, the lightning and the gale follow the clock only in play; null (the
+	## title screen) shows the fair reference afternoon, dry and calm. Warned strikes are dropped.
+	atmosphere.follow(director)
+	rain.follow(director)
+	storm.follow(director)
+	ambient.follow(director)
 
 func start_new_game() -> void:
 	death_serial += 1
@@ -359,6 +384,7 @@ func _update_region() -> void:
 		atmosphere.set_region(id)
 		ambient.set_region(id)
 		weather.set_region(id)
+		rain.set_region(region)
 		audio.set_area(String(region.get("music", "explore")), String(region.get("ambience", "wind")))
 		if first:
 			state.set_flag("visited:" + id)
@@ -464,7 +490,8 @@ func _refresh_hud() -> void:
 	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
 	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
 	hud.set_statuses(player.statuses.list_for_hud())
-	hud.set_clock(weather.clock_text(), weather.weather_name(), weather.icon(), weather.is_night())
+	# The icon shows the moon once the sun is down (halfway through dusk), as the sky does.
+	hud.set_clock(weather.clock_text(), weather.weather_name(), weather.icon(), weather.night_level() >= 0.5)
 	var boss: Enemy = _fighting_boss()
 	if boss:
 		hud.set_boss_poise(boss.poise_ratio(), boss.is_broken(), boss.is_finishable())
@@ -488,11 +515,12 @@ func _refresh_hud() -> void:
 		hud.set_tracker(region_name, "", "")
 	if hud.debug_enabled:
 		var memory_mb: float = Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
-		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d\nNgày %d  •  %s  •  %s %.0f s  •  ghi trời %d" % [
+		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d\nNgày %d  •  %s  •  %s %.0f s  •  ghi trời %d\nMưa %.2f  •  đèn %d/%d" % [
 			Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), world.active.size(), settings.chunk_capacity(), world.last_build_ms,
 			player.global_position.x, player.global_position.y, player.global_position.z, current_region, memory_mb,
-			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed, weather.day, weather.clock_hhmm(), weather.world, weather.remaining, atmosphere.sky_writes]
+			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed, weather.day, weather.clock_hhmm(), weather.world, weather.remaining, atmosphere.sky_writes,
+			rain.intensity, night_lights.lit_count(), night_lights.lights.size()]
 
 # ------------------------------------------------------------------ input
 
@@ -1218,6 +1246,8 @@ func apply_settings() -> void:
 	if world:
 		world.configure(int(preset["view_radius"]), float(preset["density"]))
 		ambient.set_budget(float(preset["ambient"]))
+		rain.set_density(float(preset["rain"]))
+		night_lights.set_budget(int(preset["lights"]))
 		atmosphere.set_view_distance(world.settings.view_radius * world.settings.chunk_size)
 		for chunk: WorldChunk in world.pool + world.active.values():
 			_apply_chunk_quality(chunk, preset)
@@ -1286,6 +1316,7 @@ func load_game() -> bool:
 		spawner.reset_navzones()
 	state.from_dict(data["state"])
 	weather.from_save(data)
+	storm.cancel()
 	_check_echo_skill(false)
 	spawner.clear_all()
 	chime_sequence.clear()

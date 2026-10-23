@@ -5,7 +5,9 @@ extends SceneTree
 ## its step-by-step migration; the layered atmosphere (data/world/moods.json, the sun and moon
 ## arc, deterministic blending, settling, global shader uniforms); then in the running game:
 ## pausing, the HUD clock, the setting, shrine rest to dawn or dusk, the Trial pocket, saving and
-## loading the clock, and the sky following the clock in play but not on the title screen.
+## loading the clock, and the sky following the clock in play but not on the title screen; then
+## the effects: the rain curtain and its presets, shelter and the Trial, the gale, the lantern
+## light pool, lightning intervals and flashes, and strikes with their safe rule.
 
 var failures: int = 0
 const SAVE: String = "user://world_test_save.json"
@@ -375,6 +377,19 @@ func _atmosphere() -> void:
 	atmosphere.follow(null)
 	check(atmosphere.weather == null and atmosphere.time_of_day() == reference and not director.changed.is_connected(atmosphere._on_weather_changed),
 		"Letting go of the clock returns to the reference hour")
+	# Unlit petals follow the light: untouched on a fair day, darker than the tint itself at night.
+	var petals: AmbientFx = AmbientFx.new()
+	root.add_child(petals)
+	petals.set_budget(0.5)
+	petals.set_region("ben_van_khe")
+	petals.set_light(Color.WHITE)
+	var fair_petals: Color = petals.material.albedo_color
+	var moonlit: Color = Color(0.3, 0.36, 0.55)
+	petals.set_light(moonlit)
+	var night_petals: Color = petals.material.albedo_color
+	check(fair_petals.is_equal_approx(Color.WHITE) and night_petals.get_luminance() < 0.8 * moonlit.linear_to_srgb().get_luminance() and night_petals.b > night_petals.r
+		and is_equal_approx(night_petals.a, 1.0), "Drifting petals keep their colours on a fair day and dim below the light's tint at night, still opaque")
+	petals.free()
 	atmosphere.free()
 	director.free()
 
@@ -530,6 +545,13 @@ func _scene() -> void:
 		and game.hud.clock_label.visible and game.hud.clock_label.get_global_rect().position.x > game.hud.region_label.get_global_rect().end.x,
 		"The HUD shows the double hour and the weather, with its icon, beside the region name")
 	check(game.quests.check(["time:night"]) and game.quests.check(["weather:clear"]), "The game's conditions read its own clock and sky")
+	weather.set_time(0.77)
+	game._refresh_hud()
+	var before_sunset: bool = game.hud.clock_night
+	weather.set_time(0.8)
+	game._refresh_hud()
+	check(not before_sunset and game.hud.clock_night and weather.day_phase() == "dusk" and game.atmosphere.arc.w == 1.0,
+		"The HUD icon turns to the moon when the sun sets, halfway through dusk, as the sky does")
 	# The "Thời tiết động" setting: saved in settings.cfg, applied by main.
 	weather.set_weather("rain", 0.0, 300.0)
 	game.user_settings.dynamic_weather = false
@@ -587,19 +609,25 @@ func _scene() -> void:
 		game._rest("dawn")
 		check(not fighting_prompt and absf(weather.time_of_day() - hour) < 0.001 and not game.can_rest(), "No rest is offered or taken during a fight")
 		game.engaged = 0
-	# The Trial pocket: fixed clear sky, the valley's weather waits; no rest inside.
+	# The Trial pocket: fixed clear sky, the valley's weather waits; no rest inside. Its illusion
+	# keeps a fair afternoon even when the valley is deep in the night.
 	weather.set_weather("rain", 0.0, 500.0)
+	weather.set_time(0.95)
 	game.trial.start(player.global_position)
 	await frames(4)
 	var inside: String = weather.weather_id()
 	var region: String = weather.region
 	var waiting: Dictionary = weather.to_save()["weather"]
+	var trial_sky: bool = (sky.still and sky.time_of_day() == Atmosphere.reference_clock() and is_zero_approx(float(sky.current["night"])) and sky.arc.w == 0.0
+		and sky.settled and is_zero_approx(sky.wet))
 	await frames(30)
 	check(region == "ao_canh" and inside == "clear" and weather.weather_id() == "clear" and weather.to_save()["weather"] == waiting and weather.world == "rain" and not game.can_rest(),
 		"In the Trial the sky is clear and the valley's rain waits, unchanged; there is no shrine rest")
+	check(trial_sky and weather.is_night(), "The Trial shows its fair afternoon at once, dry, while the valley's clock says night")
 	game.trial.end_run("leave")
 	await frames(4)
-	check(weather.region != "ao_canh" and weather.weather_id() == "rain", "Leaving the Trial brings back the valley's rain")
+	check(weather.region != "ao_canh" and weather.weather_id() == "rain" and not sky.still and is_equal_approx(float(sky.current["night"]), 1.0) and sky.arc.w == 1.0,
+		"Leaving the Trial brings back the valley's rain and its night at once")
 	# Save and load through the game: clock, day, weather and RNG.
 	weather.set_time(0.9)
 	weather.set_weather("storm", 0.0, 77.0)
@@ -617,14 +645,226 @@ func _scene() -> void:
 	weather.set_time(0.0)
 	game.return_to_title()
 	await frames(2)
-	var title_sky: bool = game.atmosphere.weather == null and game.atmosphere.time_of_day() == Atmosphere.reference_clock() and game.atmosphere.arc.w == 0.0
+	var title_sky: bool = (game.atmosphere.weather == null and game.atmosphere.time_of_day() == Atmosphere.reference_clock() and game.atmosphere.arc.w == 0.0
+		and game.rain.weather == null and game.storm.weather == null and game.ambient.weather == null)
 	game.start_new_game()
 	await frames(2)
-	check(title_sky and game.atmosphere.weather == weather, "The title shows the fair reference afternoon whatever the hour; play follows the clock again")
+	check(title_sky and game.atmosphere.weather == weather and game.rain.weather == weather and game.storm.weather == weather and game.ambient.weather == weather,
+		"The title shows the fair reference afternoon whatever the hour, dry and calm; play follows the clock again")
 	check(weather.day == 1 and absf(weather.time_of_day() - float(start["time"])) < 0.01 and weather.weather_id() == "clear", "A new game starts the clock over on a clear morning")
+	await _effects(game)
 	game.audio.stop_all()
 	await create_timer(0.2, true, false, true).timeout
 	game.queue_free()
 	await frames(2)
 	_remove(SAVE)
 	_remove(PROFILE)
+
+func _foe(game: Node, id: String, point: Vector3) -> Enemy:
+	## A bandit standing still at point (its AI off) for the lightning checks.
+	var foe: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+	foe.setup({"id": id, "enemy": "tan_binh", "yaw": 0.0}, game.assets, game.world)
+	game.add_child(foe)
+	point.y = game.world.height_at(point.x, point.z)
+	foe.activate(point, game.player)
+	foe.set_physics_process(false)
+	return foe
+
+func _ground(game: Node, x: float, z: float) -> Vector3:
+	return Vector3(x, game.world.height_at(x, z), z)
+
+func _run_storm(storm: StormDirector, seconds: float, times: Array[float], warned: Array[Vector3], until_warned: bool = false) -> void:
+	## Drives the lightning scheduler by hand in 0.1 s steps, noting when each bolt fell (distant or
+	## warned strike) and where each strike was warned; until_warned stops at the first warning.
+	var clock: Array[float] = [0.0]
+	var before: int = warned.size()
+	var on_bolt: Callable = func(_point: Vector3, _distance: float) -> void: times.append(clock[0])
+	var on_warn: Callable = func(point: Vector3) -> void:
+		times.append(clock[0])
+		warned.append(point)
+	storm.bolt_fell.connect(on_bolt)
+	storm.strike_warned.connect(on_warn)
+	for tick: int in range(roundi(seconds * 10.0)):
+		clock[0] += 0.1
+		storm.step(0.1)
+		if until_warned and warned.size() > before:
+			break
+	storm.bolt_fell.disconnect(on_bolt)
+	storm.strike_warned.disconnect(on_warn)
+
+func _effects(game: Node) -> void:
+	## Phase 2.3 in the running game: the rain curtain, the gale, lantern light, lightning and its
+	## strikes with their safe rule.
+	var weather: WeatherDirector = game.weather
+	var player: PlayerController = game.player
+	var rain: RainFx = game.rain
+	var storm: StormDirector = game.storm
+	var lights: NightLights = game.night_lights
+	var rules: Dictionary = WeatherDirector.data()["weathers"]
+	var presets: Dictionary = UserSettings.QUALITY
+	check(float(presets["low"]["rain"]) == 0.0 and float(presets["medium"]["rain"]) == 0.5 and float(presets["high"]["rain"]) == 1.0
+		and int(presets["low"]["lights"]) == 0 and int(presets["medium"]["lights"]) == 4 and int(presets["high"]["lights"]) == 6,
+		"Quality presets carry the rain density (0 / 0.5 / 1) and the lantern light pool (0 / 4 / 6)")
+	# Rain: as hard as the weather says times the preset; the shader is told the same.
+	rain.set_density(1.0)
+	weather.set_weather("rain")
+	rain.update()
+	var light_rain: float = rain.intensity
+	var shown: bool = rain.curtain.visible
+	weather.set_weather("storm")
+	rain.update()
+	var downpour: float = rain.intensity
+	var lean: float = float(rain.material.get_shader_parameter("lean"))
+	var splashing: bool = rain.splash.emitting
+	rain.set_density(0.5)
+	var medium: float = rain.intensity
+	var medium_splash: bool = rain.splash.emitting
+	weather.set_weather("clear")
+	rain.update()
+	check(is_equal_approx(light_rain, float(rules["rain"]["rain"])) and shown and is_equal_approx(downpour, 1.0) and lean > 0.0 and is_equal_approx(medium, 0.5)
+		and splashing and not medium_splash and rain.intensity == 0.0 and not rain.curtain.visible and float(rain.material.get_shader_parameter("intensity")) == 0.0,
+		"Rain falls as hard as the weather says times the preset (rain %.2f, storm %.2f, half on Medium, splashes on High only), leaning with the storm wind; a clear sky stops it" % [light_rain, downpour])
+	weather.set_weather("rain")
+	rain.set_region({"indoor": true})
+	var indoors: float = rain.intensity
+	rain.set_region(game.world.layout.region_at(player.global_position.z))
+	check(indoors == 0.0 and rain.intensity > 0.0, "No rain falls in a sheltered ('indoor') region")
+	# The gale: a storm's wind turns the drifting petals into torn leaves streaming downwind.
+	var ambient: AmbientFx = game.ambient
+	ambient.set_budget(0.5)
+	weather.set_weather("storm")
+	ambient.set_wind(weather.wind())
+	var gale: bool = ambient.gale and ambient.mood() == AmbientFx.GALE and ambient.particles.direction.x > 0.0 and ambient.particles.initial_velocity_min >= AmbientFx.GALE_SPEED.x
+	weather.set_weather("clear")
+	ambient.set_wind(weather.wind())
+	check(gale and not ambient.gale and ambient.mood() == AmbientFx.MOODS[ambient.region], "A storm's gale sends torn leaves streaming downwind; calm air brings the region's drift back")
+	# Lantern light: the pool follows the preset and lights only at night, near the view.
+	var sizes: Array[int] = []
+	for quality: String in ["low", "medium", "high"]:
+		lights.set_budget(int(presets[quality]["lights"]))
+		sizes.append(lights.lights.size())
+	player.teleport(Vector3(6, game.world.height_at(6, 27) + 0.6, 27))
+	weather.set_time(0.5)
+	await create_timer(0.5).timeout
+	var day_lit: int = lights.lit_count()
+	weather.set_time(0.0)
+	await create_timer(0.6).timeout
+	var night_lit: int = lights.lit_count()
+	var near: bool = true
+	for light: OmniLight3D in lights.lights:
+		near = near and light.visible and light.global_position.distance_to(player.global_position) < NightLights.REACH + NightLights.LOOK_AHEAD and light.shadow_enabled == false
+	weather.set_time(0.5)
+	await create_timer(0.2).timeout
+	check(sizes == [0, 4, 6] and day_lit == 0 and night_lit == 6 and near and lights.lit_count() == 0 and not lights.lights[0].visible,
+		"The lantern light pool follows the preset (none, 4, 6), stays dark by day and lights the lanterns near Lâm An at night (%d lit)" % night_lit)
+	# The Trial pocket: never rain, lightning or lantern light, whatever the valley's night storm.
+	weather.set_weather("storm", 0.0, 900.0)
+	weather.set_time(0.0)
+	game.trial.start(player.global_position)
+	await create_timer(0.3).timeout
+	rain.update()
+	var trial_rain: float = rain.intensity
+	var trial_curtain: bool = rain.curtain.visible
+	storm.set_physics_process(false)
+	var trial_bolts: Array[float] = []
+	var trial_warned: Array[Vector3] = []
+	_run_storm(storm, 60.0, trial_bolts, trial_warned)
+	check(trial_rain == 0.0 and not trial_curtain and trial_bolts.is_empty() and storm.until_next < 0.0 and lights.lit_count() == 0 and weather.world == "storm",
+		"In the Trial no rain falls, no lightning comes and no lantern lights, while the valley's night storm waits")
+	game.trial.end_run("leave")
+	await frames(4)
+	# Lightning in the village: bolts at the storm's intervals, but never a strike there, even with
+	# a foe beside Lâm An and every bolt allowed to strike.
+	weather.set_time(0.5)
+	player.teleport(Vector3(6, game.world.height_at(6, 27) + 0.6, 27))
+	await frames(2)
+	var interval: float = float(rules["storm"]["lightning"])
+	var spread: Array = storm.rule["spread"]
+	storm.strike_rule["chance"] = 1.0
+	storm.strike_rule["cooldown"] = 0.0
+	var guard: Enemy = _foe(game, "world_test_storm_guard", player.global_position + Vector3(2.0, 0.0, -2.0))
+	weather.set_weather("storm", 0.0, 9999.0)
+	storm.until_next = -1.0
+	var times: Array[float] = []
+	var warned: Array[Vector3] = []
+	_run_storm(storm, 600.0, times, warned)
+	var gaps_ok: bool = times.size() >= floori(600.0 / (interval * float(spread[-1]))) and times[0] <= interval * float(spread[-1]) + 0.11
+	for index: int in range(1, times.size()):
+		var gap: float = times[index] - times[index - 1]
+		gaps_ok = gaps_ok and gap >= interval * float(spread[0]) - 0.11 and gap <= interval * float(spread[-1]) + 0.11
+	check(gaps_ok and warned.is_empty() and guard.health == guard.max_health and player.health == player.max_health(),
+		"A storm's bolts fall every %.0f–%.0f s (%d in 10 min); in the village none ever strikes, even beside a foe" % [interval * float(spread[0]), interval * float(spread[-1]), times.size()])
+	storm.rumbles.clear()
+	storm.distant_bolt()
+	var rumble: Dictionary = storm.rumbles[-1] if not storm.rumbles.is_empty() else {}
+	check(game.hud.flash_level > 0.0 and game.hud.flash_rect.visible and game.hud.fade.color.a == 0.0 and game.atmosphere.flash_level > 0.0 and not rumble.is_empty()
+		and float(rumble["left"]) >= float(storm.rule["distance"][0]) / float(storm.rule["speed_of_sound"]) - 0.01 and rumble["position"] == null,
+		"A distant bolt flashes the sky and the screen (its own HUD layer), and its thunder waits %.2f s for the sound to arrive" % float(rumble.get("left", 0.0)))
+	# Out on Đồi Gió (not a safe region): no strike during a dialogue; outside one, strikes come.
+	var hill: Vector3 = _ground(game, 8.0, -60.0)
+	player.teleport(hill + Vector3.UP * 0.6)
+	guard.global_position = _ground(game, hill.x + 7.0, hill.z - 5.0)
+	await frames(2)
+	await _settle(game)
+	game._run_dialogue("shrine_rest", null, true)
+	var talking: bool = game.hud.dialogue_open()
+	times.clear()
+	warned.clear()
+	_run_storm(storm, 300.0, times, warned)
+	var during_talk: int = warned.size()
+	game._end_dialogue()
+	times.clear()
+	_run_storm(storm, 3.0 * interval, times, warned, true)
+	var struck_near_foe: bool = not warned.is_empty() and Vector2(warned[0].x - guard.global_position.x, warned[0].z - guard.global_position.z).length() <= 1.5
+	check(talking and during_talk == 0 and struck_near_foe, "On Đồi Gió no strike comes while a dialogue is open; once it closes, a strike is warned beside the foe")
+	storm.cancel()
+	# A strike: the ring warns, then thunder and Tê liệt hit every foe and Lâm An inside it, only them.
+	# (No scheduled bolt may fall meanwhile.)
+	storm.until_next = 1000000.0
+	await create_timer(0.6).timeout
+	player.cleanse(player.statuses.active.keys())
+	player.heal(player.max_health())
+	var radius: float = float(storm.strike_rule["radius"])
+	var spot: Vector3 = _ground(game, 8.0, -64.0)
+	guard.health = guard.max_health
+	guard.statuses.clear()
+	guard.global_position = _ground(game, spot.x + 0.6, spot.z + 0.4)
+	var outside: Enemy = _foe(game, "world_test_storm_far", spot + Vector3(radius + 1.5, 0.0, 0.0))
+	player.teleport(spot + Vector3(-1.0, 0.6, 0.6))
+	await frames(2)
+	var hp: float = player.health
+	storm.warn(spot)
+	var ring: bool = storm.pending.size() == 1 and is_instance_valid(storm.pending[0]["ring"])
+	storm.step(float(storm.strike_rule["telegraph"]) * 0.5)
+	var early: bool = guard.health == guard.max_health and player.health == hp
+	storm.step(float(storm.strike_rule["telegraph"]))
+	check(ring and early and guard.health < guard.max_health and guard.statuses.has("shock") and outside.health == outside.max_health and not outside.statuses.has("shock")
+		and player.health < hp and player.statuses.has("shock") and storm.pending.is_empty(),
+		"A strike warns with a ring, then thunder and Tê liệt hit the foe and Lâm An inside it (-%.0f), not the foe %.1f m outside" % [hp - player.health, radius + 1.5])
+	# Out of the ring nothing reaches her; a strike whose moment comes in a dialogue fizzles.
+	await create_timer(0.6).timeout
+	player.cleanse(player.statuses.active.keys())
+	player.heal(player.max_health())
+	player.teleport(spot + Vector3(-radius - 3.0, 0.6, 0.0))
+	await frames(2)
+	var guard_hp: float = guard.health
+	storm.warn(spot)
+	storm.step(float(storm.strike_rule["telegraph"]) + 0.1)
+	var spared: bool = player.health == player.max_health() and guard.health < guard_hp
+	guard_hp = guard.health
+	storm.warn(spot)
+	game._run_dialogue("shrine_rest", null, true)
+	storm.step(float(storm.strike_rule["telegraph"]) + 0.1)
+	var fizzled: bool = guard.health == guard_hp and storm.pending.is_empty()
+	game._end_dialogue()
+	check(spared and fizzled, "Lâm An outside the ring is spared while the foe in it is struck; a strike due during a dialogue fizzles")
+	storm.strike_rule["chance"] = float(WeatherDirector.data()["lightning"]["strike"]["chance"])
+	storm.strike_rule["cooldown"] = float(WeatherDirector.data()["lightning"]["strike"]["cooldown"])
+	storm.set_physics_process(true)
+	weather.set_weather("clear")
+	for foe: Enemy in [guard, outside]:
+		foe.queue_free()
+	lights.set_budget(int(game.user_settings.preset()["lights"]))
+	rain.set_density(float(game.user_settings.preset()["rain"]))
+	ambient.set_budget(float(game.user_settings.preset()["ambient"]))
+	await frames(2)

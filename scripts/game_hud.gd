@@ -2,7 +2,7 @@ class_name GameHUD
 extends CanvasLayer
 ## In-game HUD: vitals with buff/debuff icons, skills, quest tracker with world marker and the
 ## clock and weather beside the region name, interaction prompt, toasts/banners, boss bar with
-## its poise gauge, the Tâm Nhãn veil, dialogue box, memory visions, fade/death screen and the
+## its poise gauge, the Tâm Nhãn veil, the lightning flash, dialogue box, memory visions, fade/death screen and the
 ## optional technical overlay (F3).
 
 signal dialogue_advanced
@@ -12,6 +12,9 @@ signal vision_closed
 const FOCUS_SHADER: Shader = preload("res://shaders/focus_veil.gdshader")
 ## Seconds the Tâm Nhãn name stays up (it fades over the last 0.4 s).
 const FOCUS_TITLE_TIME: float = 1.3
+## A lightning flash on the screen fades out at this rate (alpha per second).
+const FLASH_FADE: float = 3.0
+const FLASH_COLOR: Color = Color(0.9, 0.94, 1.0, 0.0)
 
 var root: Control
 var status: Label
@@ -72,6 +75,10 @@ var focus_sub: Label
 var focus_active: bool = false
 var focus_level: float = 0.0
 var focus_title_left: float = 0.0
+## Lightning: a full-screen pale flash on its own ColorRect (not `fade`), just above the Tâm
+## Nhãn veil and under every other HUD element, fading out over 1 / FLASH_FADE seconds.
+var flash_rect: ColorRect
+var flash_level: float = 0.0
 var toast_queue: Array[String] = []
 ## Colour of a queued toast by its text (a talisman drop shows in its rarity colour); cream otherwise.
 var toast_tints: Dictionary = {}
@@ -120,6 +127,12 @@ func _build_focus() -> void:
 	focus_veil.material = focus_material
 	focus_veil.visible = false
 	root.add_child(focus_veil)
+	flash_rect = ColorRect.new()
+	flash_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash_rect.color = FLASH_COLOR
+	flash_rect.visible = false
+	root.add_child(flash_rect)
 	focus_title = _anchored(UiTheme.title("", 34, UiTheme.CREAM), Control.PRESET_CENTER, Vector2(-300, -240), Vector2(300, -192))
 	focus_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	focus_sub = _anchored(UiTheme.label("", 16, UiTheme.CREAM, true), Control.PRESET_CENTER, Vector2(-300, -192), Vector2(300, -166))
@@ -592,6 +605,12 @@ func set_focus(active: bool, title: String = "", subtitle: String = "", tint: Co
 	focus_sub.text = subtitle
 	focus_title_left = FOCUS_TITLE_TIME
 
+func flash(strength: float) -> void:
+	## A lightning flash over the whole screen (StormDirector), from this frame on.
+	flash_level = maxf(flash_level, clampf(strength, 0.0, 1.0))
+	flash_rect.color.a = flash_level
+	flash_rect.visible = flash_level > 0.0
+
 func hide_boss() -> void:
 	boss_box.visible = false
 	boss_finishable = false
@@ -690,6 +709,10 @@ func _process(delta: float) -> void:
 		pulse_time += delta
 		boss_poise.modulate.a = 0.55 + 0.45 * sin(pulse_time * 11.0)
 	_fade_focus(delta)
+	if flash_level > 0.0:
+		flash_level = maxf(0.0, flash_level - delta * FLASH_FADE)
+		flash_rect.color.a = flash_level
+		flash_rect.visible = flash_level > 0.0
 	# A message raised behind the dialogue box (a shrine's prompt) waits until it closes.
 	if not dialogue_panel.visible:
 		toast_remaining = maxf(0.0, toast_remaining - delta)

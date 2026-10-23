@@ -32,6 +32,13 @@
 			"rain": 0.0, "fog": 0.0, "wind": 1.0, "storm": 0.0, "lightning": 0, "darken": 0.05, "desaturate": 0.05, "clouds": 0.55,
 			"gameplay": {}}
 	},
+	"lightning": {
+		"spread": [0.5, 1.5], "distance": [75, 170], "height": [90, 140], "view": 0.42, "color": "e6eeff",
+		"flash": {"sky": [0.9, 0.45], "screen": [0.32, 0.12], "strike_screen": 0.45}, "thunder_db": [-2, -10], "speed_of_sound": 343,
+		"strike": {"chance": 0.35, "cooldown": 30, "range": 14, "telegraph": 1.2, "radius": 2.8, "color": "ffe066",
+			"player_damage": 0.14, "enemy_damage": 0.2, "boss_damage": 0.04, "poise": 25, "knockback": 3.0, "hitstop": 0.08, "shake": 0.6,
+			"status": {"id": "shock", "stacks": 1, "chance": 1.0}}
+	},
 	"regions": {
 		"default": {"clear": 5, "cloudy": 3, "rain": 2, "storm": 1, "fog": 1, "wind": 1},
 		"ben_van_khe": {"clear": 6, "cloudy": 3, "rain": 2, "storm": 0.25, "fog": 1, "wind": 1},
