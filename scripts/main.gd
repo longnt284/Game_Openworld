@@ -22,6 +22,8 @@ var storm: StormDirector
 var night_lights: NightLights
 ## Weather bed shares handed to the AudioDirector every frame (reused, no allocation).
 var weather_beds: Dictionary = {"rain_light": 0.0, "rain_heavy": 0.0, "storm_wind": 0.0, "night_insects": 0.0}
+## Seconds of rain since the last soaking (WeatherDirector.soak_interval).
+var soak_timer: float = 0.0
 var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
@@ -107,6 +109,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	MapView.shutdown()
+	Combat.weather = null
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -179,6 +182,7 @@ func _start_world() -> void:
 	weather.name = "Weather"
 	add_child(weather)
 	quests.weather = weather
+	weather.changed.connect(_on_weather_changed)
 	rain = RainFx.new()
 	rain.name = "Rain"
 	add_child(rain)
@@ -271,6 +275,9 @@ func _follow_weather(director: WeatherDirector) -> void:
 	rain.follow(director)
 	storm.follow(director)
 	ambient.follow(director)
+	# Rain and storms change elemental blows; fog and night shorten enemy sight (Combat).
+	Combat.weather = director
+	soak_timer = 0.0
 
 func start_new_game() -> void:
 	death_serial += 1
@@ -357,6 +364,7 @@ func _process(delta: float) -> void:
 	_update_region()
 	_update_focus()
 	_update_combat_state()
+	_update_soak(delta)
 	autosave_timer -= delta
 	if autosave_timer <= 0.0 and player.state == "move" and engaged == 0 and not trial.active:
 		autosave_timer = 60.0 if web else 300.0
@@ -399,6 +407,42 @@ func _update_region() -> void:
 		river_distance = minf(river_distance, world.layout._line_query(water, player.global_position.x, player.global_position.z).x - float(water["width"]) * 0.5)
 	audio.set_river_distance(river_distance)
 	_update_weather_audio(region)
+
+func _on_weather_changed(kind: String) -> void:
+	## The first rain, storm, fog and night of a journey explain what they change in a fight.
+	if not playing or trial.active:
+		return
+	var key: String = ""
+	var hint: String = ""
+	if kind == "weather":
+		key = weather.weather_id()
+		hint = String((weather.weather_rule().get("gameplay", {}) as Dictionary).get("hint", ""))
+	elif kind == "phase" and weather.is_night():
+		key = "night"
+		hint = String((WeatherDirector.data().get("night", {}) as Dictionary).get("hint", ""))
+	if hint != "" and not hinted.has("weather:" + key):
+		hinted["weather:" + key] = true
+		hud.show_hint(hint, 9.0)
+
+func _update_soak(delta: float) -> void:
+	## Out in the rain everyone gets wet, a stack of Ướt every soak_interval seconds: foes (so Lôi
+	## and Băng find water to work with) and Lâm An alike. Nobody under a roof; never in the
+	## Trial's fixed clear sky (its interval is 0); not while a conversation holds the world.
+	var interval: float = weather.soak_interval()
+	if interval <= 0.0 or not playing or not player.input_enabled:
+		soak_timer = 0.0
+		return
+	soak_timer += delta
+	if soak_timer < interval:
+		return
+	soak_timer = 0.0
+	var layout: WorldLayout = world.layout
+	if not bool(layout.region_at(player.global_position.z).get("indoor", false)) and not player.is_dead():
+		player.apply_status("soak")
+	for node: Node in get_tree().get_nodes_in_group("enemy"):
+		var enemy: Enemy = node as Enemy
+		if enemy and not enemy.is_dead() and not bool(layout.region_at(enemy.global_position.z).get("indoor", false)):
+			enemy.apply_status("soak")
 
 func _update_weather_audio(region: Dictionary) -> void:
 	## Rain on the leaves (light, then a heavy roar), storm wind, and crickets after dark; nothing
@@ -1042,7 +1086,9 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	if enemy.data.has("elite") and rng.randf() < float(ContentDB.get_data("elites").get("base", {}).get("chest_chance", 0.2)):
 		spawn_reward_chest("elite", enemy.global_position)
 	audio.play("enemy_down", enemy.global_position)
-	_add_xp(int(enemy.data.get("xp", 10)))
+	# Foes beaten at night give more (data/weather.json "night" "reward_mult"); the Trial has its own rewards.
+	var night_bonus: float = weather.reward_mult()
+	_add_xp(roundi(float(enemy.data.get("xp", 10)) * night_bonus))
 	# heal_on_kill (the Huyết Ngọc set) works on world kills too; Trial kills heal in TrialDirector.
 	var heal: float = state.stat("heal_on_kill")
 	if heal > 0.0 and not player.is_dead():
@@ -1053,7 +1099,8 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 		if drop[0] == Talismans.DROP:
 			talisman_chance = float(drop[3])
 		elif randf() <= float(drop[3]):
-			drops.append([drop[0], randi_range(int(drop[1]), int(drop[2]))])
+			var amount: int = randi_range(int(drop[1]), int(drop[2]))
+			drops.append([drop[0], roundi(amount * night_bonus) if drop[0] == "coins" else amount])
 	if not drops.is_empty():
 		give_items(drops)
 	if talisman_chance > 0.0:

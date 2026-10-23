@@ -311,7 +311,8 @@ func _set_state(next: String) -> void:
 # ------------------------------------------------------------------ states
 
 func _physics_idle(delta: float) -> void:
-	if _can_see_target(float(data.get("detect", 13.0))):
+	# Fog and night shorten the first sighting; a foe already alerted keeps its full range.
+	if _can_see_target(float(data.get("detect", 13.0)) * (1.0 if boss else Combat.detect_mult())):
 		_set_state("alert")
 		return
 	if global_position.distance_to(wander_target) < 0.8 or state_time > 9.0:
@@ -480,7 +481,7 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 	damage.amount = maxf(damage.amount, max_health * damage.hp_floor)
 	# Judged on what the blow found: a reaction may consume the status that made this target take
 	# more of the element, and a freeze it starts is no stagger for the blow that started it.
-	var multiplier: float = (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element)
+	var multiplier: float = (1.35 if state == "stagger" else 1.0) * element_mult(damage.element) * statuses.taken_mult(damage.element) * Combat.weather_mult(damage.element)
 	var reaction: Dictionary = Reactions.check(statuses, damage)
 	if not reaction.is_empty():
 		Reactions.apply(self, damage, reaction)

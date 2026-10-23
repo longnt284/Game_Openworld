@@ -8,7 +8,7 @@ extends SceneTree
 ## loading the clock, and the sky following the clock in play but not on the title screen; then
 ## the effects: the rain curtain and its presets, shelter and the Trial, the gale, the lantern
 ## light pool, lightning intervals and flashes, and strikes with their safe rule; the weather
-## sound beds and thunder.
+## sound beds and thunder; the sky in a fight (elements, soaking rain, enemy sight, night kills).
 
 var failures: int = 0
 const SAVE: String = "user://world_test_save.json"
@@ -655,6 +655,7 @@ func _scene() -> void:
 	check(weather.day == 1 and absf(weather.time_of_day() - float(start["time"])) < 0.01 and weather.weather_id() == "clear", "A new game starts the clock over on a clear morning")
 	await _effects(game)
 	_audio(game)
+	await _gameplay(game)
 	game.audio.stop_all()
 	await create_timer(0.2, true, false, true).timeout
 	game.queue_free()
@@ -693,6 +694,81 @@ func _run_storm(storm: StormDirector, seconds: float, times: Array[float], warne
 			break
 	storm.bolt_fell.disconnect(on_bolt)
 	storm.strike_warned.disconnect(on_warn)
+
+func _thunder_blow(source: Node, amount: float, element: String) -> Combat.Damage:
+	var damage: Combat.Damage = Combat.make_damage(source, {"poise": 0, "knockback": 0.0, "flinch": false, "element": element, "ranged": true}, amount, Vector3.ZERO)
+	damage.direction = Vector3.FORWARD
+	return damage
+
+func _gameplay(game: Node) -> void:
+	## Phase 2.5: the sky in a fight. Elements on both sides, soaking rain, shorter sight in fog
+	## and at night, richer kills at night; the Trial's clear sky changes nothing.
+	var weather: WeatherDirector = game.weather
+	var player: PlayerController = game.player
+	weather.set_time(0.5)
+	weather.set_weather("rain")
+	var mults: bool = is_equal_approx(Combat.weather_mult("thunder"), 1.2) and is_equal_approx(Combat.weather_mult("flame"), 0.8) and Combat.weather_mult("") == 1.0
+	var foe: Enemy = _foe(game, "weather_foe", player.global_position + Vector3(0, 0, -6))
+	foe.max_health = 10000.0
+	foe.health = foe.max_health
+	var before: float = foe.health
+	foe.take_damage(_thunder_blow(player, 100.0, "thunder"))
+	var wet_thunder: float = before - foe.health
+	weather.set_weather("clear")
+	before = foe.health
+	foe.take_damage(_thunder_blow(player, 100.0, "thunder"))
+	var dry_thunder: float = before - foe.health
+	weather.set_weather("rain")
+	player.invulnerable = 0.0
+	var hp: float = player.health
+	player.take_damage(_thunder_blow(foe, 10.0, "flame"))
+	var wet_flame: float = hp - player.health
+	player.revive(player.global_position)
+	await frames(2)
+	check(mults and is_equal_approx(wet_thunder, dry_thunder * 1.2) and is_equal_approx(wet_flame, 8.0),
+		"Rain: Lôi ×1.2 on foes (%.0f vs %.0f dry), Hỏa ×0.8 on Lâm An (%.1f of 10)" % [wet_thunder, dry_thunder, wet_flame])
+	# Soaking rain: a stack of Ướt for everyone outdoors every soak_interval seconds.
+	player.statuses.clear()
+	foe.statuses.clear()
+	game.soak_timer = 0.0
+	game._update_soak(weather.soak_interval() + 0.1)
+	var soaked: bool = player.statuses.has("soak") and foe.statuses.has("soak")
+	weather.set_weather("clear")
+	player.statuses.clear()
+	foe.statuses.clear()
+	game._update_soak(30.0)
+	var dry: bool = not player.statuses.has("soak") and not foe.statuses.has("soak")
+	weather.set_weather("rain")
+	weather.set_region("ao_canh")
+	var pocket: float = weather.soak_interval()
+	weather.set_region(game.world.layout.region_at(player.global_position.z).get("id", ""))
+	check(soaked and dry and pocket == 0.0, "Rain soaks Lâm An and foes in the open; a clear sky and the Trial's pocket soak nobody")
+	player.statuses.clear()
+	player._sync_statuses()
+	# Sight: fog and night shorten it (never below the floor); a clear noon keeps it whole.
+	weather.set_weather("clear")
+	var noon: float = Combat.detect_mult()
+	weather.set_weather("fog")
+	var fog: float = Combat.detect_mult()
+	weather.set_time(0.0)
+	var fog_night: float = Combat.detect_mult()
+	weather.set_weather("clear")
+	var night: float = Combat.detect_mult()
+	check(noon == 1.0 and is_equal_approx(fog, 0.6) and is_equal_approx(night, 0.8) and fog_night >= Combat.MIN_DETECT and fog_night < fog,
+		"Enemy sight: noon ×%.2f, fog ×%.2f, night ×%.2f, fog at night ×%.2f (floor %.2f)" % [noon, fog, night, fog_night, Combat.MIN_DETECT])
+	# Night kills: +25% experience.
+	var entity: Dictionary = {"id": "weather_foe", "enemy": "tan_binh"}
+	var xp_before: int = game.state.xp
+	game.on_enemy_defeated(foe, entity)
+	var night_xp: int = game.state.xp - xp_before
+	weather.set_time(0.5)
+	xp_before = game.state.xp
+	game.on_enemy_defeated(foe, entity)
+	var day_xp: int = game.state.xp - xp_before
+	check(night_xp == roundi(day_xp * 1.25) and day_xp == int(ContentDB.enemy("tan_binh")["xp"]), "A foe beaten at night gives %d experience instead of %d" % [night_xp, day_xp])
+	foe.queue_free()
+	game.state.camp_kills.erase("weather_foe")
+	await frames(2)
 
 func _settle_audio(game: Node, region: Dictionary) -> void:
 	## The beds fade a little each frame; run enough updates for them to arrive.

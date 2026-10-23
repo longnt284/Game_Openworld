@@ -941,8 +941,8 @@ func take_damage(damage: Combat.Damage) -> Dictionary:
 		damage.amount *= maxf(0.2, 1.0 + game.stat("damage_taken"))
 	# Flat defense, then the blow's element against her matching resistance (both neutral at 0).
 	damage.amount *= Combat.defense_mult(game.stat("defense")) * element_damage_mult(damage.element)
-	# A soaked Lâm An conducts thunder just like a soaked bandit.
-	damage.amount *= statuses.taken_mult(damage.element)
+	# A soaked Lâm An conducts thunder just like a soaked bandit; rain and storms change elements.
+	damage.amount *= statuses.taken_mult(damage.element) * Combat.weather_mult(damage.element)
 	var blocking: bool = (current_action() == "parry" or (state == "move" and block_held and is_on_floor())) and from_front
 	if blocking and not damage.unblockable:
 		var chip: float = damage.amount * 0.15
