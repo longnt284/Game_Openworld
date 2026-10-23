@@ -17,11 +17,12 @@ const ACTION_NAMES: Dictionary = {
 ## Distances in metres. density thins grass, flowers and ground cover only (trees never move);
 ## view_radius is the streamed area in chunks around the player; ambient is the particle budget;
 ## sky_hz caps how often the sky and light are rewritten while they change (each sky write
-## re-renders its radiance); rain is the share of rain streaks drawn (0 none, 1 all, with
-## splashes around Lâm An); lights is the size of the lantern light pool after dark.
+## re-renders its radiance); rain is the share of rain streaks drawn (Low keeps a sparse
+## curtain so the Web build still shows rain; 1 draws all, with splashes around Lâm An);
+## lights is the size of the lantern light pool after dark.
 const QUALITY: Dictionary = {
 	"low": {"shadow": 0.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_DISABLED, "scale": 0.85, "view_radius": 2, "tree_distance": 60.0, "bamboo": 48.0,
-		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "sky_hz": 5.0, "rain": 0.0, "lights": 0, "label": "Thấp"},
+		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "sky_hz": 5.0, "rain": 0.3, "lights": 0, "label": "Thấp"},
 	"medium": {"shadow": 70.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_2X, "scale": 1.0, "view_radius": 2, "tree_distance": 82.0, "bamboo": 64.0,
 		"grass": 44.0, "clutter": 36.0, "rock": 90.0, "density": 1.0, "glow": true, "ambient": 0.5, "sky_hz": 10.0, "rain": 0.5, "lights": 4, "label": "Trung bình"},
 	"high": {"shadow": 120.0, "shadow_atlas": 4096, "msaa": Viewport.MSAA_4X, "scale": 1.0, "view_radius": 3, "tree_distance": 120.0, "bamboo": 90.0,

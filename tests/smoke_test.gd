@@ -187,7 +187,9 @@ func _check_flora(game: Node, layout: WorldLayout) -> void:
 	check(presets.has("low") and presets.has("medium") and presets.has("high"), "Low, Medium and High quality presets exist")
 	var scaled: bool = true
 	for key: String in ["rain", "lights"]:
-		scaled = scaled and float(presets["low"][key]) == 0.0 and float(presets["low"][key]) < float(presets["medium"][key]) and float(presets["medium"][key]) < float(presets["high"][key])
+		scaled = scaled and float(presets["low"][key]) < float(presets["medium"][key]) and float(presets["medium"][key]) < float(presets["high"][key])
+	# Low keeps a sparse rain curtain (the Web build shows rain) but no lantern lights.
+	scaled = scaled and float(presets["low"]["rain"]) > 0.0 and int(presets["low"]["lights"]) == 0
 	check(float(presets["low"]["density"]) < float(presets["medium"]["density"]) and float(presets["medium"]["density"]) < float(presets["high"]["density"])
 		and int(presets["high"]["view_radius"]) >= int(presets["medium"]["view_radius"]) and scaled,
-		"Quality presets scale density, view distance, rain and lantern lights (none on Low)")
+		"Quality presets scale density, view distance, rain (sparse on Low) and lantern lights (none on Low)")

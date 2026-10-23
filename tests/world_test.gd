@@ -702,9 +702,9 @@ func _effects(game: Node) -> void:
 	var lights: NightLights = game.night_lights
 	var rules: Dictionary = WeatherDirector.data()["weathers"]
 	var presets: Dictionary = UserSettings.QUALITY
-	check(float(presets["low"]["rain"]) == 0.0 and float(presets["medium"]["rain"]) == 0.5 and float(presets["high"]["rain"]) == 1.0
+	check(float(presets["low"]["rain"]) == 0.3 and float(presets["medium"]["rain"]) == 0.5 and float(presets["high"]["rain"]) == 1.0
 		and int(presets["low"]["lights"]) == 0 and int(presets["medium"]["lights"]) == 4 and int(presets["high"]["lights"]) == 6,
-		"Quality presets carry the rain density (0 / 0.5 / 1) and the lantern light pool (0 / 4 / 6)")
+		"Quality presets carry the rain density (0.3 / 0.5 / 1) and the lantern light pool (0 / 4 / 6)")
 	# Rain: as hard as the weather says times the preset; the shader is told the same.
 	rain.set_density(1.0)
 	weather.set_weather("rain")
