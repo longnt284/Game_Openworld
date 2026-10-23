@@ -6,7 +6,7 @@ Lâm An, kiếm khách trẻ mang thanh kiếm cũ, cập bến thung lũng Vân
 
 ![Làng Vân Khê](docs/screenshots/village.jpg)
 
-**Trạng thái:** đoạn chơi mẫu (vertical slice) Chương I — Hồi 1 và 2, khoảng 20–30 phút: 4 nhiệm vụ chính, 2 nhiệm vụ phụ, 2 sự kiện, 2 loại địch thường, miniboss Trúc Tướng, hệ chiến đấu đầy đủ (trạng thái, buff/debuff, Ngọc bội, phản ứng nguyên tố, kết liễu, Tâm Nhãn), lưu game, nhạc/âm thanh, giao diện tiếng Việt. Hồi 3 chưa làm; đang mở rộng thành Chương I hoàn chỉnh theo 6 giai đoạn (xong giai đoạn 1). Chi tiết: [tiến độ](docs/progress.md), [thiết kế](docs/game-design.md).
+**Trạng thái:** đoạn chơi mẫu (vertical slice) Chương I — Hồi 1 và 2, khoảng 20–30 phút: 4 nhiệm vụ chính, 2 nhiệm vụ phụ, 2 sự kiện, 2 loại địch thường, miniboss Trúc Tướng, hệ chiến đấu đầy đủ (trạng thái, buff/debuff, Ngọc bội, phản ứng nguyên tố, kết liễu, Tâm Nhãn), lưu game, nhạc/âm thanh, giao diện tiếng Việt. Hồi 3 chưa làm; đang mở rộng thành Chương I hoàn chỉnh theo 6 giai đoạn (xong giai đoạn 1 — lõi combat và giai đoạn 2 — thời tiết, ngày–đêm 24 phút, kiếm phụ). Chi tiết: [tiến độ](docs/progress.md), [thiết kế](docs/game-design.md).
 
 ## Chơi trên Windows
 
@@ -39,6 +39,7 @@ Nếu PowerShell chặn script, dùng `powershell -ExecutionPolicy Bypass -File 
 | F | Nói chuyện, mở rương, thắp miếu…; cạnh địch đã phá thế: kết liễu |
 | R | Dùng thuốc hồi máu |
 | C | Dùng vật phẩm ở ô nhanh (chọn trong Túi đồ) |
+| V | Đổi sang kiếm phụ (chọn trong Kho kiếm) |
 | Chuột giữa / T | Khóa mục tiêu |
 | M / J / I | Bản đồ / Nhật ký / Túi đồ |
 | F5 / F9 | Lưu / Tải nhanh |

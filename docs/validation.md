@@ -1,4 +1,4 @@
-# Kết quả kiểm tra — 21/10/2026
+# Kết quả kiểm tra — 23/10/2026
 
 Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** trong môi trường phát triển.
 
@@ -15,10 +15,11 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 | Import asset | `godot --headless --path . --editor --import` | Thành công |
 | Smoke test (bản nền + thực vật, vùng cấm, preset) | `tests/smoke_test.gd` | **35/35 PASS** |
 | Gameplay test (chơi trọn đoạn mẫu) | `tests/gameplay_test.gd` | **48/48 PASS** |
-| Combat test (15 thức của 5 hệ, trạng thái, nộ khí; GĐ1: trạng thái trên người chơi, chỉ số, phản ứng, phá thế, kết liễu, Tâm Nhãn, địch dùng AoE) | `tests/combat_test.gd` | **152/152 PASS** |
-| Progression test (save v3, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới; GĐ1: vật phẩm, quầy thuốc, affix mới, Ngọc bội, hồ sơ v1 → v2) | `tests/progression_test.gd` | **118/118 PASS** |
+| Combat test (15 thức của 5 hệ, trạng thái, nộ khí; GĐ1: trạng thái trên người chơi, chỉ số, phản ứng, phá thế, kết liễu, Tâm Nhãn, địch dùng AoE; GĐ2: kiếm phụ) | `tests/combat_test.gd` | **155/155 PASS** |
+| Progression test (save v4, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới; GĐ1: vật phẩm, quầy thuốc, affix mới, Ngọc bội, hồ sơ v1 → v2) | `tests/progression_test.gd` | **119/119 PASS** |
+| World test (GĐ2: đồng hồ, thời tiết theo vùng, mức chuyển mượt, khí quyển nhiều lớp, điều kiện `time:`/`weather:`, save v4 + migrate, nghỉ ở miếu, mưa, sét, đèn đêm, âm thanh thời tiết, thời tiết trong trận) | `tests/world_test.gd` | **92/92 PASS** |
 
-Tổng **353/353 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả bốn bộ. CI GitHub Actions chạy trên `windows-latest`.
+Tổng **449/449 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả năm bộ. CI GitHub Actions chạy trên `windows-latest`.
 
 **Combat test:** mỗi thức E/Q/X của 5 hệ khởi động, gây sát thương và gây đúng trạng thái; thiêu đốt gây sát thương theo thời gian không làm khựng; lạnh cóng làm chậm, 3 lớp thành đóng băng, boss không bị đóng băng; mục tiêu ướt chỉ nhận thêm sát thương sấm; tuyệt kỹ bị từ chối khi nộ khí chưa đầy và tiêu hết khi dùng; Phong Trảm vẫn bằng công lực × 1,6 như bản trước.
 
@@ -43,6 +44,15 @@ Tổng **353/353 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.s
 | ![Điện Giật](screenshots/reaction_electrocharge.jpg) | ![Hỏa Lốc](screenshots/reaction_firestorm.jpg) |
 | ![Thanh thế](screenshots/poise_bars.jpg) | ![Kết liễu](screenshots/finisher.jpg) |
 | ![Tâm Nhãn](screenshots/focus.jpg) | ![Ông Lang Vân](screenshots/merchant.jpg) |
+
+**Giai đoạn 2 (thời tiết, ngày–đêm, kiếm phụ):** đồng hồ quay vòng và đếm ngày, đêm ≈ 1/3 ngày, tạm dừng là dừng; thời tiết bốc theo trọng số vùng tái lập được từ seed, làng hiếm bão (< 4%), Ải luôn quang và thời tiết thung lũng chờ nguyên vẹn; tắt "Thời tiết động" thì trời quang; các mức chuyển mượt; điều kiện `time:`/`weather:` cả phủ định; save v4 lưu/tải giờ, ngày, thời tiết, RNG; save v1/v2/v3 migrate lên v4; nghỉ ở miếu tới sáng/tối; khí quyển trộn vùng × giờ × thời tiết đúng và ngừng ghi khi ổn định; mưa theo thời tiết × preset, không mưa trong nhà/Ải; gió bão đổi hạt bay; đèn đêm theo preset và chỉ sáng ban đêm; sét theo khoảng thời gian, sét đánh trúng địch và Lâm An trong vòng, không đánh trong làng hay khi hội thoại; lớp tiếng mưa/bão/dế theo trời; mưa Lôi ×1,2 / Hỏa ×0,8 cả hai phía; mưa làm Ướt ngoài trời, không làm Ướt trong Ải; sương ×0,6, đêm ×0,8, sàn ×0,45 tầm phát hiện; hạ địch ban đêm +25%; đổi kiếm phụ đổi hệ, nguyên tố, chỉ số, hồi 2,5 s, đòn đầu +30% và chắc chắn gây trạng thái (Điện Giật trên địch Ướt), không đổi khi đang né hay hội thoại, kiếm phụ còn sau khi lưu/tải.
+
+| | |
+|---|---|
+| ![Làng chiều tà](screenshots/w_village_dusk.jpg) | ![Làng ban đêm](screenshots/w_village_night.jpg) |
+| ![Mưa ở làng](screenshots/w_village_rain.jpg) | ![Sương ở Trúc Hải](screenshots/w_gorge_fog.jpg) |
+| ![Bão có chớp](screenshots/w_bamboo_storm_flash.jpg) | ![Sét sắp đánh](screenshots/w_bamboo_storm_warn.jpg) |
+| ![Bão đêm](screenshots/w_bamboo_storm_night.jpg) | ![Đèn lồng ban đêm](screenshots/w_village_night_lights.jpg) |
 
 ## Kiểm tra hình ảnh — đã chạy (renderer phần mềm)
 

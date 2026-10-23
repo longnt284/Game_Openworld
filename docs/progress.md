@@ -1,6 +1,6 @@
 # Tiến độ
 
-Cập nhật: 21/10/2026. Nhánh `claude/p1-combat-core` (giai đoạn 1 của kế hoạch mở rộng thành Chương I hoàn chỉnh). Đọc file này đầu mỗi phiên để biết đang ở đâu.
+Cập nhật: 23/10/2026. Nhánh `claude/p2-weather` (giai đoạn 2 của kế hoạch mở rộng thành Chương I hoàn chỉnh). Đọc file này đầu mỗi phiên để biết đang ở đâu.
 
 ## Tổng quan theo mốc
 
@@ -15,7 +15,8 @@ Cập nhật: 21/10/2026. Nhánh `claude/p1-combat-core` (giai đoạn 1 của k
 | 7. Ngũ hành kiếm quyết | Xong: 5 hệ × E/Q/X, 6 trạng thái, nộ khí, tuyệt kỹ, 4 kiếm nguyên tố, 2 clip mới, SFX |
 | 8. Chơi dài hạn | Xong: Ải Vô Tận, Cảnh giới 1–5 và tinh anh, Kỳ Ngộ (công khai tỉ lệ, bảo hiểm), rương thưởng, kiếm có chỉ số, trang phục, nhiệm vụ ngày, điểm danh 7 ngày; save v3 + hồ sơ dùng chung |
 | 9. Mở rộng GĐ1 — lõi combat | Xong: trạng thái/buff/debuff trên người chơi có icon HUD, vật phẩm tiêu hao theo dữ liệu + ô nhanh (C) + quầy thuốc, 13 chỉ số mới + bảng Nhân vật, Ngọc bội (3 ô, 4 bộ), 6 phản ứng nguyên tố, phá thế + kết liễu (F), Tâm Nhãn (né/phản hoàn hảo làm chậm địch); hồ sơ v2 |
-| 10. Mở rộng GĐ2–6 | Chưa làm: thời tiết + ngày–đêm + tông tối (GĐ2), quái mới (GĐ3), bản đồ phía bắc (GĐ4), Hồi 3 + boss cuối (GĐ5), cân bằng và phát hành (GĐ6) |
+| 10. Mở rộng GĐ2 — thời tiết, ngày–đêm | Xong: đồng hồ 24 phút/ngày, 6 kiểu thời tiết theo vùng, khí quyển nhiều lớp (vùng × giờ × thời tiết), trời đêm có sao/trăng, mưa, sấm sét và sét đánh có báo trước, sương, gió bão, đèn lồng ban đêm, âm thanh mưa/bão/dế, ảnh hưởng nhẹ trong trận, nghỉ ở miếu, kiếm phụ đổi nhanh (V); save v4 |
+| 11. Mở rộng GĐ3–6 | Chưa làm: quái mới (GĐ3), bản đồ phía bắc (GĐ4), Hồi 3 + boss cuối (GĐ5), cân bằng và phát hành (GĐ6) |
 
 ## Đã xong trong đoạn chơi mẫu
 
@@ -38,6 +39,17 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 - **AI:** tàn binh chỉ lượn vòng mà không áp sát (lỗi token tấn công); địch dùng navmesh của khu khác hoặc đứng im ở mép navmesh; tường gió bị bake vào navmesh làm boss kẹt; hit-stop làm lệch thời điểm đòn của địch; heo trượt xa sau khi bị phản; khối va chạm heo không xoay theo hướng; sóng xung kích vẫn gây sát thương sau khi boss chết; vòng báo đòn nện lệch vùng sát thương thật; phản lưỡi gió từ xa làm boss choáng.
 - **Người chơi:** chết vì sát thương xuyên đỡ không kích hoạt; nút đỡ/đánh bị "kẹt" sau khi tạm dừng hoặc hội thoại; thể lực không hồi sau khi chạy rồi đánh; animation tiếp đất mạnh không bao giờ chạy; nhấn đỡ trong lúc bất tử sau hồi sinh vẫn bị đánh; Phong Trảm trúng hai lần ở cự ly gần.
 - **Luồng game:** tải save trong màn hình gục ngã bị hồi sinh đè lên; bắt đầu game mới giữa trận boss giữ nguyên trạng thái trận; mở hội thoại/thị kiến/miếu giữa lúc giao chiến.
+
+## Giai đoạn 2 — thời tiết, ngày–đêm, kiếm phụ (21–23/10)
+
+- **Đồng hồ:** 1 ngày = 24 phút thật (đêm ≈ 8 phút), đếm ngày, canh giờ trên HUD; tạm dừng là dừng. Nghỉ ở Miếu Gió đã thắp: "Nghỉ đến sáng / đến tối". Điều kiện `time:` / `weather:` cho thực thể và nhiệm vụ (quái đêm ở GĐ3).
+- **Thời tiết:** quang, nhiều mây, mưa, giông bão, sương mù, gió lớn; bốc theo trọng số vùng bằng RNG lưu trong save; Ải luôn quang; thiết lập "Thời tiết động".
+- **Hình:** `data/world/moods.json` — vùng × giờ × thời tiết; mặt trời/trăng quay theo giờ; trời có sao, trăng, mây bão, chớp; uniform toàn cục `vk_wind`/`vk_wet`/`vk_night`/`vk_gloom`/`vk_sky`; ngày quang ở làng giữ đúng màu cũ. Mưa bằng shader quanh camera (rẻ cho Web), sét xa + sét đánh có vòng báo trước, đèn lồng có ánh sáng ban đêm, lá bay trong gió bão.
+- **Tiếng:** mưa nhẹ/nặng, gió bão, dế đêm, 4 tiếng sấm — tổng hợp bằng `build_sfx.py --weather`.
+- **Trong trận:** mưa Lôi ×1,2, Hỏa ×0,8; bão Lôi ×1,3, Phong ×1,15, Hỏa ×0,8; mưa làm Ướt người và địch ngoài trời; sương/đêm thu tầm phát hiện của địch; hạ địch ban đêm +25% kinh nghiệm và Đồng.
+- **Kiếm phụ:** chọn trong Kho kiếm, V để đổi (hồi 2,5 s); đòn trúng đầu tiên sau khi đổi +30% và chắc chắn gây trạng thái của kiếm mới → tự tạo phản ứng nguyên tố.
+- **Save v4:** giờ, ngày, thời tiết + RNG, kiếm phụ; migrate từng bước v1 → v2 → v3 → v4.
+- Test: 449 check (smoke 35, gameplay 48, combat 155, progression 119, world 92 — bộ mới), tất cả PASS.
 
 ## Giai đoạn 1 — lõi combat mở rộng (18–21/10)
 
@@ -66,7 +78,7 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 - Cân bằng Ải Vô Tận và Cảnh giới mới qua test tự động, chưa qua người chơi thật; số liệu nằm hết trong `data/*.json` để chỉnh nhanh.
 - Bản Web tải ~51 MB (wasm 39,5 MB, pck 12,7 MB) trước khi nén; Vercel nén khi truyền.
 - Chỉ có 2 loại địch thường + 1 miniboss (mục tiêu chương: 6 mẫu thuộc 4 nhóm — thiếu nhóm đánh xa và hộ vệ nặng).
-- 5/6 phản ứng nguyên tố cần hai nguồn nguyên tố; một thanh kiếm chỉ có một hệ nên hiện chỉ tự làm được Vỡ Băng. Mưa (GĐ2) và quái gây trạng thái (GĐ3) sẽ mở phần còn lại.
+- Phản ứng nguyên tố: từ GĐ2 tự tạo được bằng kiếm phụ (đổi hệ) và mưa/bão (Ướt); quái gây trạng thái đến ở GĐ3.
 - Ngọc bội đang đeo áp dụng cho mọi bản lưu, kể cả hành trình mới.
 - Điều khiển chỉ hỗ trợ bàn phím + chuột; chưa hỗ trợ gamepad.
 - Hiệu năng chỉ đo được trên renderer phần mềm (llvmpipe) trong môi trường phát triển, không có ý nghĩa cho mục tiêu 60 FPS.
@@ -75,8 +87,7 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 
 Theo kế hoạch đã duyệt (6 giai đoạn, mỗi giai đoạn một PR):
 
-1. **GĐ2:** thời tiết (mưa + sấm sét, sương mù, gió bão), ngày–đêm 24 phút, tông tối khi xấu trời/đêm; ảnh hưởng nhẹ gameplay; save v4.
-2. **GĐ3:** cung thủ, hộ vệ khiên, bầy sói đêm + sói đầu đàn, hồn ảnh ký ức, pháp sư tàn binh, khôi lỗi đá.
-3. **GĐ4:** bản đồ nối dài phía bắc (Sơn Đạo, Hắc Lâm, Nội Điện) + hang riêng.
-4. **GĐ5:** Hồi 3, boss cuối Tịch Phong 3 pha, kết thường / kết thật (đủ 5 Tơ ký ức).
-5. **GĐ6:** cân bằng, hiệu năng, tài liệu, phát hành.
+1. **GĐ3:** cung thủ, hộ vệ khiên, bầy sói đêm + sói đầu đàn, hồn ảnh ký ức, pháp sư tàn binh, khôi lỗi đá.
+2. **GĐ4:** bản đồ nối dài phía bắc (Sơn Đạo, Hắc Lâm, Nội Điện) + hang riêng.
+3. **GĐ5:** Hồi 3, boss cuối Tịch Phong 3 pha, kết thường / kết thật (đủ 5 Tơ ký ức).
+4. **GĐ6:** cân bằng, hiệu năng, tài liệu, phát hành.

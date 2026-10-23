@@ -41,6 +41,7 @@ Mỗi nhiệm vụ có nguyên nhân, kết quả, phần thưởng và nhiệm 
 | Đỡ / phản đòn | Chuột phải; bấm đúng lúc đòn tới (0,2 s đầu) để phản, làm địch choáng; 0,1 s đầu là **phản hoàn hảo** (Tâm Nhãn) |
 | Kết liễu | F khi đứng trong 3 m quanh kẻ địch đã phá thế; ưu tiên hơn mọi tương tác khác |
 | Kiếm thức | E và Q: hai thức của hệ kiếm đang cầm (có hồi chiêu); X: tuyệt kỹ, tốn đầy thanh nộ khí |
+| Kiếm phụ | V: đổi sang kiếm phụ (chọn trong Kho kiếm, nút "Kiếm phụ"); hồi 2,5 s. Đòn trúng đầu tiên trong 2 s sau khi đổi mạnh hơn 30% và chắc chắn gây trạng thái của kiếm mới — đổi giữa hai hệ để tự tạo phản ứng nguyên tố. Đổi ngay sau khi đòn đã trúng sẽ cắt phần thu kiếm |
 | Khóa mục tiêu | Chuột giữa / T |
 | Khinh công | Space trên không để bật nhảy; giữ Space khi rơi để lướt |
 
@@ -84,6 +85,22 @@ Kẻ địch:
 - **Trúc Tướng** (miniboss) — 950 máu, 3 đòn (chém, quét, nện đất có sóng xung kích); dưới 50% máu gầm lên, bất tử ngắn rồi sang pha 2 với lưỡi gió. Thua thì đấu trường mở lại, boss hồi máu; thắng thì không hồi sinh.
 
 Chưa có: địch bắn xa, địch khiên nặng, boss hai pha cuối chương (Hồi 3).
+
+## Thời tiết và ngày–đêm
+
+Một ngày trong game dài 24 phút thật (`data/weather.json`): bình minh, ban ngày (~16 phút), hoàng hôn, ban đêm (~8 phút). Mặt trời đi từ đông sang tây; đêm là trăng lạnh, sao và đèn lồng sáng lên (preset Trung bình/Cao có ánh đèn thật quanh đèn lồng). HUD ghi canh giờ ("Giờ Tý"…) và thời tiết cạnh tên vùng. Nghỉ ở Miếu Gió đã thắp để đợi tới sáng hoặc tối.
+
+Thời tiết đổi theo trọng số của từng vùng, chuyển dần trong 30 s: trời quang, nhiều mây, mưa, giông bão, sương mù, gió lớn. Làng hiếm khi có bão; Trúc Hải hay mưa, sương; khu đền hay bão. Ải Vô Tận luôn là buổi chiều quang. Tắt "Thời tiết động" trong Thiết lập thì trời luôn quang (giờ vẫn chạy). Vùng cũ chỉ tối đi khi mưa, bão hoặc đêm; ngày quang ở làng giữ đúng màu cũ.
+
+| Thời tiết | Hình và tiếng | Ảnh hưởng gameplay |
+|---|---|---|
+| Mưa | Vệt mưa quanh camera, đất ướt sẫm, tiếng mưa | Lôi ×1,2, Hỏa ×0,8 cho mọi đòn; ai đứng ngoài trời bị Ướt mỗi 8 s |
+| Giông bão | Mây đen dày, mưa lớn, gió giật, chớp và sấm | Lôi ×1,3, Phong ×1,15, Hỏa ×0,8; Ướt mỗi 5 s; thỉnh thoảng sét đánh xuống gần trận đấu (vòng vàng báo trước 1,2 s, trúng cả địch lẫn Lâm An; không đánh trong làng, trong nhà, trong Ải hay khi đang hội thoại) |
+| Sương mù | Sương dày, tầm nhìn ngắn | Địch phát hiện Lâm An ở cự ly ×0,6 |
+| Gió lớn | Lá bay ngang, cây nghiêng | — |
+| Đêm | Trăng, sao, đèn lồng, tiếng dế | Địch phát hiện ở cự ly ×0,8 (cộng sương: thấp nhất ×0,45); hạ địch được +25% kinh nghiệm và Đồng |
+
+Boss và kẻ địch đã báo động không bị giảm tầm nhìn. Lần đầu gặp mưa, bão, sương và đêm có lời nhắc ngắn.
 
 ## Phát triển nhân vật
 
