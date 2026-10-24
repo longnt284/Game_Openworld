@@ -194,7 +194,7 @@ func _ready() -> void:
 	environment.sky = sky
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	environment.tonemap_exposure = 1.0
 	environment.tonemap_white = 1.4
 	environment.fog_enabled = true
@@ -202,14 +202,14 @@ func _ready() -> void:
 	environment.fog_density = FOG_DENSITY
 	environment.fog_sky_affect = 0.0
 	environment.fog_depth_curve = FOG_CURVE
-	environment.glow_enabled = true
+	environment.glow_enabled = false
 	environment.glow_intensity = 0.55
 	environment.glow_strength = 1.0
 	environment.glow_bloom = 0.0
-	environment.glow_hdr_threshold = 0.88
+	environment.glow_hdr_threshold = 1.4
 	environment.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	environment.adjustment_enabled = true
-	environment.adjustment_contrast = 1.06
+	environment.adjustment_contrast = 1.0
 	world_environment.environment = environment
 	add_child(world_environment)
 	sun = DirectionalLight3D.new()

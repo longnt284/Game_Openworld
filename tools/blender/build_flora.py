@@ -33,10 +33,13 @@ def canopy_paint(b, verts, center, dark, light, sun="leaf_sun", jitter=0.0, rng=
 
 
 def blob(b, center, radius, squash, dark, light, rng, segments=10, rings=7, sun="leaf_sun"):
-    def lumpy(co):
-        return co * (1.0 + rng.uniform(-0.09, 0.09))
-    verts = b.sphere(radius, center, scale=(1, 1, squash), mat="leaf", segments=segments, rings=rings, shape=lumpy)
-    canopy_paint(b, verts, center, dark, light, sun, 0.08, rng)
+    # Broad, angular foliage masses instead of smooth spherical balloons.
+    for k in range(5):
+        a = k*2.4
+        c = Vector(center)+Vector((math.cos(a)*radius*0.42,math.sin(a)*radius*0.42,(k%3-1)*radius*0.17))
+        size = radius*rng.uniform(0.90,1.18)
+        b.box((size,size*0.85,size*squash*0.65),c,(0,0,rng.uniform(-25,25)),
+              mat=('gold' if light=='lantern' else light) if k%3 else dark,bevel=radius*0.10)
 
 
 def trunk(b, height, radius, branches, rng, mat="wood"):
@@ -120,9 +123,12 @@ def bamboo_cluster():
         steps = 6
         for s in range(steps + 1):
             point = base + lean * (height * s / steps)
-            radius = 0.058 - 0.016 * s / steps
+            radius = 0.085 - 0.022 * s / steps
             rings.append([tuple(point + Vector((math.cos(i * math.tau / 5) * radius, math.sin(i * math.tau / 5) * radius, 0))) for i in range(5)])
         stalk = b.loft(rings, mat=tone, cap_bottom=False, cap_top=False)
+        for node in range(1,int(height)):
+            p=base+lean*node
+            b.cylinder(0.09-node/height*0.02,0.055,p,mat='bamboo_light',segments=6,smooth=False)
         b.paint(stalk, lambda co, tone=tone, height=height: vk.mix("bamboo_dark", tone, 0.3 + co.z / height) if (co.z % 1.1) > 0.12 else vk.color("bamboo_dark"))
         for leaf in range(5):
             spot = base + lean * (height * rng.uniform(0.6, 0.97))
@@ -288,25 +294,21 @@ def karst_peak():
     """Background limestone tower: pale cliffs under a forested cap (Hạ Long / Guilin look)."""
     rng = random.Random(97)
     b = vk.MeshBuilder("Karst", vcol=True)
-    rings = []
-    heights = [0.0, 0.15, 0.35, 0.55, 0.72, 0.84, 0.93, 1.0]
-    widths = [1.0, 0.9, 0.78, 0.7, 0.66, 0.58, 0.42, 0.12]
-    count = 16
-    for level, (h, w) in enumerate(zip(heights, widths)):
-        ring = []
-        for i in range(count):
-            a = math.tau * i / count
-            r = w * rng.uniform(0.85, 1.12)
-            ring.append((math.cos(a) * r, math.sin(a) * r, h))
-        rings.append(ring)
-    verts = b.loft(rings, mat="karst", cap_top=True, cap_bottom=False, sharp_angle=70)
-
-    def paint(co):
-        if co.z > 0.62 + 0.08 * math.sin(co.x * 5 + co.y * 3):
-            return vk.mix("karst_forest", "karst_forest_light", (co.z - 0.6) * 2.5)
-        streak = 0.5 + 0.5 * math.sin(co.x * 9 + co.y * 7)
-        return vk.mix("karst_shadow", "karst", min(1.0, co.z * 1.4) * (0.75 + 0.25 * streak))
-    b.paint(verts, paint)
+    # Interlocking limestone columns keep the original unit-size footprint.
+    # World placement/scaling remains untouched, so this is a visual-only change.
+    for k in range(15):
+        a=k*2.39996
+        radius=0.12+0.58*(k%5)/4
+        x,y=math.cos(a)*radius,math.sin(a)*radius
+        height=0.58+0.38*(1-radius)+rng.uniform(-0.08,0.08)
+        width=rng.uniform(0.22,0.40)
+        for tier in range(3):
+            h=height/3
+            b.box((width*(1-tier*0.08),width*0.82,h+0.03),(x,y,h*(tier+0.5)),
+                  (0,0,rng.uniform(-8,8)),mat='karst' if (k+tier)%3 else 'karst_shadow',bevel=0.018)
+        b.box((width*1.08,width*0.90,0.055),(x,y,height),mat='karst_forest_light',bevel=0.014)
+        if k%2==0:
+            b.box((width*0.65,width*0.7,0.075),(x,y,height+0.06),mat='karst_forest',bevel=0.018)
     return b
 
 

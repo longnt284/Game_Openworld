@@ -13,6 +13,8 @@ from mathutils import Vector  # noqa: E402
 
 import anim_humanoid as anims  # noqa: E402
 import humanoid as hu  # noqa: E402
+import blocky_humanoid  # noqa: E402
+import compact_palette  # noqa: E402
 import vk_lib as vk  # noqa: E402
 
 CHARACTERS = {
@@ -78,9 +80,10 @@ def build(name, preview):
     scale = spec["scale"]
     vk.reset()
     extras = [extra for extra in spec.get("extras", []) if extra not in ("cane", "hammer")]
-    builder = hu.build_mesh("Body", dict(spec, extras=extras))
+    builder = blocky_humanoid.build_mesh("Body", dict(spec, extras=extras))
     extra_props(builder, spec)
     body = builder.build()
+    compact_palette.compact(body,name)
     body.data.transform(__import__("mathutils").Matrix.Scale(scale, 4))
     rig = hu.create_rig(scale)
     hu.bind(body, rig)

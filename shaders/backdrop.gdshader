@@ -20,6 +20,9 @@ void vertex() {
 void fragment() {
 	// Imported glTF vertex colours already arrive linear.
 	vec3 c = COLOR.rgb;
+	if (OUTPUT_IS_SRGB) {
+		c = mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+	}
 	float light = smoothstep(-0.05, 0.35, dot(world_normal, normalize(sun_direction)));
 	c *= mix(shadow_floor, 1.08, light);
 	c *= light_tint.rgb;
