@@ -37,8 +37,8 @@ static func flat_material(color: Color) -> ShaderMaterial:
 	return make(color, {"rim_strength": 0.0})
 
 static func terrain_material() -> ShaderMaterial:
-	return make(Color.WHITE, {"use_vertex_color": true, "rim_strength": 0.0, "paint_strength": 0.09, "paint_scale": 0.05,
-		"shade_tint": Color(0.62, 0.7, 0.88), "shade_softness": 0.1, "ground_detail": 0.7, "dapple": 0.85})
+	return make(Color.WHITE, {"use_vertex_color": true, "rim_strength": 0.0, "paint_strength": 0.025, "paint_scale": 0.05,
+		"shade_tint": Color(0.62, 0.7, 0.88), "shade_softness": 0.06, "ground_detail": 0.18, "dapple": 0.4})
 
 static func outline_material() -> ShaderMaterial:
 	if _outline == null:
@@ -64,15 +64,17 @@ static func convert_material(material: Material, outline: bool, foliage: bool, g
 		var base: BaseMaterial3D = material as BaseMaterial3D
 		color = base.albedo_color
 		# Blender "VK_vcol" materials arrive with vertex colours enabled (Godot strips the suffix).
-		if base.vertex_color_use_as_albedo:
+		# Godot's GLB importer may leave the first material's flag disabled even
+		# when COLOR_0 exists. These authored palette materials require it.
+		if base.vertex_color_use_as_albedo or material.resource_name in ["VK_vcol", "VK_avatar_palette"]:
 			options["use_vertex_color"] = true
 			options["vertex_color_linear"] = true
 		if base.emission_enabled:
 			options["emission_color"] = base.emission
 			options["emission_energy"] = base.emission_energy_multiplier * 1.2
 		if base.metallic > 0.3:
-			options["rim_strength"] = 0.35
-			options["spec_strength"] = 0.5
+			options["rim_strength"] = 0.08
+			options["spec_strength"] = 0.18
 			options["spec_size"] = 0.08
 		if material.resource_name.contains("hair"):
 			# Anime hair sheen: a thin hard highlight band.

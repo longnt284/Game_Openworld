@@ -1,8 +1,8 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back;
+render_mode blend_mix, depth_draw_opaque, cull_back, ambient_light_disabled;
 
-// Soft two-tone cel shading with a cool shadow tint, rim light and a faint
-// world-space "brush" variation. Works on the GL Compatibility renderer.
+// Three-band cel shading with a cool shadow tint and restrained rim light.
+// Works on the GL Compatibility renderer.
 // Terrain adds painted ground strokes and, under tree canopies (vertex alpha),
 // sun flecks that drift like light through moving leaves. The sky reaches every
 // material through global uniforms (project.godot [shader_globals], set by Atmosphere):
@@ -22,9 +22,9 @@ uniform float shade_threshold = 0.04;
 uniform float shade_softness = 0.07;
 uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_energy = 0.0;
-uniform float rim_strength = 0.16;
+uniform float rim_strength = 0.045;
 uniform vec4 rim_color : source_color = vec4(1.0, 0.96, 0.86, 1.0);
-uniform float paint_strength = 0.05;
+uniform float paint_strength = 0.0;
 uniform float paint_scale = 0.08;
 uniform sampler2D paint_noise : hint_default_white, repeat_enable, filter_linear_mipmap;
 uniform float sway = 0.0;
@@ -73,9 +73,14 @@ void vertex() {
 void fragment() {
 	vec3 base = albedo.rgb;
 	if (use_vertex_color) {
-		// Vertex (and MultiMesh instance) colours are authored in sRGB; convert before lighting.
+		// Imported GLB palettes are linear; generated terrain/instance colours are sRGB.
 		vec3 c = COLOR.rgb;
-		base *= vertex_color_linear ? c : mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+		if (vertex_color_linear && OUTPUT_IS_SRGB) {
+			c = mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+		} else if (!vertex_color_linear && !OUTPUT_IS_SRGB) {
+			c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+		}
+		base *= c;
 	}
 	float n = texture(paint_noise, world_pos.xz * paint_scale + vec2(world_pos.y * 0.05)).r;
 	base *= 1.0 + (n - 0.5) * 2.0 * paint_strength;
@@ -108,7 +113,10 @@ void fragment() {
 	SPECULAR = 0.0;
 	METALLIC = 0.0;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
-	EMISSION = emission_color.rgb * emission_energy * (1.0 + vk_night * night_glow) + rim_color.rgb * rim * rim_strength * base + sheen;
+	// A bounded cel fill avoids adding the sky ambient a second time on top of
+	// the shadow band. It follows the existing night/weather globals.
+	vec3 fill = base * mix(0.24, 0.06, vk_night) * (1.0 - vk_gloom * 0.3);
+	EMISSION = fill + emission_color.rgb * emission_energy * (1.0 + vk_night * night_glow) + rim_color.rgb * rim * rim_strength * base + sheen;
 }
 
 void light() {
@@ -117,11 +125,10 @@ void light() {
 		// Lantern light (NightLights: shadowless omni lights): a soft pool wrapped a little past the
 		// terminator, all of it fading with distance (ATTENUATION, which grows past 1 right by the
 		// flame). The paper or stone right around the flame (within about half a metre) glows
-		// whichever way it faces, so a hanging lantern's shell lights up from inside. Not divided by
-		// PI like the sun: a lantern's energy reads as the light it pours on the ground under it.
+		// whichever way it faces. Normalize the light energy as in the directional pass.
 		float wrap = smoothstep(-0.35, 0.55, double_sided_light ? abs(ndl) : ndl);
 		float through = 0.45 * smoothstep(2.0, 4.0, ATTENUATION);
-		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * ATTENUATION * max(wrap, through);
+		DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * max(wrap, through) / PI;
 	} else {
 		if (double_sided_light) {
 			ndl = abs(ndl) * 0.8;
@@ -133,8 +140,12 @@ void light() {
 			float flecks = smoothstep(0.5, 0.56, leaves);
 			lit *= mix(1.0, flecks, clamp(canopy * 1.7, 0.0, 1.0) * dapple);
 		}
-		vec3 shade = mix(shade_tint.rgb, vec3(1.0), lit);
-		DIFFUSE_LIGHT += ALBEDO * shade * LIGHT_COLOR / PI;
+		float band = mix(0.58, 0.82, smoothstep(0.28, 0.34, ndl));
+		band = mix(band, 1.0, smoothstep(0.72, 0.78, ndl));
+		vec3 shade = mix(shade_tint.rgb * 0.65, vec3(band), lit);
+		// Godot multiplies diffuse lighting by ALBEDO after light(). Applying it
+		// here too crushes dark colours and exaggerates saturation.
+		DIFFUSE_LIGHT += shade * LIGHT_COLOR * 0.62 / PI;
 		if (spec_strength > 0.0) {
 			float highlight = dot(reflect(-LIGHT, NORMAL), VIEW);
 			SPECULAR_LIGHT += LIGHT_COLOR * spec_strength * smoothstep(1.0 - spec_size, 1.0 - spec_size + 0.03, highlight) * lit;

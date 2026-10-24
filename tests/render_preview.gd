@@ -29,6 +29,9 @@ func shot(name: String) -> void:
 
 func place(x: float, z: float, yaw_deg: float, camera_pitch: float = -0.28) -> void:
 	var player: PlayerController = game.player
+	# Human mouse motion must not change the comparison camera during capture.
+	player.camera_rig.set_process_unhandled_input(false)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	player.teleport(Vector3(x, game.world.height_at(x, z) + 0.3, z))
 	var yaw: float = deg_to_rad(yaw_deg)
 	player.face_direction(Vector3(-sin(yaw), 0, -cos(yaw)), true)
@@ -67,6 +70,10 @@ func measure(label: String, frame_count: int) -> void:
 		Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0, Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 
 func profile() -> void:
+	game.user_settings.quality = "medium"
+	game.apply_settings()
+	sky("clear", 0.5)
+	await settle()
 	print("PROFILE setup: ", DisplayServer.window_get_size(), " | ", RenderingServer.get_video_adapter_name(), " | ",
 		RenderingServer.get_video_adapter_vendor(), " | quality=", game.user_settings.quality)
 	# Busy village plaza: NPCs, props, market, shadows.
@@ -74,6 +81,13 @@ func profile() -> void:
 	Input.action_press("move_forward")
 	await measure("village", 300)
 	Input.action_release("move_forward")
+	await place(4, -128, 0, -0.18)
+	await measure("bamboo_bridge", 300)
+	await place(1, -243, 0, -0.3)
+	game.player.velocity = Vector3(0, 8, -5)
+	Input.action_press("jump")
+	await measure("gorge_traversal", 180)
+	Input.action_release("jump")
 	# Region change: sprint north from the hill into Trúc Hải while chunks stream in.
 	await place(4, -92, 0, -0.22)
 	Input.action_press("move_forward")

@@ -95,6 +95,10 @@ def material(name):
     shader = next(node for node in mat.node_tree.nodes if node.type == "BSDF_PRINCIPLED")
     shader.inputs["Base Color"].default_value = (*rgb, 1.0)
     shader.inputs["Roughness"].default_value = 0.9
+    if name == 'vcol':
+        node = mat.node_tree.nodes.new('ShaderNodeVertexColor')
+        node.layer_name = 'Color'
+        mat.node_tree.links.new(node.outputs['Color'], shader.inputs['Base Color'])
     if name.startswith("metal") or name == "bronze":
         shader.inputs["Metallic"].default_value = 0.6
         shader.inputs["Roughness"].default_value = 0.45
@@ -311,9 +315,9 @@ class MeshBuilder:
                 base = color(name)
                 for loop in face.loops:
                     rgb = self.vert_colors.get(loop.vert, base) if name not in EMISSIVE else (1.0, 1.0, 1.0)
-                    # Godot keeps glTF vertex colours as stored and the toon shader reads them
-                    # as sRGB (like the terrain), so write the sRGB encoding.
-                    loop[layer] = (linear_to_srgb(rgb[0]), linear_to_srgb(rgb[1]), linear_to_srgb(rgb[2]), 1.0)
+                    # FLOAT_COLOR and glTF COLOR_0 are scene-linear. The runtime
+                    # shader converts only when the Compatibility framebuffer needs sRGB.
+                    loop[layer] = (*rgb, 1.0)
                 face.material_index = kept.index(name) if name in EMISSIVE else 0
             self.materials = kept
         mesh = bpy.data.meshes.new(self.name)

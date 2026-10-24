@@ -1,0 +1,766 @@
+{
+  "assets": [
+    {
+      "file": "assets/models/characters/ba_hanh.glb",
+      "tris": 6428,
+      "collision": 0,
+      "materials": 4,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "idle",
+        "talk",
+        "walk",
+        "wave"
+      ]
+    },
+    {
+      "file": "assets/models/characters/ba_luc.glb",
+      "tris": 6264,
+      "collision": 0,
+      "materials": 3,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "idle",
+        "talk",
+        "walk",
+        "wave"
+      ]
+    },
+    {
+      "file": "assets/models/characters/chu_bay.glb",
+      "tris": 6766,
+      "collision": 0,
+      "materials": 6,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "idle",
+        "talk",
+        "walk",
+        "wave",
+        "work"
+      ]
+    },
+    {
+      "file": "assets/models/characters/heo_gio.glb",
+      "tris": 1346,
+      "collision": 0,
+      "materials": 6,
+      "textures": 0,
+      "joints": 12,
+      "clips": [
+        "charge",
+        "death",
+        "hit",
+        "idle",
+        "run",
+        "stagger",
+        "walk",
+        "windup"
+      ]
+    },
+    {
+      "file": "assets/models/characters/lam_an.glb",
+      "tris": 8718,
+      "collision": 0,
+      "materials": 6,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "air_leap",
+        "attack_1",
+        "attack_2",
+        "attack_3",
+        "block",
+        "dash_slash",
+        "death",
+        "dodge",
+        "fall",
+        "glide",
+        "heavy",
+        "hit",
+        "idle",
+        "interact",
+        "jump",
+        "land",
+        "parry",
+        "run",
+        "skill_cyclone",
+        "skill_gust",
+        "ultimate",
+        "walk"
+      ]
+    },
+    {
+      "file": "assets/models/characters/tan_binh.glb",
+      "tris": 7656,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "alert",
+        "attack",
+        "death",
+        "hit",
+        "idle",
+        "run",
+        "stagger",
+        "walk"
+      ]
+    },
+    {
+      "file": "assets/models/characters/tich_phong.glb",
+      "tris": 6368,
+      "collision": 0,
+      "materials": 2,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "idle",
+        "talk",
+        "walk",
+        "wave"
+      ]
+    },
+    {
+      "file": "assets/models/characters/tieu_mac.glb",
+      "tris": 7502,
+      "collision": 0,
+      "materials": 3,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "idle",
+        "talk",
+        "walk",
+        "wave"
+      ]
+    },
+    {
+      "file": "assets/models/characters/truc_tuong.glb",
+      "tris": 9670,
+      "collision": 0,
+      "materials": 2,
+      "textures": 0,
+      "joints": 20,
+      "clips": [
+        "attack",
+        "death",
+        "hit",
+        "idle",
+        "roar",
+        "slam",
+        "stagger",
+        "sweep",
+        "walk"
+      ]
+    },
+    {
+      "file": "assets/models/env/bamboo_cluster.glb",
+      "tris": 2130,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/bamboo_far.glb",
+      "tris": 50,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/barrel.glb",
+      "tris": 232,
+      "collision": 28,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/basket_produce.glb",
+      "tris": 796,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/bench.glb",
+      "tris": 68,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/boat.glb",
+      "tris": 448,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/bridge_wood.glb",
+      "tris": 1272,
+      "collision": 120,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/bush_flower.glb",
+      "tris": 1280,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/bush_round.glb",
+      "tris": 1100,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/campfire.glb",
+      "tris": 378,
+      "collision": 0,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/chest.glb",
+      "tris": 148,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/crate.glb",
+      "tris": 96,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/dock.glb",
+      "tris": 1020,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/fence_bamboo.glb",
+      "tris": 224,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/fern_clump.glb",
+      "tris": 112,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/flower_patch.glb",
+      "tris": 192,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/flower_pot.glb",
+      "tris": 728,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/gate_tam_quan.glb",
+      "tris": 4680,
+      "collision": 112,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/gate_village.glb",
+      "tris": 2428,
+      "collision": 56,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/grass_tuft.glb",
+      "tris": 78,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/haystack.glb",
+      "tris": 214,
+      "collision": 28,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/house_long.glb",
+      "tris": 11508,
+      "collision": 12,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/house_small.glb",
+      "tris": 6656,
+      "collision": 12,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/house_teal.glb",
+      "tris": 7304,
+      "collision": 12,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/incense_burner.glb",
+      "tris": 748,
+      "collision": 28,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/karst_peak.glb",
+      "tris": 2992,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/lantern_post.glb",
+      "tris": 334,
+      "collision": 28,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/lantern_stone.glb",
+      "tris": 214,
+      "collision": 12,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/lantern_string.glb",
+      "tris": 1670,
+      "collision": 56,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/log_fallen.glb",
+      "tris": 108,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/market_stall.glb",
+      "tris": 2256,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/memory_stone.glb",
+      "tris": 126,
+      "collision": 28,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/mushroom_cluster.glb",
+      "tris": 232,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/pagoda_bell_tower.glb",
+      "tris": 6382,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/pebbles.glb",
+      "tris": 216,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/prayer_banner.glb",
+      "tris": 192,
+      "collision": 28,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/reed_clump.glb",
+      "tris": 130,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/rice_rack.glb",
+      "tris": 320,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/rock_cliff.glb",
+      "tris": 880,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/rock_moss.glb",
+      "tris": 90,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/ruins_pillar.glb",
+      "tris": 176,
+      "collision": 28,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/ruins_wall.glb",
+      "tris": 936,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/seal_gate.glb",
+      "tris": 2988,
+      "collision": 24,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/shrine_wind.glb",
+      "tris": 1228,
+      "collision": 36,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/signboard.glb",
+      "tris": 176,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/smithy.glb",
+      "tris": 4732,
+      "collision": 136,
+      "materials": 2,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/stele.glb",
+      "tris": 280,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/steps_stone.glb",
+      "tris": 264,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/stone_nghe.glb",
+      "tris": 908,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/table.glb",
+      "tris": 184,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/tent.glb",
+      "tris": 84,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/tree_blossom.glb",
+      "tris": 1392,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/tree_maple.glb",
+      "tris": 1376,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/tree_pine.glb",
+      "tris": 152,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/tree_round.glb",
+      "tris": 1832,
+      "collision": 0,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/watchtower.glb",
+      "tris": 2216,
+      "collision": 12,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/well.glb",
+      "tris": 2932,
+      "collision": 36,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/env/wind_chime_post.glb",
+      "tris": 228,
+      "collision": 28,
+      "materials": 1,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/glaive.glb",
+      "tris": 504,
+      "collision": 0,
+      "materials": 6,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sabre.glb",
+      "tris": 530,
+      "collision": 0,
+      "materials": 4,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_bamboo.glb",
+      "tris": 462,
+      "collision": 0,
+      "materials": 7,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_flame.glb",
+      "tris": 648,
+      "collision": 0,
+      "materials": 5,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_frost.glb",
+      "tris": 650,
+      "collision": 0,
+      "materials": 4,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_old.glb",
+      "tris": 688,
+      "collision": 0,
+      "materials": 6,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_thunder.glb",
+      "tris": 704,
+      "collision": 0,
+      "materials": 5,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_water.glb",
+      "tris": 856,
+      "collision": 0,
+      "materials": 5,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    },
+    {
+      "file": "assets/models/weapons/sword_wind.glb",
+      "tris": 630,
+      "collision": 0,
+      "materials": 5,
+      "textures": 0,
+      "joints": 0,
+      "clips": []
+    }
+  ],
+  "errors": []
+}

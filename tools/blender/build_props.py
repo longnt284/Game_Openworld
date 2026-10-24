@@ -52,6 +52,19 @@ def roof(b, width, depth, base_z, ridge, mat="roof", upturn=0.45, center=(0, 0),
         faces.append(b.bm.faces.new((top[nu][j], top[nu][j + 1], bottom[nu][j + 1], bottom[nu][j])))
     verts = [v for row in top + bottom for v in row]
     b._finish(verts, mat, None, vk._matrix((0, 0, 0), (0, 0, 0)), True, 40)
+    # Separate stepped tile courses make the roof readable at gameplay distance.
+    columns = max(6, round(width / 0.42))
+    rows = max(3, round(depth / 0.75))
+    for side in (-1, 1):
+        for row in range(rows):
+            u = side * (row + 0.5) / rows
+            for col in range(columns):
+                v = -1 + (col + 0.5) * 2 / columns
+                z = base_z + ridge * (1-abs(u))**1.6 + upturn*abs(v)**6*abs(u)**2 + upturn*0.35*abs(u)**6
+                slope = side * (-ridge*1.6*(1-abs(u))**0.6 + 2*upturn*abs(v)**6*abs(u) + 2.1*upturn*abs(u)**5) / (depth*0.5)
+                b.box((width/columns*0.93, depth/(2*rows)*1.04, 0.065),
+                      (center[0]+v*width*0.5, center[1]+u*depth*0.5, z+0.055),
+                      (math.degrees(math.atan(slope)),0,0), mat=mat if (col+row)%4 else 'roof_dark')
     ridge_z = base_z + ridge
     b.cylinder(0.11, width * 0.92, (center[0], center[1], ridge_z + 0.02), (0, 90, 0), mat="roof_dark", segments=8)
     for side in (1, -1):
@@ -409,9 +422,12 @@ def ruins_wall():
 
 def well():
     b = vk.MeshBuilder("Well")
-    b.cylinder(0.95, 0.85, (0, 0, 0.42), mat="stone", segments=14)
-    b.cylinder(0.75, 0.86, (0, 0, 0.45), mat="ink", segments=14)
-    b.torus(0.88, 0.1, (0, 0, 0.86), mat="stone_light", segments=14, ring=5)
+    for row in range(4):
+        for i in range(12):
+            a = math.tau*(i+0.5*(row%2))/12
+            b.box((0.45,0.25,0.205),(math.sin(a)*0.84,math.cos(a)*0.84,0.108+row*0.213),
+                  (0,0,-math.degrees(a)),mat='stone_light' if (i+row)%3 else 'stone',bevel=0.012)
+    b.cylinder(0.70,0.025,(0,0,0.22),mat='jade_dark',segments=16)
     for x in (-0.9, 0.9):
         b.cylinder(0.07, 2.2, (x, 0, 1.1), mat="wood_dark", segments=6)
     b.cylinder(0.06, 1.9, (0, 0, 1.75), (0, 90, 0), mat="wood", segments=6)
@@ -460,8 +476,17 @@ def market_stall():
             b.cylinder(0.06, 2.4 if y > 0 else 2.0, (x, y, 1.2 if y > 0 else 1.0), mat="wood_dark", segments=6)
     for k in range(6):
         b.box((0.45, 1.9, 0.04), (-1.15 + k * 0.46, 0, 2.2), (-12, 0, 0), mat="vermilion" if k % 2 else "cream")
+        b.box((0.44,0.06,0.20),(-1.15+k*0.46,-0.94,2.29),mat='vermilion' if k%2 else 'cream',bevel=0.035)
     b.box((2.4, 1.0, 0.08), (0, -0.2, 0.85), mat="wood_light")
     b.box((2.3, 0.08, 0.8), (0, -0.7, 0.42), mat="wood")
+    for k in range(10):
+        b.box((0.19,0.045,0.7),(-1.04+k*0.23,-0.75,0.43),mat='wood_light',bevel=0.006)
+    for tray in range(3):
+        x=-0.78+tray*0.72
+        b.box((0.64,0.55,0.09),(x,-0.17,0.94),mat='wood_dark')
+        for i in range(3):
+            for j in range(2):
+                b.sphere(0.095,(x+(i-1)*0.18,-0.32+j*0.2,1.04),mat='fruit_orange' if tray%2 else 'fruit_green',segments=8,rings=5,smooth=False)
     for k in range(4):
         b.sphere(0.13, (-0.8 + k * 0.5, -0.2, 0.98), mat=["gold", "bamboo", "vermilion", "cream"][k], segments=8, rings=5)
     b.cylinder(0.18, 0.3, (0.9, 0.2, 1.04), mat="jade_dark", top=0.12, segments=8)
@@ -568,11 +593,11 @@ def rock_cliff():
     b = vk.MeshBuilder("Cliff")
     rng = random.Random(21)
 
-    def lumpy(co):
-        return co * (1.0 + rng.uniform(-0.1, 0.1))
-    b.sphere(2.4, (0, 0, 1.6), scale=(1.4, 1.0, 1.0), mat="stone", segments=10, rings=7, shape=lumpy)
-    b.sphere(1.6, (1.8, 0.6, 1.0), scale=(1.0, 0.9, 0.9), mat="stone_dark", segments=9, rings=6, shape=lumpy)
-    b.sphere(1.9, (0.2, 0.0, 3.6), scale=(1.1, 0.9, 0.3), mat="moss", segments=9, rings=5, shape=lumpy)
+    for x,y,h in [(-1.6,0,3.5),(0,0.15,4.0),(1.6,0.3,3.1),(-0.8,-1.0,2.8),(1.0,-0.9,2.5)]:
+        for tier in range(3):
+            b.box((1.7-tier*0.08,1.75,h/3+0.06),(x,y,h/3*(tier+0.5)),
+                  (0,0,rng.uniform(-5,5)),mat='stone' if tier%2 else 'stone_light',bevel=0.12)
+        b.box((1.75,1.8,0.15),(x,y,h),mat='moss',bevel=0.05)
     b.build()
     vk.collider_box("Body", (5.5, 3.8, 4.0), (0.3, 0, 2.0))
 

@@ -1,6 +1,8 @@
 # Blender → Godot
 
-Mọi model, rig và animation trong game được dựng bằng **script Python chạy Blender 5.2.2 ở chế độ nền**. Phiên làm việc này không có Blender MCP (không kết nối được Blender đang mở), nên không có thao tác tay trong giao diện Blender: chạy lại script là tạo lại y hệt `.blend` và `.glb`.
+Model, rig và animation được dựng bằng script Python chạy Blender 5.2.2 ở chế độ nền. Đợt nâng cấp Roblox dùng Blender MCP để kiểm tra model trong Blender, đồng thời chạy generator ở tiến trình nền riêng để bảo vệ scene đang mở. Xem [hướng mỹ thuật](roblox-art-direction.md) và [ảnh, kiểm tra, hiệu năng](visual-upgrade-progress.md).
+
+Chạy `blender --background --factory-startup --python tools/blender/build_roblox.py -- --all` để xuất lại 76 asset đang dùng. Bỏ `--all` để dựng bộ prototype Lâm An và làng nhỏ. Chạy `python tests/art_contract.py` để so animation, skeleton và collider với commit trước nâng cấp.
 
 | Script | Tạo ra |
 |---|---|
