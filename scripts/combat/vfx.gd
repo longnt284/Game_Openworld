@@ -279,8 +279,10 @@ static func streak(parent: Node, from: Vector3, to: Vector3, color: Color, width
 		alphas.append(sin(u * PI) * 0.9 + 0.1)
 	_spawn_mesh(parent, _ribbon(points, normals, width, alphas), from, color, duration)
 
-static func bolt(parent: Node, from: Vector3, to: Vector3, color: Color = Color("ffe066"), duration: float = 0.24, jitter: float = 0.45) -> void:
-	## Jagged lightning between two points: a bright core inside a coloured sheath.
+static func bolt(parent: Node, from: Vector3, to: Vector3, color: Color = Color("ffe066"), duration: float = 0.24, jitter: float = 0.45, width: float = 1.0, fogless: bool = false) -> void:
+	## Jagged lightning between two points: a bright core inside a coloured sheath. A distant
+	## storm bolt is drawn wider (width) and ignores the depth fog (fogless), which would
+	## otherwise wash it into the haze it lights.
 	var direction: Vector3 = to - from
 	var length: float = direction.length()
 	if length < 0.05:
@@ -288,7 +290,7 @@ static func bolt(parent: Node, from: Vector3, to: Vector3, color: Color = Color(
 	var axis: Vector3 = direction / length
 	var side: Vector3 = axis.cross(Vector3.UP if absf(axis.y) < 0.9 else Vector3.RIGHT).normalized()
 	var up: Vector3 = side.cross(axis).normalized()
-	var segments: int = clampi(int(length / 0.7), 4, 24)
+	var segments: int = clampi(int(length / maxf(0.7, width * 0.7)), 4, 24)
 	var points: PackedVector3Array = PackedVector3Array()
 	for index: int in range(segments + 1):
 		var u: float = float(index) / segments
@@ -303,7 +305,9 @@ static func bolt(parent: Node, from: Vector3, to: Vector3, color: Color = Color(
 			for index: int in range(points.size()):
 				normals.append(normal)
 				alphas.append(1.0)
-			_spawn_mesh(parent, _ribbon(points, normals, float(layer[0]), alphas), from, layer[1], duration)
+			var ribbon: MeshInstance3D = _spawn_mesh(parent, _ribbon(points, normals, float(layer[0]) * width, alphas), from, layer[1], duration)
+			if fogless:
+				(ribbon.material_override as StandardMaterial3D).disable_fog = true
 
 static func pillar(parent: Node, position: Vector3, color: Color, height: float = 9.0, radius: float = 0.55, duration: float = 0.45) -> void:
 	## Column of light (lightning strike, rarity reveal).

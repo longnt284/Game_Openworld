@@ -36,6 +36,16 @@ func place(x: float, z: float, yaw_deg: float, camera_pitch: float = -0.28) -> v
 	player.camera_rig.pitch = camera_pitch
 	await frames(2)
 	await settle()
+	# A new region shows its mood at once instead of easing into it while the shot is taken.
+	game.atmosphere.snap()
+
+func sky(weather_id: String, time: float) -> void:
+	## Holds the clock at a fraction of the day under a weather and shows the atmosphere's target
+	## mood at once, so shots of the hours and skies are deterministic.
+	game.weather.set_process(false)
+	game.weather.set_weather(weather_id)
+	game.weather.set_time(time)
+	game.atmosphere.snap()
 
 func measure(label: String, frame_count: int) -> void:
 	## Frame-to-frame wall time while the scene keeps running; prints p50/p95/FPS and memory.
@@ -107,19 +117,112 @@ func _run() -> void:
 	game.hud.close_vision()
 	game._on_vision_closed()
 	await settle()
-	var scenes: Array[String] = ["dock", "village", "dialogue", "combat", "statuses", "reactions", "finisher", "focus", "moves", "bamboo", "gorge", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
+	var scenes: Array[String] = ["dock", "village", "village_day", "village_dusk", "village_night", "village_night_lights", "village_rain", "clock", "dialogue", "combat", "statuses",
+		"reactions", "finisher", "focus", "moves", "bamboo", "bamboo_storm", "gorge", "gorge_fog", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
+		# Every scene starts from the fair reference afternoon (the old fixed sun), whatever the scene
+		# before it showed; scenes of the hours and the weather set their own sky after placing.
+		sky("clear", Atmosphere.reference_clock())
 		match scene:
 			"dock":
 				await place(-20, 70.5, 0)
 				await frames(30)
 				await shot("dock")
 			"village":
+				# The reference hour: a fair afternoon with the sun where the old fixed sun stood.
 				await place(2, 26, 15, -0.22)
 				await frames(40)
 				await shot("village")
+			"village_day":
+				# Same framing at noon, then at the hour a new game starts (morning sun in the east).
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.5)
+				await frames(30)
+				await shot("village_day")
+				sky("clear", float(WeatherDirector.data()["start"]["time"]))
+				await frames(30)
+				await shot("village_morning")
+			"village_dusk":
+				# Golden hour with the sun low in the west, then just after sunset.
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.77)
+				await frames(30)
+				await shot("village_dusk")
+				sky("clear", 0.805)
+				await frames(30)
+				await shot("village_twilight")
+			"village_night":
+				# Midnight under a high moon (lanterns glow brighter), then a cloudy night facing the plaza.
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.0)
+				await frames(30)
+				await shot("village_night")
+				await place(6, 25.5, 210, -0.2)
+				sky("cloudy", 0.92)
+				await frames(30)
+				await shot("village_night_cloudy")
+			"village_night_lights":
+				# Lantern light after dark (Medium: 4 lights): the plaza at midnight, then the shrine
+				# lanterns by the dock road in the rain, where the wet stone catches their glow; then
+				# the High pool (6 lights) on the gate.
+				await place(2, 26, 15, -0.22)
+				sky("clear", 0.0)
+				await frames(40)
+				await shot("village_night_lights")
+				await place(6, 25.5, 210, -0.2)
+				sky("rain", 0.95)
+				await frames(40)
+				await shot("village_night_rain")
+				game.night_lights.set_budget(6)
+				await place(0, -2, 0, -0.2)
+				sky("clear", 0.9)
+				await frames(40)
+				await shot("village_night_gate")
+				game.apply_settings()
+			"village_rain":
+				# Rain by day: grey sky, streaks falling around the camera (Medium: half of them), soaked
+				# ground with a sheen, foliage swaying harder; then High, with splashes at Lâm An's feet.
+				await place(2, 26, 15, -0.22)
+				sky("rain", 0.45)
+				await frames(30)
+				await shot("village_rain")
+				game.rain.set_density(1.0)
+				await frames(20)
+				await shot("village_rain_high")
+				game.apply_settings()
+			"clock":
+				# The double hour and weather icon beside the region name for each sky (the world follows
+				# the clock and the weather too), then a lit shrine's rest prompt.
+				await place(6, 25.5, 210, -0.2)
+				var sky: WeatherDirector = game.weather
+				for entry: Array in [["clear", 0.5], ["clear", 0.95], ["cloudy", 0.4], ["cloudy", 0.9], ["rain", 0.6], ["storm", 0.8], ["fog", 0.22], ["wind", 0.7]]:
+					sky.set_weather(entry[0])
+					sky.set_time(entry[1])
+					game._refresh_hud()
+					await frames(2)
+					await shot("clock_%s_%s" % [entry[0], "night" if sky.is_night() else "day"])
+				sky.set_weather("cloudy")
+				sky.set_time(0.6)
+				var shrine: Interactable = game.spawner.node_for("shrine_village") as Interactable
+				if shrine:
+					game.state.set_flag(shrine.flag_key())
+					shrine.refresh()
+					game.on_interact(shrine)
+				game._refresh_hud()
+				await frames(20)
+				await shot("shrine_rest")
+				# "Nghỉ đến sáng": fade out, the clock jumps to dawn, the banner names the new day.
+				if game.dialogue.has("choices"):
+					game._choose_dialogue(0)
+				await create_timer(2.4).timeout
+				game._refresh_hud()
+				await frames(2)
+				await shot("shrine_rest_dawn")
+				game._close_dialogue()
+				sky.set_weather("clear")
+				sky.set_time(float(WeatherDirector.data()["start"]["time"]))
 			"dialogue":
 				await place(-16.3, 6.2, 0, -0.2)
 				var npc: Npc = game.spawner.node_for("npc_ba_luc") as Npc
@@ -325,10 +428,63 @@ func _run() -> void:
 				await place(4, -128, 0, -0.18)
 				await frames(30)
 				await shot("bamboo")
+			"bamboo_storm":
+				# A storm over Trúc Hải at midday: a dark, heavy deck with scud, rain slanting downwind,
+				# torn leaves streaming past and the bamboo gusting. Bolts fall only on cue here.
+				await place(4, -128, 0, -0.1)
+				sky("storm", 0.5)
+				game.storm.set_physics_process(false)
+				await frames(30)
+				await shot("bamboo_storm")
+				# A distant bolt in view with its sky and screen flash, caught at its peak: slowed time
+				# keeps the short bolt and flash up through a software-rendered frame.
+				game.storm.rng.seed = 11
+				Engine.time_scale = 0.02
+				game.storm.distant_bolt()
+				await frames(2)
+				await shot("bamboo_storm_flash")
+				Engine.time_scale = 1.0
+				await frames(30)
+				# A strike beside a fight: the warning ring fills under a bandit, then the bolt lands.
+				var bandit: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+				bandit.setup({"id": "preview_storm", "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+				game.add_child(bandit)
+				var spot: Vector3 = game.player.global_position + Vector3(1.2, 0, -6.5)
+				spot.y = game.world.height_at(spot.x, spot.z) + 0.05
+				bandit.activate(spot, game.player)
+				bandit.set_physics_process(false)
+				game.on_enemy_spawned(bandit, {"id": bandit.entity_id})
+				# Slowed so the ring is caught most of the way full (the strike waits for step()).
+				Engine.time_scale = 0.15
+				game.storm.warn(Vector3(spot.x, game.world.height_at(spot.x, spot.z), spot.z))
+				await frames(12)
+				await shot("bamboo_storm_warn")
+				Engine.time_scale = 0.03
+				game.storm.step(5.0)
+				await frames(2)
+				await shot("bamboo_storm_strike")
+				Engine.time_scale = 1.0
+				bandit.queue_free()
+				game.storm.set_physics_process(true)
+				await frames(30)
+				# The darkest sky the valley has: a storm at night. Lâm An and the path must still read.
+				sky("storm", 0.95)
+				await frames(30)
+				await shot("bamboo_storm_night")
 			"gorge":
 				await place(1, -243, 0, -0.3)
 				await frames(30)
 				await shot("gorge")
+			"gorge_fog":
+				# Thick fog in Khe Gió: the depth fog closes in, pale and grey.
+				await place(1, -243, 0, -0.3)
+				sky("fog", 0.4)
+				await frames(30)
+				await shot("gorge_fog")
+				# The same fog at night turns moonlit blue instead of milky white.
+				sky("fog", 0.9)
+				await frames(30)
+				await shot("gorge_fog_night")
 			"arena":
 				await place(3, -300, 0, -0.2)
 				await frames(30)

@@ -16,6 +16,14 @@ var quests: QuestManager
 var audio: AudioDirector
 var atmosphere: Atmosphere
 var ambient: AmbientFx
+var weather: WeatherDirector
+var rain: RainFx
+var storm: StormDirector
+var night_lights: NightLights
+## Weather bed shares handed to the AudioDirector every frame (reused, no allocation).
+var weather_beds: Dictionary = {"rain_light": 0.0, "rain_heavy": 0.0, "storm_wind": 0.0, "night_insects": 0.0}
+## Seconds of rain since the last soaking (WeatherDirector.soak_interval).
+var soak_timer: float = 0.0
 var player: PlayerController
 var world: WorldManager
 var spawner: EntitySpawner
@@ -101,6 +109,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	MapView.shutdown()
+	Combat.weather = null
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -143,7 +152,9 @@ func _start_world() -> void:
 	add_child(backdrop)
 	backdrop.build(Vector2(0, -180), settings.world_seed, assets)
 	atmosphere.haze_changed.connect(backdrop.set_haze)
+	atmosphere.light_changed.connect(backdrop.set_light)
 	backdrop.set_haze(atmosphere.haze())
+	backdrop.set_light(atmosphere.light_tint())
 	props = PropPlacer.new()
 	props.name = "Props"
 	props.add_to_group(EntitySpawner.NAV_SOURCE)
@@ -165,6 +176,27 @@ func _start_world() -> void:
 	ambient.name = "AmbientFx"
 	add_child(ambient)
 	ambient.target = player
+	atmosphere.light_changed.connect(ambient.set_light)
+	ambient.set_light(atmosphere.light_tint())
+	weather = WeatherDirector.new()
+	weather.name = "Weather"
+	add_child(weather)
+	quests.weather = weather
+	weather.changed.connect(_on_weather_changed)
+	rain = RainFx.new()
+	rain.name = "Rain"
+	add_child(rain)
+	rain.target = player
+	atmosphere.light_changed.connect(rain.set_light)
+	rain.set_light(atmosphere.light_tint())
+	storm = StormDirector.new()
+	storm.name = "Storm"
+	add_child(storm)
+	storm.setup(self)
+	night_lights = NightLights.new()
+	night_lights.name = "NightLights"
+	add_child(night_lights)
+	night_lights.setup(props.lights, atmosphere, player)
 	player.health_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.stamina_changed.connect(func(_c: float, _m: float) -> void: _refresh_vitals())
 	player.died.connect(_on_player_died)
@@ -179,6 +211,7 @@ func _start_world() -> void:
 	player.status_applied.connect(func(_status: String) -> void: _mission("status"))
 	player.finisher_landed.connect(_on_finisher_landed)
 	player.focus_started.connect(_on_focus_started)
+	player.swap_requested.connect(_swap_swords)
 	player.focus_ended.connect(func() -> void: hud.set_focus(false))
 	player.statuses_changed.connect(_on_player_statuses)
 	_equip_visuals()
@@ -210,6 +243,8 @@ func show_title() -> void:
 	player.state = "disabled"
 	hud.set_gameplay_visible(false)
 	hud.close_dialogue()
+	# The title always shows the valley's fair reference afternoon, whatever the clock says.
+	_follow_weather(null)
 	title_camera.current = true
 	menus.show_title(SaveStore.has_save(save_path))
 	audio.set_music("title", 1.5)
@@ -229,12 +264,25 @@ func _begin_play() -> void:
 	if player.state == "disabled":
 		player.state = "move"
 	player.camera_rig.camera.current = true
+	_follow_weather(weather)
 	current_region = ""
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+func _follow_weather(director: WeatherDirector) -> void:
+	## The sky, the rain, the lightning and the gale follow the clock only in play; null (the
+	## title screen) shows the fair reference afternoon, dry and calm. Warned strikes are dropped.
+	atmosphere.follow(director)
+	rain.follow(director)
+	storm.follow(director)
+	ambient.follow(director)
+	# Rain and storms change elemental blows; fog and night shorten enemy sight (Combat).
+	Combat.weather = director
+	soak_timer = 0.0
+
 func start_new_game() -> void:
 	death_serial += 1
+	_close_dialogue()
 	_abort_trial()
 	_clear_reward_chests()
 	if spawner.arena.fighting:
@@ -243,6 +291,7 @@ func start_new_game() -> void:
 	hud.fade_to(0.0, 0.3)
 	state.from_dict(GameState.new().to_dict())
 	state.health = state.max_health()
+	weather.reset()
 	chime_sequence.clear()
 	spawner.clear_all()
 	_equip_visuals()
@@ -316,6 +365,7 @@ func _process(delta: float) -> void:
 	_update_region()
 	_update_focus()
 	_update_combat_state()
+	_update_soak(delta)
 	autosave_timer -= delta
 	if autosave_timer <= 0.0 and player.state == "move" and engaged == 0 and not trial.active:
 		autosave_timer = 60.0 if web else 300.0
@@ -344,6 +394,8 @@ func _update_region() -> void:
 		current_region = id
 		atmosphere.set_region(id)
 		ambient.set_region(id)
+		weather.set_region(id)
+		rain.set_region(region)
 		audio.set_area(String(region.get("music", "explore")), String(region.get("ambience", "wind")))
 		if first:
 			state.set_flag("visited:" + id)
@@ -355,6 +407,54 @@ func _update_region() -> void:
 	for water: Dictionary in world.layout.waters:
 		river_distance = minf(river_distance, world.layout._line_query(water, player.global_position.x, player.global_position.z).x - float(water["width"]) * 0.5)
 	audio.set_river_distance(river_distance)
+	_update_weather_audio(region)
+
+func _on_weather_changed(kind: String) -> void:
+	## The first rain, storm, fog and night of a journey explain what they change in a fight.
+	if not playing or trial.active:
+		return
+	var key: String = ""
+	var hint: String = ""
+	if kind == "weather":
+		key = weather.weather_id()
+		hint = String((weather.weather_rule().get("gameplay", {}) as Dictionary).get("hint", ""))
+	elif kind == "phase" and weather.is_night():
+		key = "night"
+		hint = String((WeatherDirector.data().get("night", {}) as Dictionary).get("hint", ""))
+	if hint != "" and not hinted.has("weather:" + key):
+		hinted["weather:" + key] = true
+		hud.show_hint(hint, 9.0)
+
+func _update_soak(delta: float) -> void:
+	## Out in the rain everyone gets wet, a stack of Ướt every soak_interval seconds: foes (so Lôi
+	## and Băng find water to work with) and Lâm An alike. Nobody under a roof; never in the
+	## Trial's fixed clear sky (its interval is 0); not while a conversation holds the world.
+	var interval: float = weather.soak_interval()
+	if interval <= 0.0 or not playing or not player.input_enabled:
+		soak_timer = 0.0
+		return
+	soak_timer += delta
+	if soak_timer < interval:
+		return
+	soak_timer = 0.0
+	var layout: WorldLayout = world.layout
+	if not bool(layout.region_at(player.global_position.z).get("indoor", false)) and not player.is_dead():
+		player.apply_status("soak")
+	for node: Node in get_tree().get_nodes_in_group("enemy"):
+		var enemy: Enemy = node as Enemy
+		if enemy and not enemy.is_dead() and not bool(layout.region_at(enemy.global_position.z).get("indoor", false)):
+			enemy.apply_status("soak")
+
+func _update_weather_audio(region: Dictionary) -> void:
+	## Rain on the leaves (light, then a heavy roar), storm wind, and crickets after dark; nothing
+	## under a roof or in the Trial's fixed afternoon (its sky is always clear and day).
+	var outside: bool = playing and not trial.active and not bool(region.get("indoor", false))
+	var wet: float = weather.rain() if outside else 0.0
+	weather_beds["rain_light"] = clampf(wet * 1.8, 0.0, 1.0) * (1.0 - 0.6 * smoothstep(0.55, 1.0, wet))
+	weather_beds["rain_heavy"] = smoothstep(0.45, 1.0, wet)
+	weather_beds["storm_wind"] = weather.wind() if outside else 0.0
+	weather_beds["night_insects"] = weather.night_level() * (1.0 - wet) if outside else 0.0
+	audio.set_weather(weather_beds)
 
 func _update_focus() -> void:
 	focus = null
@@ -448,7 +548,11 @@ func _refresh_hud() -> void:
 	var quick: String = state.quick_item
 	var stock: String = "%s ×%d" % [ContentDB.item(quick).get("name", quick), state.count(quick)] if quick != "" else "Ô nhanh trống"
 	hud.set_quick_item("%s  •  %s" % [UserSettings.event_label("use_item"), stock], quick != "" and state.count(quick) > 0)
+	var alt: String = "Kiếm phụ: " + PlayerStats.weapon_label(profile.weapon(state.alt_uid) if state.alt_uid >= 0 else {"base": state.sword_alt}) if state.has_alt() else "Chưa có kiếm phụ"
+	hud.set_alt_sword("%s  •  %s" % [UserSettings.event_label("swap_sword"), alt], state.has_alt() and player.swap_cooldown <= 0.0)
 	hud.set_statuses(player.statuses.list_for_hud())
+	# The icon shows the moon once the sun is down (halfway through dusk), as the sky does.
+	hud.set_clock(weather.clock_text(), weather.weather_name(), weather.icon(), weather.night_level() >= 0.5)
 	var boss: Enemy = _fighting_boss()
 	if boss:
 		hud.set_boss_poise(boss.poise_ratio(), boss.is_broken(), boss.is_finishable())
@@ -472,11 +576,12 @@ func _refresh_hud() -> void:
 		hud.set_tracker(region_name, "", "")
 	if hud.debug_enabled:
 		var memory_mb: float = Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
-		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d" % [
+		hud.status.text = "%d FPS  •  %.1f ms  •  %d draw calls\n%d/%d vùng  •  %.1f ms dựng vùng\nX %.0f  Y %.0f  Z %.0f  •  %s\nBộ nhớ %.0f MB  •  Quái %d  •  Seed %d\nNgày %d  •  %s  •  %s %.0f s  •  ghi trời %d\nMưa %.2f  •  đèn %d/%d" % [
 			Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), world.active.size(), settings.chunk_capacity(), world.last_build_ms,
 			player.global_position.x, player.global_position.y, player.global_position.z, current_region, memory_mb,
-			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed]
+			get_tree().get_nodes_in_group("enemy").size(), settings.world_seed, weather.day, weather.clock_hhmm(), weather.world, weather.remaining, atmosphere.sky_writes,
+			rain.intensity, night_lights.lit_count(), night_lights.lights.size()]
 
 # ------------------------------------------------------------------ input
 
@@ -546,12 +651,13 @@ func start_dialogue(npc: Npc) -> void:
 	audio.ui("ui_select")
 	_run_dialogue(dialogue_id, npc)
 
-func _run_dialogue(dialogue_id: String, npc: Npc) -> void:
+func _run_dialogue(dialogue_id: String, npc: Npc, choices_first: bool = false) -> void:
+	## choices_first opens straight on the last line with its choices (a prompt, not a talk).
 	var node: Dictionary = ContentDB.dialogue_node(dialogue_id)
 	if node.is_empty():
 		_end_dialogue()
 		return
-	dialogue = {"id": dialogue_id, "node": node, "index": 0, "npc": npc}
+	dialogue = {"id": dialogue_id, "node": node, "index": (node.get("lines", []) as Array).size() if choices_first else 0, "npc": npc}
 	_show_line()
 
 func _show_line() -> void:
@@ -598,6 +704,11 @@ func _end_dialogue() -> void:
 	dialogue = {}
 	player.input_enabled = true
 
+func _close_dialogue() -> void:
+	## A new game or a load drops any conversation or prompt still on screen.
+	if not dialogue.is_empty():
+		_end_dialogue()
+
 func show_vision(title: String, lines: Array, callback: Callable = Callable()) -> void:
 	vision_callback = callback
 	player.input_enabled = false
@@ -643,6 +754,9 @@ func run_action(action: String) -> void:
 			_add_xp(int(parts[1]))
 		"shop":
 			open_shop(parts[1])
+		"rest":
+			# After the prompt has closed, so the fade keeps the controls locked.
+			_rest.call_deferred(parts[1])
 
 func unlock_skill(skill: String) -> void:
 	state.unlock_skill(skill)
@@ -869,6 +983,43 @@ func _use_shrine(item: Interactable) -> void:
 		hud.show_banner(name, "Miếu Gió đã thắp sáng")
 	hud.show_message("Nghỉ chân: hồi đầy khí huyết • Đã lưu hành trình • Quái trong trại xuất hiện lại")
 	save_game(true)
+	if not first and can_rest():
+		# A shrine already lit also lets Lâm An wait for the next dawn or dusk.
+		player.input_enabled = false
+		audio.ui("ui_open")
+		_run_dialogue("shrine_rest", null, true)
+
+func can_rest() -> bool:
+	## Waiting at a shrine for dawn or dusk: never in a fight or inside the Trial.
+	return playing and not player.is_dead() and not trial.active and engaged == 0 and not spawner.arena.fighting
+
+func _rest(target: String) -> void:
+	## "Nghỉ đến sáng / tối": the screen fades out, the clock skips to the next dawn or dusk
+	## (WeatherDirector.rest_until), the journey is saved and the screen fades back in.
+	if not can_rest() or not weather.can_rest_until(target):
+		return
+	var serial: int = death_serial
+	player.input_enabled = false
+	var wake: Callable = func() -> void:
+		# A death, load, new game or the title screen in between cancels the rest (and only the
+		# title leaves the screen to lift here: the others run their own fades).
+		if serial != death_serial or not playing:
+			if not playing:
+				hud.fade_to(0.0, 0.4)
+			return
+		player.input_enabled = true
+		hud.fade_to(0.0, 1.0)
+		if not can_rest():
+			hud.show_message("Không thể nghỉ khi đang giao chiến")
+			return
+		weather.rest_until(target)
+		hud.show_banner(weather.phase_name(), "Ngày %d  •  %s  •  %s" % [weather.day, weather.clock_text(), weather.weather_name()])
+		save_game(true)
+	if DisplayServer.get_name() == "headless":
+		wake.call()
+		return
+	hud.fade_to(1.0, 0.6, "", "Ngồi nghỉ bên ngọn đèn miếu…")
+	get_tree().create_timer(0.9).timeout.connect(wake)
 
 func _ring_chime(item: Interactable) -> void:
 	var note: int = int(item.entity.get("note", 1))
@@ -938,7 +1089,9 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	if enemy.data.has("elite") and rng.randf() < float(ContentDB.get_data("elites").get("base", {}).get("chest_chance", 0.2)):
 		spawn_reward_chest("elite", enemy.global_position)
 	audio.play("enemy_down", enemy.global_position)
-	_add_xp(int(enemy.data.get("xp", 10)))
+	# Foes beaten at night give more (data/weather.json "night" "reward_mult"); the Trial has its own rewards.
+	var night_bonus: float = weather.reward_mult()
+	_add_xp(roundi(float(enemy.data.get("xp", 10)) * night_bonus))
 	# heal_on_kill (the Huyết Ngọc set) works on world kills too; Trial kills heal in TrialDirector.
 	var heal: float = state.stat("heal_on_kill")
 	if heal > 0.0 and not player.is_dead():
@@ -949,7 +1102,8 @@ func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 		if drop[0] == Talismans.DROP:
 			talisman_chance = float(drop[3])
 		elif randf() <= float(drop[3]):
-			drops.append([drop[0], randi_range(int(drop[1]), int(drop[2]))])
+			var amount: int = randi_range(int(drop[1]), int(drop[2]))
+			drops.append([drop[0], roundi(amount * night_bonus) if drop[0] == "coins" else amount])
 	if not drops.is_empty():
 		give_items(drops)
 	if talisman_chance > 0.0:
@@ -1145,14 +1299,19 @@ func apply_settings() -> void:
 		settings.mouse_sensitivity = user_settings.mouse_sensitivity
 	var preset: Dictionary = user_settings.preset()
 	atmosphere.set_shadow_distance(float(preset["shadow"]))
+	atmosphere.set_update_rate(float(preset["sky_hz"]))
 	atmosphere.environment.glow_enabled = bool(preset["glow"])
 	RenderingServer.directional_shadow_atlas_set_size(int(preset["shadow_atlas"]), true)
 	var viewport: Viewport = get_viewport()
 	viewport.msaa_3d = preset["msaa"]
 	viewport.scaling_3d_scale = float(preset["scale"])
+	if weather:
+		weather.set_dynamic(user_settings.dynamic_weather)
 	if world:
 		world.configure(int(preset["view_radius"]), float(preset["density"]))
 		ambient.set_budget(float(preset["ambient"]))
+		rain.set_density(float(preset["rain"]))
+		night_lights.set_budget(int(preset["lights"]))
 		atmosphere.set_view_distance(world.settings.view_radius * world.settings.chunk_size)
 		for chunk: WorldChunk in world.pool + world.active.values():
 			_apply_chunk_quality(chunk, preset)
@@ -1186,6 +1345,7 @@ func save_game(silent: bool = false) -> bool:
 		"yaw": player.model_yaw, "checkpoint": SaveStore.to_array(_checkpoint_position()), "state": state.to_dict(),
 		"label": String(world.layout.region_at(player.global_position.z).get("name", "")), "saved_at": int(Time.get_unix_time_from_system()),
 	}
+	data.merge(weather.to_save())
 	var error: Error = SaveStore.write_save(data, save_path)
 	if error == OK:
 		save_profile()
@@ -1210,6 +1370,7 @@ func load_game() -> bool:
 		hud.show_message("Chưa có bản lưu hợp lệ")
 		return false
 	death_serial += 1
+	_close_dialogue()
 	_abort_trial()
 	_clear_reward_chests()
 	hud.fade_to(0.0, 0.4)
@@ -1218,6 +1379,8 @@ func load_game() -> bool:
 		world.reset_seed(int(data["seed"]))
 		spawner.reset_navzones()
 	state.from_dict(data["state"])
+	weather.from_save(data)
+	storm.cancel()
 	_check_echo_skill(false)
 	spawner.clear_all()
 	chime_sequence.clear()
@@ -1255,6 +1418,8 @@ func _equip_visuals() -> void:
 	## profile falls back to the best story sword of this save.
 	if state.equipped_uid >= 0 and profile.weapon(state.equipped_uid).is_empty():
 		state.equip_sword(String(state.swords[-1]))
+	if state.alt_uid >= 0 and profile.weapon(state.alt_uid).is_empty():
+		state.set_alt("")
 	player.visual.attach_weapon(assets, state.sword)
 	_apply_skins()
 	refresh_stats()
@@ -1281,6 +1446,34 @@ func equip_armory(uid: int) -> void:
 	state.equip_sword(base, uid)
 	_equip_visuals()
 	audio.play("sword_draw")
+
+func set_alt_sword(id: String, uid: int = -1) -> bool:
+	## Armory "Kiếm phụ": hangs a story or armory sword at the hip for the swap key ("" clears).
+	if not playing or player.state != "move":
+		return false
+	if not state.set_alt(id, uid):
+		return false
+	if uid >= 0:
+		state.learn_style(id)
+	audio.ui("ui_confirm")
+	return true
+
+func _swap_swords() -> void:
+	## The swap key: the secondary sword to hand (its style, element, stats and skins), a flash
+	## of its element, and the next blow empowered (PlayerController.on_swapped).
+	if not state.swap_swords():
+		return
+	_equip_visuals()
+	player.on_swapped()
+	var rule: Dictionary = player.swap_rule()
+	audio.play(String(rule.get("sfx", "sword_draw")), player.global_position, -2.0)
+	var element: String = String(ContentDB.weapon(state.sword).get("element", ""))
+	var color: Color = Vfx.element_color(element) if element != "" else Vfx.WIND
+	Vfx.ring(self, player.global_position + Vector3.UP * 0.2, 1.6, color, 0.35, 0.15)
+	Vfx.burst(self, player.global_position + Vector3.UP * 1.1, color, 14, 4.0, 0.08, 0.4)
+	if not hinted.has("swap"):
+		hinted["swap"] = true
+		hud.show_hint("Đổi kiếm! Đòn trúng đầu tiên trong 2 giây sau khi đổi mạnh hơn 30%% và chắc chắn gây trạng thái của kiếm mới — đổi giữa hai hệ để tự tạo phản ứng nguyên tố (Ướt rồi Lôi: Điện Giật…). Mỗi lần đổi cần nghỉ %.1f giây." % float(rule.get("cooldown", 2.5)), 10.0)
 
 func equip_skin(target: String, id: String) -> void:
 	if id != "" and not profile.skins.has(id):

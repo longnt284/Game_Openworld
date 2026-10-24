@@ -1,5 +1,5 @@
 extends SceneTree
-## Account and long-term progression: save schema v3 migration and validation, the
+## Account and long-term progression: save migration (v2 -> current) and validation, the
 ## account profile (currency, armory, RNG state) and its backup recovery. Later
 ## sections cover gacha, world tiers, the Endless Trial, daily missions, consumables
 ## (heal pick, buffs, cures, quick slot), the village medicine counter, flat and percent
@@ -48,14 +48,16 @@ func _saves() -> void:
 	v2_state["sword"] = "sword_wind"
 	var v2: Dictionary = {"version": 2, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [1.0, 2.0, 3.0], "yaw": 0.0, "state": v2_state}
 	var migrated: Dictionary = SaveStore.migrate(v2)
-	check(not migrated.is_empty() and int(migrated["version"]) == SaveStore.SCHEMA_VERSION, "Version 2 saves migrate to version 3")
+	check(not migrated.is_empty() and int(migrated["version"]) == SaveStore.SCHEMA_VERSION, "Version 2 saves migrate to the current version (%d)" % SaveStore.SCHEMA_VERSION)
 	if not migrated.is_empty():
 		var state: GameState = GameState.new()
 		state.from_dict(migrated["state"])
 		check(state.swords == ["sword_old", "sword_bamboo", "sword_wind"] and state.sword == "sword_wind" and state.world_tier == 0, "Migration keeps the forged swords and starts at world tier 0")
 	var broken: Dictionary = {"version": SaveStore.SCHEMA_VERSION, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [1.0, 2.0, 3.0], "state": GameState.new().to_dict()}
+	broken.merge(WeatherDirector.initial_save(284))
+	check(SaveStore.validate(broken), "A current save with the world clock validates")
 	broken["state"]["swords"] = "sword_old"
-	check(not SaveStore.validate(broken), "A v3 save with a non-array sword list is rejected")
+	check(not SaveStore.validate(broken), "A save with a non-array sword list is rejected")
 	broken["state"]["swords"] = ["sword_old"]
 	broken["state"]["world_tier"] = -1
 	check(not SaveStore.validate(broken), "A negative world tier is rejected")
@@ -395,13 +397,14 @@ func _consumables() -> void:
 		"A purchase the coins cannot cover is refused and changes nothing")
 	state.quick_item = "kim_cang_dan"
 	var save: Dictionary = {"version": SaveStore.SCHEMA_VERSION, "seed": 284, "position": [1.0, 2.0, 3.0], "checkpoint": [1.0, 2.0, 3.0], "state": state.to_dict()}
+	save.merge(WeatherDirector.initial_save(284))
 	var loaded: GameState = GameState.new()
 	loaded.from_dict(save["state"])
 	check(SaveStore.validate(save) and loaded.quick_item == "kim_cang_dan", "The quick slot is saved with the game state")
 	var older: Dictionary = save.duplicate(true)
 	(older["state"] as Dictionary).erase("quick_item")
 	loaded.from_dict(older["state"])
-	check(SaveStore.validate(older) and loaded.quick_item == "", "A v3 save from before the quick slot still loads, with the slot empty")
+	check(SaveStore.validate(older) and loaded.quick_item == "", "A save from before the quick slot still loads, with the slot empty")
 	save["state"]["quick_item"] = "da_gio"
 	loaded.from_dict(save["state"])
 	check(loaded.quick_item == "", "A material on the quick slot is dropped on load")

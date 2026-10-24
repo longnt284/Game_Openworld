@@ -54,7 +54,7 @@ func _run() -> void:
 		var look: Vector3 = view[2]
 		anchor.global_position = eye
 		atmosphere.set_region(world.layout.region_at(eye.z).get("id", "ben_van_khe"))
-		atmosphere.current = Atmosphere.MOODS[atmosphere.target_id].duplicate()
+		atmosphere.snap()
 		for frame: int in range(90):
 			await process_frame
 		eye.y = world.height_at(eye.x, eye.z) + view[3]

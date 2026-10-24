@@ -5,24 +5,28 @@ extends RefCounted
 const PATH: String = "user://settings.cfg"
 const REBINDABLE: PackedStringArray = [
 	"move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "block", "skill_1", "skill_2", "skill_ult",
-	"interact", "heal", "use_item", "lock_on", "open_map", "open_journal", "open_inventory",
+	"interact", "heal", "use_item", "swap_sword", "lock_on", "open_map", "open_journal", "open_inventory",
 ]
 const ACTION_NAMES: Dictionary = {
 	"move_forward": "Đi tới", "move_back": "Lùi", "move_left": "Sang trái", "move_right": "Sang phải", "jump": "Nhảy / Khinh công",
 	"sprint": "Né / Chạy nhanh", "attack": "Đánh (giữ: trọng kích)", "block": "Đỡ / Phản đòn", "skill_1": "Chiêu thức 1", "skill_2": "Chiêu thức 2",
 	"skill_ult": "Tuyệt kỹ (đủ nộ khí)",
-	"interact": "Tương tác", "heal": "Dùng thuốc", "use_item": "Dùng vật phẩm nhanh", "lock_on": "Khóa mục tiêu", "open_map": "Bản đồ",
+	"interact": "Tương tác", "heal": "Dùng thuốc", "use_item": "Dùng vật phẩm nhanh", "swap_sword": "Đổi kiếm phụ", "lock_on": "Khóa mục tiêu", "open_map": "Bản đồ",
 	"open_journal": "Nhật ký", "open_inventory": "Túi đồ",
 }
 ## Distances in metres. density thins grass, flowers and ground cover only (trees never move);
-## view_radius is the streamed area in chunks around the player; ambient is the particle budget.
+## view_radius is the streamed area in chunks around the player; ambient is the particle budget;
+## sky_hz caps how often the sky and light are rewritten while they change (each sky write
+## re-renders its radiance); rain is the share of rain streaks drawn (Low keeps a sparse
+## curtain so the Web build still shows rain; 1 draws all, with splashes around Lâm An);
+## lights is the size of the lantern light pool after dark.
 const QUALITY: Dictionary = {
 	"low": {"shadow": 0.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_DISABLED, "scale": 0.85, "view_radius": 2, "tree_distance": 60.0, "bamboo": 48.0,
-		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "label": "Thấp"},
+		"grass": 28.0, "clutter": 24.0, "rock": 70.0, "density": 0.5, "glow": false, "ambient": 0.0, "sky_hz": 5.0, "rain": 0.3, "lights": 0, "label": "Thấp"},
 	"medium": {"shadow": 70.0, "shadow_atlas": 2048, "msaa": Viewport.MSAA_2X, "scale": 1.0, "view_radius": 2, "tree_distance": 82.0, "bamboo": 64.0,
-		"grass": 44.0, "clutter": 36.0, "rock": 90.0, "density": 1.0, "glow": true, "ambient": 0.5, "label": "Trung bình"},
+		"grass": 44.0, "clutter": 36.0, "rock": 90.0, "density": 1.0, "glow": true, "ambient": 0.5, "sky_hz": 10.0, "rain": 0.5, "lights": 4, "label": "Trung bình"},
 	"high": {"shadow": 120.0, "shadow_atlas": 4096, "msaa": Viewport.MSAA_4X, "scale": 1.0, "view_radius": 3, "tree_distance": 120.0, "bamboo": 90.0,
-		"grass": 62.0, "clutter": 50.0, "rock": 120.0, "density": 1.4, "glow": true, "ambient": 1.0, "label": "Cao"},
+		"grass": 62.0, "clutter": 50.0, "rock": 120.0, "density": 1.4, "glow": true, "ambient": 1.0, "sky_hz": 10.0, "rain": 1.0, "lights": 6, "label": "Cao"},
 }
 
 var mouse_sensitivity: float = 0.0025
@@ -35,6 +39,8 @@ var quality: String = "medium"
 var debug_hud: bool = false
 var fullscreen: bool = false
 var damage_numbers: bool = true
+## "Thời tiết động": off keeps the sky clear (the day still turns); WeatherDirector.set_dynamic.
+var dynamic_weather: bool = true
 var bindings: Dictionary = {}
 
 func load_file(path: String = PATH) -> void:
@@ -55,6 +61,7 @@ func load_file(path: String = PATH) -> void:
 	fullscreen = bool(config.get_value("video", "fullscreen", fullscreen))
 	debug_hud = bool(config.get_value("video", "debug_hud", debug_hud))
 	damage_numbers = bool(config.get_value("video", "damage_numbers", damage_numbers))
+	dynamic_weather = bool(config.get_value("world", "dynamic_weather", dynamic_weather))
 	var stored: Variant = config.get_value("controls", "bindings", {})
 	bindings = stored if stored is Dictionary else {}
 
@@ -71,6 +78,7 @@ func save_file(path: String = PATH) -> Error:
 	config.set_value("video", "fullscreen", fullscreen)
 	config.set_value("video", "debug_hud", debug_hud)
 	config.set_value("video", "damage_numbers", damage_numbers)
+	config.set_value("world", "dynamic_weather", dynamic_weather)
 	return config.save(path)
 
 func apply_input() -> void:

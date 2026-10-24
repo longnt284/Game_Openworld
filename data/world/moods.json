@@ -1,0 +1,42 @@
+{
+	"keys": ["top", "horizon", "fog", "sun", "sun_energy", "ambient", "ambient_energy", "pitch", "clouds", "saturation", "cloud", "cloud_shade", "gloom"],
+	"regions": {
+		"ben_van_khe": {"top": "2b78cc", "horizon": "c4e2f0", "fog": "cfe5ee", "sun": "fff0cc", "sun_energy": 1.12, "ambient": "b9d2e2", "ambient_energy": 0.55,
+			"pitch": -50.0, "clouds": 0.5, "saturation": 1.04, "cloud": "fffcf5", "cloud_shade": "a8c2e6", "gloom": 0.0},
+		"doi_gio": {"top": "2a74c6", "horizon": "c8e4ee", "fog": "d2e6ea", "sun": "fff2d2", "sun_energy": 1.12, "ambient": "b8d0dc", "ambient_energy": 0.55,
+			"pitch": -46.0, "clouds": 0.47, "saturation": 1.04, "cloud": "fffcf5", "cloud_shade": "a8c2e6", "gloom": 0.0},
+		"truc_hai": {"top": "3282c4", "horizon": "cfe9e2", "fog": "c4e0d4", "sun": "f7f6d6", "sun_energy": 1.08, "ambient": "a8d0c4", "ambient_energy": 0.6,
+			"pitch": -56.0, "clouds": 0.52, "saturation": 1.03, "cloud": "fffcf5", "cloud_shade": "a8c2e6", "gloom": 0.0},
+		"den_tich_phong": {"top": "3e70b8", "horizon": "e6dcd0", "fog": "dcd8d6", "sun": "ffdcae", "sun_energy": 1.1, "ambient": "bcc0d2", "ambient_energy": 0.5,
+			"pitch": -34.0, "clouds": 0.55, "saturation": 1.0, "cloud": "fffcf5", "cloud_shade": "a8c2e6", "gloom": 0.0},
+		"ao_canh": {"top": "3b4f9a", "horizon": "d9c9e8", "fog": "cfc4e2", "sun": "ffe2c8", "sun_energy": 1.05, "ambient": "c4bcdc", "ambient_energy": 0.6,
+			"pitch": -40.0, "clouds": 0.56, "saturation": 1.02, "cloud": "fffcf5", "cloud_shade": "a8c2e6", "gloom": 0.0}
+	},
+	"times": {
+		"dawn": {"top": "4d6aa6", "horizon": "f2c4a2", "fog": "e3c6b8", "sun": "ffc996", "sun_energy": 0.9, "ambient": "c2b6cc", "ambient_energy": 0.55,
+			"pitch": -40.0, "clouds": 0.5, "saturation": 1.06, "cloud": "ffdcc4", "cloud_shade": "9c92bc", "gloom": 0.0},
+		"dusk": {"top": "3e4f90", "horizon": "f4a97c", "fog": "dfab94", "sun": "ffad6e", "sun_energy": 0.95, "ambient": "c6a8b8", "ambient_energy": 0.55,
+			"pitch": -38.0, "clouds": 0.48, "saturation": 1.1, "cloud": "ffc6a2", "cloud_shade": "8c7cac", "gloom": 0.0},
+		"night": {"top": "0c1632", "horizon": "2b4170", "fog": "253a64", "sun": "a9bdf2", "sun_energy": 0.42, "ambient": "5c76b4", "ambient_energy": 0.82,
+			"pitch": -48.0, "clouds": 0.56, "saturation": 0.92, "cloud": "3c4a72", "cloud_shade": "1c2644", "gloom": 0.0}
+	},
+	"weathers": {
+		"cloudy": {"top": "5f86b4", "horizon": "c8d6de", "fog": "c9d5da", "sun": "f2ecdc", "ambient": "b4c4d0", "cloud": "eef0f2", "cloud_shade": "9aa8ba"},
+		"rain": {"top": "56687c", "horizon": "a9b6bf", "fog": "a8b5bc", "sun": "d8dee4", "ambient": "9fb0bd", "cloud": "a9b2bb", "cloud_shade": "6f7c8c"},
+		"storm": {"top": "2f3a48", "horizon": "6e7b88", "fog": "6f7c86", "sun": "b8c2cc", "ambient": "8796a8", "cloud": "6b747e", "cloud_shade": "353d48"},
+		"fog": {"top": "98abb8", "horizon": "c9d2d6", "fog": "bfc9cc", "sun": "f4f0e6", "ambient": "c4ced4", "cloud": "dfe4e6", "cloud_shade": "b0bac2"},
+		"wind": {"top": "3a7cc8", "horizon": "d2e6ee", "fog": "d8e8ec", "cloud": "fbfcfc", "cloud_shade": "aac4e0"}
+	},
+	"light": {
+		"rise": 0.21, "set": 0.79, "east_yaw": 90.0, "west_yaw": -90.0, "reference_yaw": -35.0, "arc_power": 0.5, "fade": 0.04,
+		"dawn": {"from": 0.16, "peak": 0.215, "to": 0.29, "strength": 0.85},
+		"dusk": {"from": 0.7, "peak": 0.785, "to": 0.85, "strength": 0.9},
+		"night": {"strength": 0.95, "shadow": 0.55},
+		"still": ["ao_canh"]
+	},
+	"levels": {
+		"sun_dim": 1.1, "ambient_dim": 0.12, "shadow_dim": 1.0, "desaturate": 0.45, "cloud_gain": 0.55,
+		"fog_begin": 0.1, "fog_end": 0.38, "fog_density": 0.97, "fog_curve": 1.0, "gloom": 0.6
+	},
+	"shading": {"sway_gain": 1.8, "gust_gain": 1.0, "wet_in": 25.0, "wet_out": 120.0, "water_sky": "b8e0f2"}
+}

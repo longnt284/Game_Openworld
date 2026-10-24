@@ -9,7 +9,7 @@ if (-not (Test-Path -LiteralPath $GodotPath)) { throw 'Run tools/setup.ps1 first
 if ($Mode -eq 'test') {
     & $GodotPath --headless --path $projectRoot --editor --import
     if ($LASTEXITCODE -ne 0) { throw 'Asset import failed.' }
-    foreach ($suite in @('smoke_test', 'gameplay_test', 'combat_test', 'progression_test')) {
+    foreach ($suite in @('smoke_test', 'gameplay_test', 'combat_test', 'progression_test', 'world_test')) {
         if (-not (Test-Path -LiteralPath (Join-Path $projectRoot ('tests/' + $suite + '.gd')))) { continue }
         & $GodotPath --headless --render-thread safe --path $projectRoot --script ('res://tests/' + $suite + '.gd')
         if ($LASTEXITCODE -ne 0) { throw ($suite + ' failed.') }

@@ -1,10 +1,11 @@
 class_name SaveStore
 extends RefCounted
 ## Versioned JSON saves: atomic write through .tmp, previous save kept as .bak,
-## corrupt files fall back to the backup, older schemas are migrated on read.
+## corrupt files fall back to the backup, older schemas are migrated on read one step
+## at a time (v1 -> v2 -> v3 -> v4). v4 added the world clock and weather.
 
 const SAVE_PATH: String = "user://world_save.json"
-const SCHEMA_VERSION: int = 3
+const SCHEMA_VERSION: int = 4
 const MAX_BYTES: int = 1048576
 
 static func _is_number(value: Variant) -> bool:
@@ -45,44 +46,88 @@ static func validate(data: Variant) -> bool:
 			return false
 	if not state.get("sword", "") is String or not _is_number(state.get("equipped_uid", -1)):
 		return false
-	# Optional in v3 (added with the quick-use slot): absent means an empty slot.
+	# Optional since v3 (added with the quick-use slot): absent means an empty slot.
 	if not state.get("quick_item", "") is String:
 		return false
+	# Optional in v4 (the secondary sword): absent means none.
+	if not state.get("sword_alt", "") is String or not _is_number(state.get("alt_uid", -1)):
+		return false
+	return _valid_clock(data)
+
+static func _valid_clock(data: Dictionary) -> bool:
+	## v4: the time of day (fraction of a day), the day count from 1, and the valley's weather
+	## with the seconds it has left and its RNG (64-bit seed and state kept as text).
+	var time: Variant = data.get("time_of_day")
+	if not _is_number(time) or float(time) < 0.0 or float(time) > 1.0:
+		return false
+	if not _valid_seed(data.get("day")) or float(data["day"]) < 1.0:
+		return false
+	var weather: Variant = data.get("weather")
+	if not weather is Dictionary or not weather.get("id") is String:
+		return false
+	if not _is_number(weather.get("remaining")) or float(weather["remaining"]) < 0.0:
+		return false
+	for key: String in ["seed", "state"]:
+		if not weather.get(key) is String or not String(weather[key]).is_valid_int():
+			return false
 	return true
 
 static func migrate(data: Variant) -> Dictionary:
-	## Upgrades older schemas in place; returns {} when the data cannot be trusted.
+	## Upgrades older schemas in place, one version at a time; returns {} when the data cannot
+	## be trusted. Each step only adds what its version introduced.
 	if not data is Dictionary:
 		return {}
 	var version: Variant = data.get("version")
 	if version == 1 or version == 1.0:
-		if not _valid_seed(data.get("seed")) or not data.get("beacon_active") is bool:
+		data = _v1_to_v2(data)
+		if data.is_empty():
 			return {}
-		if not _valid_vector(data.get("position")) or not _valid_vector(data.get("checkpoint")):
+		version = 2
+	if version == 2 or version == 2.0:
+		if not _v2_to_v3(data):
 			return {}
-		var state: Dictionary = GameState.new().to_dict()
-		state["flags"] = {"migrated_from_v1": true}
-		if data["beacon_active"]:
-			state["checkpoints"] = ["shrine_village"]
-			state["checkpoint_id"] = "shrine_village"
-		data = {"version": SCHEMA_VERSION, "seed": data["seed"], "position": data["position"], "checkpoint": data["checkpoint"],
-			"yaw": 0.0, "state": state, "label": "Bản nền cũ", "saved_at": 0}
-	elif version == 2 or version == 2.0:
-		# v3 adds the owned-sword list, the equipped armory weapon and the world tier.
-		if not data.get("state") is Dictionary:
-			return {}
-		var state: Dictionary = data["state"]
-		var sword: String = String(state.get("sword", "sword_old"))
-		var owned: Array = ["sword_old"]
-		for story: String in ["sword_bamboo", "sword_wind"]:
-			if sword == story or (story == "sword_bamboo" and sword == "sword_wind"):
-				owned.append(story)
-		state["swords"] = owned
-		state["equipped_uid"] = -1
-		state["world_tier"] = 0
-		state["max_tier"] = 0
-		data["version"] = SCHEMA_VERSION
+		version = 3
+	if version == 3 or version == 3.0:
+		_v3_to_v4(data)
 	return data if validate(data) else {}
+
+static func _v1_to_v2(data: Dictionary) -> Dictionary:
+	## The base project's save: only a lit beacon and a position survive into a fresh state.
+	if not _valid_seed(data.get("seed")) or not data.get("beacon_active") is bool:
+		return {}
+	if not _valid_vector(data.get("position")) or not _valid_vector(data.get("checkpoint")):
+		return {}
+	var state: Dictionary = GameState.new().to_dict()
+	state["flags"] = {"migrated_from_v1": true}
+	if data["beacon_active"]:
+		state["checkpoints"] = ["shrine_village"]
+		state["checkpoint_id"] = "shrine_village"
+	return {"version": 2, "seed": data["seed"], "position": data["position"], "checkpoint": data["checkpoint"],
+		"yaw": 0.0, "state": state, "label": "Bản nền cũ", "saved_at": 0}
+
+static func _v2_to_v3(data: Dictionary) -> bool:
+	## v3 adds the owned-sword list, the equipped armory weapon and the world tier.
+	if not data.get("state") is Dictionary:
+		return false
+	var state: Dictionary = data["state"]
+	var sword: String = String(state.get("sword", "sword_old"))
+	var owned: Array = ["sword_old"]
+	for story: String in ["sword_bamboo", "sword_wind"]:
+		if sword == story or (story == "sword_bamboo" and sword == "sword_wind"):
+			owned.append(story)
+	state["swords"] = owned
+	state["equipped_uid"] = -1
+	state["world_tier"] = 0
+	state["max_tier"] = 0
+	data["version"] = 3
+	return true
+
+static func _v3_to_v4(data: Dictionary) -> void:
+	## v4 adds the world clock and weather: an older journey wakes on a clear morning of day 1,
+	## its weather RNG seeded from the world seed.
+	var world_seed: int = int(data.get("seed", 0)) if _valid_seed(data.get("seed")) else 0
+	data.merge(WeatherDirector.initial_save(world_seed), true)
+	data["version"] = 4
 
 static func write_save(data: Dictionary, path: String = SAVE_PATH) -> Error:
 	if not validate(data):

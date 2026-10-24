@@ -15,6 +15,26 @@ const LAYER_HURT_ENEMY: int = 32
 const LAYER_INTERACT: int = 64
 ## Flat "defense" (enemies and Lâm An alike) leaves 100 / (100 + defense) of a blow.
 const DEFENSE_SCALE: float = 100.0
+## Enemy sight never shrinks below this share, however thick the fog and dark the night.
+const MIN_DETECT: float = 0.45
+
+## The sky over the journey (main sets it while playing): rain and storms change elemental
+## blows on every side, fog and night shorten enemy sight. Null (tests, the title) is neutral.
+static var weather: WeatherDirector
+
+
+static func weather_mult(element: String) -> float:
+	## Rain: Lôi ×1.2, Hỏa ×0.8; storm: Lôi ×1.3, Phong ×1.15 (data/weather.json). 1 for plain steel.
+	if element == "" or weather == null or not is_instance_valid(weather):
+		return 1.0
+	return weather.element_mult(element)
+
+
+static func detect_mult() -> float:
+	## Share of an enemy's sight range left by fog and night (never below MIN_DETECT).
+	if weather == null or not is_instance_valid(weather):
+		return 1.0
+	return maxf(MIN_DETECT, weather.detect_mult())
 
 
 class Damage:

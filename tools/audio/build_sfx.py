@@ -1,6 +1,6 @@
 """Build sound effects and ambience loops.
 
-python3 tools/audio/build_sfx.py <kenney_dir>   (or --elemental to rebuild only the elemental clips)
+python3 tools/audio/build_sfx.py <kenney_dir>   (or --elemental / --weather to rebuild only those clips)
 - Synthesises whooshes, wind skills, impacts, creature sounds and ambience loops with numpy/scipy
   (original work for this project).
 - Copies selected CC0 clips from Kenney's "RPG Audio", "Impact Sounds" and "Interface Sounds" packs
@@ -263,6 +263,53 @@ def ambience():
     write(AMBIENCE / "village.ogg", loopable(village))
 
 
+def weather():
+    """Rain, storm wind, night insects and thunder (own RNG, so every clip above stays byte-identical)."""
+    global RNG
+    saved, RNG = RNG, np.random.default_rng(2841)
+    length = 28.0
+    n = int(length * RATE)
+
+    def drops(count, low, high, gain):
+        bed = np.zeros(n)
+        return scatter(bed, lambda: bandpass(RNG.standard_normal(int(0.012 * RATE)), low, high) * env(0.012, 0.0005, 0.011, 3.0), count, gain)
+
+    # Light rain: a soft high hiss with patters of drops on leaves and roofs.
+    hiss = bandpass(RNG.standard_normal(n), 1800, 9000, 2) * 0.35
+    hiss *= 0.85 + 0.15 * np.sin(2 * np.pi * 0.11 * t(length)) * np.sin(2 * np.pi * 0.37 * t(length))
+    write(AMBIENCE / "rain_light.ogg", loopable(hiss + drops(900, 2000, 7000, 0.5) + drops(260, 600, 2400, 0.35)))
+    # Heavy rain: a dense roar in the low mids under the hiss, drops everywhere.
+    roar = bandpass(RNG.standard_normal(n), 250, 1800, 2) * 0.6 + bandpass(RNG.standard_normal(n), 1500, 8000, 2) * 0.45
+    roar *= 0.8 + 0.2 * np.sin(2 * np.pi * 0.07 * t(length) + 0.6)
+    write(AMBIENCE / "rain_heavy.ogg", loopable(roar + drops(2600, 1500, 7000, 0.45) + drops(700, 400, 1800, 0.35)))
+    # Storm wind: fast gusts that howl and drop away.
+    gale = wind_bed(length, 90, 1400, 0.22) * 0.8
+    howl = swept_noise(length, 380, 900, 0.12) * (0.25 + 0.25 * np.sin(2 * np.pi * 0.09 * t(length)) ** 2)
+    write(AMBIENCE / "storm_wind.ogg", loopable(gale + howl))
+    # Night: crickets chirping in trains at their own pitches and rates over a faint breeze.
+    night = wind_bed(length, 120, 600, 0.04) * 0.12
+
+    def cricket():
+        pitch = RNG.uniform(3800, 5200)
+        pulses = []
+        for _ in range(RNG.integers(3, 7)):
+            pulses.append(sine(pitch, 0.018) * env(0.018, 0.002, 0.01) * 0.6)
+            pulses.append(np.zeros(int(0.022 * RATE)))
+        return np.concatenate(pulses)
+    night = scatter(night, cricket, 420, 0.35)
+    night = scatter(night, lambda: bird(RNG.uniform(900, 1300), 0.3) * 0.5, 4, 0.3)
+    write(AMBIENCE / "night_insects.ogg", loopable(night))
+    # Thunder: a crack (near) into a rolling low rumble; four lengths and strengths.
+    for index, (length_s, crack) in enumerate(((3.2, 0.9), (4.5, 0.5), (5.5, 0.2), (2.6, 1.0))):
+        m = int(length_s * RATE)
+        rumble = lowpass(RNG.standard_normal(m), 160, 2) * env(length_s, 0.08, length_s * 0.8, 1.6)
+        rolls = 0.6 + 0.4 * np.abs(np.sin(2 * np.pi * RNG.uniform(0.7, 1.4) * t(length_s) + RNG.uniform(0, 3)))
+        boom = 0.5 * sine(np.linspace(55, 28, m), length_s) * env(length_s, 0.01, length_s * 0.7, 2.0)
+        snap = bandpass(RNG.standard_normal(m), 700, 6000) * env(length_s, 0.001, 0.35, 4.0) * crack
+        write(SFX / f"thunder_{index}.ogg", rumble * rolls + boom + snap)
+    RNG = saved
+
+
 def copy_kenney(base):
     for pack, mapping in KENNEY.items():
         for target, source in mapping.items():
@@ -288,8 +335,12 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--elemental"]:
         elemental()
         sys.exit()
+    if sys.argv[1:] == ["--weather"]:
+        weather()
+        sys.exit()
     if len(sys.argv) > 1:
         copy_kenney(Path(sys.argv[1]))
     effects()
     ambience()
     elemental()
+    weather()

@@ -14,7 +14,6 @@ extends Resource
 @export var jump_speed: float = 7.0
 @export var gravity: float = 20.0
 @export var mouse_sensitivity: float = 0.0025
-@export var day_length_seconds: float = 480.0
 @export var near_tree_distance: float = 72.0
 
 func chunk_capacity() -> int:

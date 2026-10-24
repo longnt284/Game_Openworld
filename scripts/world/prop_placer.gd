@@ -2,7 +2,9 @@ class_name PropPlacer
 extends Node3D
 ## Places the hand-authored static props (houses, bridge, dock, ruins…) from
 ## data/world/props.json onto the terrain. Colliders come from the GLB import
-## (*-convcolonly); `surface` drives footstep sounds.
+## (*-convcolonly); `surface` drives footstep sounds. Props that carry a flame (lanterns, the
+## smithy's forge, the campfire: props.json "lights") also list where their light sits, for
+## NightLights.
 
 const DRAW_DISTANCE: Dictionary = {
 	"house_small": 220.0, "house_long": 220.0, "house_teal": 220.0, "smithy": 200.0, "gate_village": 220.0, "watchtower": 260.0,
@@ -11,8 +13,12 @@ const DRAW_DISTANCE: Dictionary = {
 }
 
 var placed: Array[Node3D] = []
+## Every flame of the placed props: {"position" (world), "color", "energy", "range"}.
+var lights: Array[Dictionary] = []
 
 func build(assets: AssetLibrary, layout: WorldLayout) -> void:
+	var lamps: Dictionary = ContentDB.get_data("props").get("lights", {})
+	var lamp_defaults: Dictionary = lamps.get("default", {})
 	for entry: Dictionary in ContentDB.get_data("props").get("props", []):
 		var node: Node3D = assets.instantiate("env/" + String(entry["model"]))
 		node.name = "%s_%d" % [entry["model"], placed.size()]
@@ -41,6 +47,11 @@ func build(assets: AssetLibrary, layout: WorldLayout) -> void:
 			body.set_meta("surface", surface)
 			(body as StaticBody3D).collision_layer = Combat.LAYER_WORLD
 		placed.append(node)
+		var lamp: Dictionary = (lamps.get("models", {}) as Dictionary).get(entry["model"], {})
+		for point: Array in lamp.get("points", []):
+			lights.append({"position": node.transform * Vector3(float(point[0]), float(point[1]), float(point[2])),
+				"color": Color(String(lamp.get("color", lamp_defaults.get("color", "ffb25a")))),
+				"energy": float(lamp.get("energy", lamp_defaults.get("energy", 1.6))), "range": float(lamp.get("range", lamp_defaults.get("range", 7.0)))})
 
 func _footprint_low(layout: WorldLayout, x: float, z: float, radius: float) -> float:
 	## Sink props to the lowest nearby ground so they never float on slopes.

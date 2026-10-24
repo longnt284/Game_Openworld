@@ -467,6 +467,9 @@ func _inventory_view() -> Control:
 	right.add_child(UiTheme.label("Khí huyết tối đa: %d   •   Công lực: %d" % [roundi(state.max_health()), roundi(state.attack_power())], 16))
 	var style: String = StyleBook.style_of(state.sword)
 	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ContentDB.style(style).get("name", "")], 16, UiTheme.JADE_LIGHT, true))
+	if state.has_alt():
+		right.add_child(UiTheme.label("Kiếm phụ (%s): %s  •  %s" % [UserSettings.event_label("swap_sword"), ContentDB.weapon(state.sword_alt).get("name", state.sword_alt),
+			ContentDB.style(StyleBook.style_of(state.sword_alt)).get("name", "")], 15, UiTheme.MUTED))
 	right.add_child(UiTheme.label("Tơ ký ức đã kết: %d" % state.count("to_ky_uc"), 16, UiTheme.CREAM))
 	# Cultivation and the character sheet share the rest of the column as two tabs.
 	var tabs: TabContainer = TabContainer.new()
@@ -625,13 +628,16 @@ func _settings_view() -> Control:
 	video.add_child(_check_row("Hiện số sát thương", settings.damage_numbers, func(value: bool) -> void:
 		settings.damage_numbers = value
 		_changed()))
+	video.add_child(_check_row("Thời tiết động", settings.dynamic_weather, func(value: bool) -> void:
+		settings.dynamic_weather = value
+		_changed()))
 	video.add_child(_check_row("Bảng thông số kỹ thuật (F3)", settings.debug_hud, func(value: bool) -> void:
 		settings.debug_hud = value
 		_changed()))
 	video.add_child(_slider_row("Độ rung camera", 0.0, 1.0, settings.camera_shake, func(value: float) -> void:
 		settings.camera_shake = value
 		_changed()))
-	var note: Label = UiTheme.label("Thấp: tắt bóng đổ, giảm cỏ cây và độ phân giải dựng hình. Cao: bóng đổ xa hơn, khử răng cưa 4x.", 14, UiTheme.MUTED)
+	var note: Label = UiTheme.label("Thấp: tắt bóng đổ, giảm cỏ cây và độ phân giải dựng hình. Cao: bóng đổ xa hơn, khử răng cưa 4x.\nTắt Thời tiết động: trời luôn quang, ngày đêm vẫn luân chuyển.", 14, UiTheme.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	video.add_child(note)
 	return tabs

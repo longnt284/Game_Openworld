@@ -121,5 +121,11 @@
 		"lines": [["Ông Lang Vân", "Chuông thôi đổ, đêm qua lão ngủ được một giấc trọn. Nhưng thuốc thì vẫn phải sẵn, phải không cháu?"]],
 		"choices": [["Xem quầy thuốc", "lv_shop"], ["Hỏi về các vị thuốc", "lv_lore"], ["Để sau", ""]]
 	},
-	"lv_shop": {"lines": [], "do": ["shop:quay_thuoc"]}
+	"lv_shop": {"lines": [], "do": ["shop:quay_thuoc"]},
+	"shrine_rest": {
+		"lines": [["Miếu Gió", "Ngọn đèn miếu cháy đều trong gió. Ngồi nghỉ bên miếu chờ trời chuyển chăng?"]],
+		"choices": [["Nghỉ đến sáng", "shrine_rest_dawn", ["!time:dawn"]], ["Nghỉ đến tối", "shrine_rest_dusk", ["!time:dusk"]], ["Thôi", ""]]
+	},
+	"shrine_rest_dawn": {"lines": [], "do": ["rest:dawn"]},
+	"shrine_rest_dusk": {"lines": [], "do": ["rest:dusk"]}
 }

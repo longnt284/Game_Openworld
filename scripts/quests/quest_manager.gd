@@ -1,7 +1,8 @@
 class_name QuestManager
 extends Node
 ## Sequential-objective quests driven by string events ("talk:ba_luc",
-## "camp_clear:rescue", "interact:shrine_village", "flag:chimes_solved"…).
+## "camp_clear:rescue", "interact:shrine_village", "flag:chimes_solved"…). check() also
+## answers the "if" conditions of entities, dialogue choices and barks.
 ## Rewards are granted exactly once per save (guarded by a reward:<id> flag).
 
 signal quest_started(id: String)
@@ -13,6 +14,9 @@ const ONE_TIME_PREFIXES: PackedStringArray = ["read:", "opened:", "echo_seen:", 
 
 var state: GameState
 var rewarder: Callable
+## Clock and sky for "time:" and "weather:" conditions (wired by main). Without one it is a
+## clear day, so a standalone manager (tests, tools) still answers.
+var weather: WeatherDirector
 
 func setup(game_state: GameState, reward_callback: Callable) -> void:
 	state = game_state
@@ -224,5 +228,12 @@ func _check_one(condition: String) -> bool:
 			return state.has_flag("camp_clear:" + parts[1])
 		"skill":
 			return state.skill_level(parts[1]) > 0
+		"time":
+			# night, day (dawn to dusk), dawn or dusk.
+			return weather.is_time(parts[1]) if weather else parts[1] == "day"
+		"weather":
+			if not WeatherDirector.data().get("weathers", {}).has(parts[1]):
+				push_warning("Unknown weather in condition " + condition)
+			return (weather.weather_id() if weather else WeatherDirector.FALLBACK) == parts[1]
 	push_warning("Unknown condition " + condition)
 	return false

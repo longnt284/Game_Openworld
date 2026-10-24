@@ -2,7 +2,8 @@ class_name Backdrop
 extends Node3D
 ## Distant scenery outside the playable area: three rings of limestone karst towers with
 ## forested crowns, low cloud banks at their feet and a pagoda on the northern peak. Each
-## ring fades further into the horizon colour; none of it takes scene fog.
+## ring fades further into the horizon colour; none of it takes scene fog. Atmosphere feeds
+## the haze colour and the light tint of the hour and weather.
 
 const SHADER: Shader = preload("res://shaders/backdrop.gdshader")
 const CLOUD_SHADER: Shader = preload("res://shaders/backdrop_cloud.gdshader")
@@ -43,6 +44,10 @@ func build(center: Vector2, seed_value: int, assets: AssetLibrary = null) -> voi
 func set_haze(color: Color) -> void:
 	for material: ShaderMaterial in materials:
 		material.set_shader_parameter("haze_color", color)
+
+func set_light(tint: Color) -> void:
+	for material: ShaderMaterial in materials:
+		material.set_shader_parameter("light_tint", tint)
 
 func _mesh(assets: AssetLibrary, key: String) -> Mesh:
 	if assets == null or not assets.scenes.has(key):

@@ -93,7 +93,11 @@ Tổng: 79 model, 88,898 tam giác hiển thị. Mọi model của dự án đư
 | File | Nhóm | Nguồn | Giấy phép |
 |---|---|---|---|
 | `assets/audio/ambience/forest.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/night_insects.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/rain_heavy.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/rain_light.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/ambience/river.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/ambience/storm_wind.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/ambience/village.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/ambience/wind.ogg` | ambience | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/music/bamboo.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
@@ -186,6 +190,10 @@ Tổng: 79 model, 88,898 tam giác hiển thị. Mọi model của dự án đư
 | `assets/audio/sfx/swing_heavy.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/sword_draw.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 | `assets/audio/sfx/temple_bell.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/thunder_0.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/thunder_1.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/thunder_2.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/thunder_3.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/thunder_chain.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/thunder_dash.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/ui_click.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
@@ -202,7 +210,7 @@ Tổng: 79 model, 88,898 tam giác hiển thị. Mọi model của dự án đư
 | `assets/audio/sfx/wind_slash.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/wood_knock.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 
-Tổng: 109 file OGG Vorbis. Nhạc được soạn bằng code (giai điệu ngũ cung Rê thứ) và render qua soundfont General MIDI; cần người nghe duyệt lại trước khi phát hành (xem `docs/progress.md`).
+Tổng: 117 file OGG Vorbis. Nhạc được soạn bằng code (giai điệu ngũ cung Rê thứ) và render qua soundfont General MIDI; cần người nghe duyệt lại trước khi phát hành (xem `docs/progress.md`).
 
 ## Font
 
