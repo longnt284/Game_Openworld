@@ -1356,7 +1356,7 @@ func _receive_talisman(outcome: Dictionary, at: Vector3, quiet: bool = false) ->
 		hud.show_message("Túi Ngọc bội đã đầy (%d): phân giải %s → +%d Đồng" % [Talismans.capacity(), Talismans.label(salvaged), coins], 4.5,
 			PlayerStats.rarity_color(String(salvaged.get("rarity", "r"))))
 	if outcome.get("kept", false) and profile.talismans.size() == 1:
-		hud.show_hint("Nhận Ngọc bội đầu tiên. Vào Kho kiếm & trang phục (menu tạm dừng), thẻ Ngọc bội, để đeo vào ô Thiên, Địa, Nhân. Đeo 2 hoặc 3 món cùng bộ sẽ mở hiệu ứng bộ.", 10.0)
+		hud.show_hint("Nhận Ngọc bội đầu tiên. Vào mục Kiếm, Ngọc bội & trang phục (menu tạm dừng), thẻ Ngọc bội, để đeo vào ô Thiên, Địa, Nhân. Đeo 2 hoặc 3 món cùng bộ sẽ mở hiệu ứng bộ.", 10.0)
 
 func tier_cap() -> int:
 	## Highest World Tier this save may choose; none before the story slice is complete.

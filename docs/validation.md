@@ -1,4 +1,4 @@
-# Kết quả kiểm tra — 18/10/2026
+# Kết quả kiểm tra — 21/10/2026
 
 Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** trong môi trường phát triển.
 
@@ -15,10 +15,10 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 | Import asset | `godot --headless --path . --editor --import` | Thành công |
 | Smoke test (bản nền + thực vật, vùng cấm, preset) | `tests/smoke_test.gd` | **35/35 PASS** |
 | Gameplay test (chơi trọn đoạn mẫu) | `tests/gameplay_test.gd` | **48/48 PASS** |
-| Combat test (15 thức của 5 hệ, trạng thái, nộ khí) | `tests/combat_test.gd` | **53/53 PASS** |
-| Progression test (save v3, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới) | `tests/progression_test.gd` | **49/49 PASS** |
+| Combat test (15 thức của 5 hệ, trạng thái, nộ khí; GĐ1: trạng thái trên người chơi, chỉ số, phản ứng, phá thế, kết liễu, Tâm Nhãn, địch dùng AoE) | `tests/combat_test.gd` | **152/152 PASS** |
+| Progression test (save v3, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới; GĐ1: vật phẩm, quầy thuốc, affix mới, Ngọc bội, hồ sơ v1 → v2) | `tests/progression_test.gd` | **118/118 PASS** |
 
-Tổng **185/185 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả bốn bộ. CI GitHub Actions chạy trên `windows-latest`.
+Tổng **353/353 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả bốn bộ. CI GitHub Actions chạy trên `windows-latest`.
 
 **Combat test:** mỗi thức E/Q/X của 5 hệ khởi động, gây sát thương và gây đúng trạng thái; thiêu đốt gây sát thương theo thời gian không làm khựng; lạnh cóng làm chậm, 3 lớp thành đóng băng, boss không bị đóng băng; mục tiêu ướt chỉ nhận thêm sát thương sấm; tuyệt kỹ bị từ chối khi nộ khí chưa đầy và tiêu hết khi dùng; Phong Trảm vẫn bằng công lực × 1,6 như bản trước.
 
@@ -33,6 +33,16 @@ Tổng **185/185 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.s
 - Khinh công bật nhảy; tường gió đóng trước câu đố; vào đấu trường bắt đầu trận; Trúc Tướng sang pha 2 dưới 50% máu.
 - Lưu sau khi xong đoạn mẫu rồi tải lại; save v1 của bản nền migrate được và chơi tiếp được.
 - Chiến đấu: một nhát chém chỉ trúng một lần; phản đòn đúng lúc làm địch choáng; né có khung bất tử; địch không bị đẩy xuống Khe Gió; navmesh bake từ collider đã stream.
+
+**Giai đoạn 1 (lõi combat):** độc trừ máu theo thời gian không làm khựng và chặn Hồi xuân; độc đứng yên khi hội thoại khóa điều khiển; né rũ một lớp chảy máu; choáng đưa Lâm An vào trạng thái trúng đòn; buff cộng đúng chỉ số rồi hết hạn; đòn địch mang trạng thái chỉ dính khi trúng thật (đỡ: nửa tỉ lệ; né/phản: không); công thức phòng ngự, giáp địch và xuyên giáp; hút máu chỉ từ đòn trực tiếp; tốc độ ra đòn rút ngắn clip và khung gây sát thương cùng nhau; tuyệt kỹ Thủy và Băng Tiễn phát clip đúng tốc độ; mỗi phản ứng chỉ kích hoạt đúng tổ hợp, lan/nổ/nảy trúng địch khác một lần, không đệ quy; hết thế thì phá thế và mở cửa sổ kết liễu; kết liễu hạ gục địch thường, boss chỉ mất tối đa 12%; F ưu tiên kết liễu hơn tương tác khi giao chiến; né/phản hoàn hảo bật Tâm Nhãn, né muộn thì không, hết 1,5 s thời gian về 1,0, tạm dừng giữ nguyên bộ đếm; mua thuốc trừ Đồng, thiếu Đồng thì không đổi gì; Ngọc bội đúng khoảng chỉ số, dòng phụ không trùng, hiệu ứng bộ 2/3 món, túi đầy tự phân giải món thấp nhất, hồ sơ v1 migrate giữ nguyên tiền, bảo hiểm và kho kiếm.
+
+| | |
+|---|---|
+| ![Icon trạng thái](screenshots/statuses.jpg) | ![Bảng Nhân vật](screenshots/character.jpg) |
+| ![Quầy thuốc](screenshots/shop.jpg) | ![Ngọc bội](screenshots/talismans.jpg) |
+| ![Điện Giật](screenshots/reaction_electrocharge.jpg) | ![Hỏa Lốc](screenshots/reaction_firestorm.jpg) |
+| ![Thanh thế](screenshots/poise_bars.jpg) | ![Kết liễu](screenshots/finisher.jpg) |
+| ![Tâm Nhãn](screenshots/focus.jpg) | ![Ông Lang Vân](screenshots/merchant.jpg) |
 
 ## Kiểm tra hình ảnh — đã chạy (renderer phần mềm)
 

@@ -290,6 +290,12 @@ func _run() -> void:
 	state.skills["gust"] = 1
 	await frames(30)
 
+	# ---- missile forms keep their clip at normal playback; missile_speed only moves the missile
+	for form: Array in [["ult_thuy", "ultimate"], ["bang_e", "skill_gust"]]:
+		var timed: Dictionary = Combat.attack("player", String(form[0]))
+		check(is_equal_approx(float(timed["recover"]), float(ContentDB.timing("player", String(form[1]))["recover"])) and float(timed.get("missile_speed", 0.0)) > 1.0,
+			"%s plays its %s clip at normal speed (recover %.2f s)" % [form[0], form[1], float(timed["recover"])])
+
 	# ---- Phong Trảm keeps its numbers with a plain story sword
 	await reset_player()
 	state.sword = "sword_bamboo"
@@ -357,6 +363,14 @@ func _run() -> void:
 	hp_before = player.health
 	player._tick_statuses(0.5)
 	check(not player.statuses.has("poison") and is_equal_approx(player.health - hp_before, max_hp * float(ContentDB.status("buff_regen")["regen_max_hp"])), "Once the poison is gone, Hồi xuân heals over time")
+	await reset_player()
+	player.apply_status("poison")
+	player.input_enabled = false
+	hp_before = player.health
+	var poison_left: float = float(player.statuses.active["poison"]["time"])
+	await frames(40)
+	check(is_equal_approx(player.health, hp_before) and is_equal_approx(float(player.statuses.active["poison"]["time"]), poison_left), "Poison holds still while a conversation locks input")
+	player.input_enabled = true
 	await reset_player()
 	player.apply_status("bleed", 3)
 	hp_before = player.health
