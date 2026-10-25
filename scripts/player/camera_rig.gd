@@ -76,7 +76,7 @@ func _process(delta: float) -> void:
 		return
 	time += delta
 	switch_cooldown = maxf(0.0, switch_cooldown - delta)
-	var anchor: Vector3 = target.global_position + Vector3.UP * 1.45
+	var anchor: Vector3 = ((target as PlayerController).drawn_position() if target is PlayerController else target.global_position) + Vector3.UP * 1.45
 	global_position = global_position.lerp(anchor, clampf(delta * 12.0, 0.0, 1.0))
 	if lock_target and is_instance_valid(lock_target):
 		var to_target: Vector3 = lock_target.global_position - global_position

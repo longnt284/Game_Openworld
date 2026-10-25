@@ -43,6 +43,10 @@ var status_stats: Dictionary = {}
 var tracked_quest: String = ""
 ## Consumable on the quick-use key (C), chosen in the Inventory; kept when the stack runs out.
 var quick_item: String = ""
+## Kiếm Quyết on each skill key, chosen in the Kiếm Quyết panel or the style wheel:
+## slot (e, q, x) -> style id (data/styles.json). Independent of the sword in hand, whose
+## element only colours plain strikes. A missing slot uses StyleBook.DEFAULT_STYLE.
+var loadout: Dictionary = {}
 
 func has_flag(key: String) -> bool:
 	return bool(flags.get(key, false))
@@ -139,22 +143,66 @@ func learn_ultimate(skill: String, requires: String) -> bool:
 	return true
 
 func grant_sword(id: String) -> bool:
-	## Adds a base sword; the first sword of an elemental style also teaches its E and Q forms.
+	## Adds a base sword. Swords no longer teach forms: every Kiếm Quyết is learned through its
+	## own quest (data/styles.json "unlock"), so a sword only brings its element and attack.
 	if ContentDB.weapon(id).is_empty():
 		return false
 	var fresh: bool = not swords.has(id)
 	if fresh:
 		swords.append(id)
-		learn_style(id)
 		changed.emit("sword", id)
 	return fresh
 
-func learn_style(id: String) -> void:
-	## Holding a sword of an elemental style (story or armory) teaches that style's E and Q forms.
-	var style: String = StyleBook.style_of(id)
-	if style != StyleBook.DEFAULT_STYLE:
-		for slot: String in ["e", "q"]:
-			unlock_skill(String(StyleBook.form(style, slot).get("skill", "")))
+func learn_style(style: String) -> bool:
+	## A quest reward teaches a whole Kiếm Quyết: its E and Q forms (the ultimate is still bought
+	## with cultivation points). Returns true when anything new was learned.
+	if ContentDB.style(style).is_empty():
+		return false
+	var fresh: bool = false
+	for slot: String in ["e", "q"]:
+		var skill: String = String(StyleBook.form(style, slot).get("skill", ""))
+		if skill != "" and skill_level(skill) == 0:
+			unlock_skill(skill)
+			fresh = true
+	return fresh
+
+func style_learned(style: String) -> bool:
+	## A style counts as learned once any of its forms is known (Phong starts with Phong Trảm alone).
+	for slot: String in StyleBook.SLOTS:
+		if skill_level(String(StyleBook.form(style, slot).get("skill", ""))) > 0:
+			return true
+	return false
+
+func learned_styles() -> Array[String]:
+	var result: Array[String] = []
+	for style: String in StyleBook.styles():
+		if style_learned(style):
+			result.append(style)
+	return result
+
+func slot_style(slot: String) -> String:
+	## The Kiếm Quyết bound to a skill key (e, q, x).
+	var style: String = String(loadout.get(slot, StyleBook.DEFAULT_STYLE))
+	return style if not ContentDB.style(style).is_empty() else StyleBook.DEFAULT_STYLE
+
+func set_slot_style(slot: String, style: String) -> bool:
+	## Binds a learned style's form to one key; refuses unknown slots and unlearned styles.
+	if not StyleBook.SLOTS.has(slot) or ContentDB.style(style).is_empty() or not style_learned(style):
+		return false
+	if slot_style(slot) == style and loadout.has(slot):
+		return true
+	loadout[slot] = style
+	changed.emit("loadout", slot)
+	return true
+
+func equip_style(style: String) -> bool:
+	## The whole Kiếm Quyết on E, Q and X at once (the style wheel and "Trang bị cả bộ").
+	if ContentDB.style(style).is_empty() or not style_learned(style):
+		return false
+	for slot: String in StyleBook.SLOTS:
+		loadout[slot] = style
+	changed.emit("loadout", "")
+	return true
 
 func equip_sword(id: String, uid: int = -1) -> void:
 	if not swords.has(id) and uid < 0:
@@ -223,7 +271,7 @@ func to_dict() -> Dictionary:
 		"level": level, "xp": xp, "skill_points": skill_points, "skills": skills.duplicate(), "sword": sword, "coins": coins,
 		"swords": swords.duplicate(), "equipped_uid": equipped_uid, "sword_alt": sword_alt, "alt_uid": alt_uid, "world_tier": world_tier, "max_tier": max_tier,
 		"health": health, "checkpoint_id": checkpoint_id, "checkpoints": checkpoints.duplicate(), "discovered": discovered.duplicate(),
-		"play_time": play_time, "tracked_quest": tracked_quest, "quick_item": quick_item,
+		"play_time": play_time, "tracked_quest": tracked_quest, "quick_item": quick_item, "loadout": loadout.duplicate(),
 	}
 
 func from_dict(data: Dictionary) -> void:
@@ -270,4 +318,18 @@ func from_dict(data: Dictionary) -> void:
 	quick_item = String(data.get("quick_item", ""))
 	if not Consumables.usable(quick_item):
 		quick_item = ""
+	# Older saves have no loadout: their forms followed the sword in hand, so start from that
+	# sword's style when it is learned. Slots naming an unknown style fall back to the default.
+	loadout = {}
+	var saved: Variant = data.get("loadout")
+	if saved is Dictionary:
+		for slot: String in StyleBook.SLOTS:
+			var style: String = String((saved as Dictionary).get(slot, ""))
+			if not ContentDB.style(style).is_empty():
+				loadout[slot] = style
+	else:
+		var held: String = StyleBook.style_of(sword)
+		if held != StyleBook.DEFAULT_STYLE and style_learned(held):
+			for slot: String in StyleBook.SLOTS:
+				loadout[slot] = held
 	changed.emit("load", "")

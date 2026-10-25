@@ -18,6 +18,8 @@ var clock: float = 0.0
 var field_left: float = 0.0
 var tick_left: float = 0.0
 var field_radius: float = 0.0
+## Entities already struck, for attacks with "hit_once" (a fissure's overlapping spikes).
+var struck: Dictionary = {}
 
 static func spawn(owner_node: Node3D, attack: Dictionary, scale: float, kind: String, tint: Color, hit_mask: int = Combat.LAYER_HURT_ENEMY) -> AreaEffect:
 	var effect: AreaEffect = AreaEffect.new()
@@ -36,7 +38,9 @@ func add_strike(point: Vector3, delay: float, radius: float) -> void:
 	events.append({"time": delay, "position": point, "radius": radius})
 	var world: WorldManager = caster.get("world") as WorldManager
 	var ground: Vector3 = Vector3(point.x, world.height_at(point.x, point.z) if world else point.y, point.z)
-	Vfx.telegraph(get_parent(), ground, radius, delay, color, caster is Enemy)
+	events[-1]["position"] = ground
+	if not data.get("no_telegraph", false):
+		Vfx.telegraph(get_parent(), ground, radius, delay, color, caster is Enemy)
 	if String(data.get("vfx", "")) == "ice_sword":
 		Vfx.ice_sword(get_parent(), ground, delay)
 
@@ -82,6 +86,13 @@ func _land(point: Vector3, radius: float) -> void:
 			Vfx.burst(get_parent(), point + Vector3.UP, Color(1.0, 0.85, 0.5), 40, 10.0, 0.1, 0.6)
 		"ice_sword":
 			pass  # the falling blade already shatters on its own clock
+		"rock_spike":
+			Vfx.rock_spikes(get_parent(), point, radius, 3, 1.2 + randf() * 0.5)
+			Vfx.burst(get_parent(), point + Vector3.UP * 0.3, Color(0.75, 0.62, 0.42), 10, 4.0, 0.12, 0.45)
+		"quake":
+			Vfx.rock_spikes(get_parent(), point, radius, 10, 1.6)
+			Vfx.crack(get_parent(), point, radius * 0.75, color)
+			Vfx.ring(get_parent(), point + Vector3.UP * 0.2, radius, color, 0.45, 0.24)
 		_:
 			Vfx.ring(get_parent(), point + Vector3.UP * 0.2, radius, color, 0.4, 0.2)
 	if caster is PlayerController and (caster as PlayerController).camera_rig:
@@ -90,8 +101,10 @@ func _land(point: Vector3, radius: float) -> void:
 
 func _hit_area(center: Vector3, radius: float) -> void:
 	for entity: Node in Combat.entities_in(self, center + Vector3.UP * 0.8, radius, mask):
-		if entity == caster:
+		if entity == caster or struck.has(entity):
 			continue
+		if data.get("hit_once", false):
+			struck[entity] = true
 		var away: Vector3 = (entity as Node3D).global_position - center
 		away.y = 0.0
 		var direction: Vector3 = away.normalized() if away.length() > 0.05 else _caster_facing()

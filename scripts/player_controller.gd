@@ -1,8 +1,8 @@
 class_name PlayerController
 extends CharacterBody3D
 ## Lâm An: movement (run, sprint, dodge, jump, khinh công leap and glide) and
-## sword combat (3-hit combo, charged heavy, parry/block, the three forms of the equipped
-## sword's style on E, Q and X; X spends the full charge meter; F finishes a broken foe; a
+## sword combat (3-hit combo, charged heavy, parry/block, the Kiếm Quyết forms bound to E, Q
+## and X in GameState.loadout; X spends the full charge meter; F finishes a broken foe; a
 ## perfect dodge or parry opens Tâm Nhãn, slowing every enemy) and consumables (R: the
 ## strongest healing item, C: the Inventory's quick slot).
 
@@ -45,6 +45,10 @@ var stamina: float = 100.0
 var stamina_delay: float = 0.0
 var facing: Vector3 = Vector3.FORWARD
 var model_yaw: float = 0.0
+## Where the body stood when the latest physics tick began. The model is drawn between there and
+## the body by the frame's interpolation fraction, so it glides even when the screen does not run
+## at the physics rate (120 Hz displays, a browser dipping to 45 fps).
+var tick_from: Vector3 = Vector3.ZERO
 var action: Dictionary = {}
 var combo_index: int = 0
 var buffered: String = ""
@@ -141,6 +145,7 @@ func current_action() -> String:
 
 func teleport(point: Vector3) -> void:
 	global_position = point
+	tick_from = point
 	velocity = Vector3.ZERO
 	last_safe = point
 	if camera_rig:
@@ -212,7 +217,16 @@ func move_direction() -> Vector3:
 
 # ------------------------------------------------------------------ main loop
 
+func drawn_position() -> Vector3:
+	## The body's position as drawn this frame (the camera follows this, not the physics step).
+	return tick_from.lerp(global_position, Engine.get_physics_interpolation_fraction())
+
+func _process(_delta: float) -> void:
+	if visual:
+		visual.global_position = drawn_position()
+
 func _physics_process(delta: float) -> void:
+	tick_from = global_position
 	if world == null or not world.is_position_ready(global_position):
 		if state != "dead":
 			state = "loading" if state in ["loading", "move"] else state
@@ -427,8 +441,9 @@ func _physics_dodge(delta: float) -> void:
 
 # ------------------------------------------------------------------ actions
 
-func style_id() -> String:
-	return StyleBook.style_of(game.sword)
+func slot_style(slot: String) -> String:
+	## The Kiếm Quyết bound to a skill key (GameState.loadout), whatever sword is in hand.
+	return game.slot_style(slot)
 
 func cooldown_ratio(skill: String) -> float:
 	return float(cooldowns.get(skill, 0.0)) / maxf(float(cooldown_max.get(skill, 0.0)), 0.01)
@@ -441,12 +456,12 @@ func set_meter(value: float) -> void:
 	emit_signal("meter_changed", meter, METER_MAX)
 
 func _try_skill(slot: String) -> void:
-	var form: Dictionary = StyleBook.form(style_id(), slot)
+	var form: Dictionary = StyleBook.form(slot_style(slot), slot)
 	if form.is_empty():
 		return
 	var skill: String = String(form["skill"])
 	if game.skill_level(skill) <= 0:
-		emit_signal("notice", "Chưa lĩnh hội chiêu này")
+		emit_signal("notice", "Chưa lĩnh hội %s — %s: Kiếm Quyết" % [String(form.get("name", "")), UserSettings.event_label("open_styles")])
 		return
 	if float(cooldowns.get(skill, 0.0)) > 0.0:
 		return
@@ -861,7 +876,7 @@ func _resolve_hits(_name: String, data: Dictionary, t: float, hit_start: float, 
 		elif kind == "finisher":
 			_finisher_blow(data)
 	match kind:
-		"projectile", "chain", "strikes", "nova", "field", "finisher":
+		"projectile", "chain", "strikes", "fissure", "nova", "field", "finisher":
 			return  # these deal damage through the nodes SkillRunner spawned (or once, above), never twice up close
 		"tick":
 			action["tick"] = float(action["tick"]) - get_physics_process_delta_time()
@@ -917,6 +932,9 @@ func strike(entity: Node, data: Dictionary, scale: float, direction: Vector3 = V
 	damage.ranged = ranged
 	if damage.element == "":
 		_apply_sword_element(damage)
+	elif slot != "" and damage.element == String(ContentDB.weapon(game.sword).get("element", "")):
+		# Kiếm–Quyết hợp nhất: a form of the same element as the sword in hand cuts deeper.
+		damage.amount *= 1.0 + StyleBook.ATTUNE_BONUS
 	if swapped and damage.element != "":
 		var mark: String = String(ContentDB.element(damage.element).get("status", ""))
 		if mark != "":

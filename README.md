@@ -6,7 +6,7 @@ Lâm An, kiếm khách trẻ mang thanh kiếm cũ, cập bến thung lũng Vân
 
 ![Làng Vân Khê](docs/screenshots/village.jpg)
 
-**Trạng thái:** đoạn chơi mẫu (vertical slice) Chương I — Hồi 1 và 2, khoảng 20–30 phút: 4 nhiệm vụ chính, 2 nhiệm vụ phụ, 2 sự kiện, 2 loại địch thường, miniboss Trúc Tướng, hệ chiến đấu đầy đủ (trạng thái, buff/debuff, Ngọc bội, phản ứng nguyên tố, kết liễu, Tâm Nhãn), lưu game, nhạc/âm thanh, giao diện tiếng Việt. Hồi 3 chưa làm; đang mở rộng thành Chương I hoàn chỉnh theo 6 giai đoạn (xong giai đoạn 1 — lõi combat và giai đoạn 2 — thời tiết, ngày–đêm 24 phút, kiếm phụ). Chi tiết: [tiến độ](docs/progress.md), [thiết kế](docs/game-design.md).
+**Trạng thái:** đoạn chơi mẫu (vertical slice) Chương I — Hồi 1 và 2: 4 nhiệm vụ chính, 6 nhiệm vụ phụ, 2 sự kiện, 7 loại địch thường, 3 miniboss (Trúc Tướng, Sói đầu đàn, Khôi lỗi đá), 6 hệ Kiếm Quyết (Phong, Thủy, Lôi, Viêm, Băng, Thổ) mở dần qua nhiệm vụ và gắn tự do vào E/Q/X, hệ chiến đấu đầy đủ (trạng thái, buff/debuff, Ngọc bội, 9 phản ứng nguyên tố, kết liễu, Tâm Nhãn), lưu game, nhạc/âm thanh, giao diện tiếng Việt kiểu Roblox. Hồi 3 chưa làm; đang mở rộng thành Chương I hoàn chỉnh theo 6 giai đoạn (xong giai đoạn 1 — lõi combat, giai đoạn 2 — thời tiết, ngày–đêm 24 phút, kiếm phụ, và giai đoạn 3 — quái mới, Kiếm Quyết, giao diện, bản Web mượt hơn). Chi tiết: [tiến độ](docs/progress.md), [thiết kế](docs/game-design.md).
 
 ## Chơi trên Windows
 
@@ -35,7 +35,9 @@ Nếu PowerShell chặn script, dùng `powershell -ExecutionPolicy Bypass -File 
 | Chuột phải | Đỡ; bấm đúng lúc đòn tới: phản đòn |
 | Shift | Né (bấm), chạy nhanh (giữ) |
 | Space | Nhảy; trên không: khinh công; giữ khi rơi: lướt gió |
-| E / Q | Phong Trảm / Toàn Phong (sau khi lĩnh hội) |
+| E / Q / X | Hai chiêu và tuyệt kỹ của Kiếm Quyết đang gắn ở ô đó (X cần đầy nộ khí) |
+| K | Bảng Kiếm Quyết: xem 6 hệ, cách mở khóa, gắn hệ vào ô E/Q/X |
+| Tab (giữ) | Vòng chọn hệ: rê chuột hoặc bấm 1–6 rồi thả để đổi hệ cả bộ (thời gian chậm lại khi mở) |
 | F | Nói chuyện, mở rương, thắp miếu…; cạnh địch đã phá thế: kết liễu |
 | R | Dùng thuốc hồi máu |
 | C | Dùng vật phẩm ở ô nhanh (chọn trong Túi đồ) |
@@ -60,8 +62,9 @@ Bản xuất gồm toàn bộ dữ liệu, model, nhạc và font; không gồm 
 ## Phát triển và kiểm tra
 
 ```powershell
-./tools/run.ps1 -Mode test      # import + smoke test + gameplay test (chạy trọn slice)
+./tools/run.ps1 -Mode test      # import + 6 bộ test (smoke, gameplay chạy trọn slice, combat, progression, world, monster)
 ./tools/run.ps1 -Mode preview   # chụp ảnh các cảnh và đo thời gian khung hình (cần GPU, không headless)
+./tools/run.ps1 -Mode navbake   # dựng lại navmesh vùng giao chiến sau khi sửa địa hình/đạo cụ/cây/navzone
 ```
 
 Trên Linux/macOS dùng `tools/run.sh` (đặt biến `GODOT` trỏ tới Godot 4.7.2). CI GitHub Actions chạy chế độ `test` trên Windows.
@@ -73,6 +76,7 @@ Trên Linux/macOS dùng `tools/run.sh` (đặt biến `GODOT` trỏ tới Godot 
 | `assets/models/` | GLB dùng trong game · `art/` file `.blend` nguồn |
 | `assets/audio/` | Nhạc, hiệu ứng, âm nền (OGG) |
 | `tools/blender/`, `tools/audio/` | Script tái tạo model/animation và âm thanh |
-| `tests/` | Smoke test, gameplay test, chụp ảnh render |
+| `tests/` | Smoke, gameplay, combat, progression, world, monster test; chụp ảnh render |
+| `assets/nav/` | Navmesh dựng sẵn cho các vùng giao chiến (bản Web không phải bake lúc chơi); dựng lại bằng `tools/run.sh navbake` |
 
 Tài liệu: [kiến trúc](docs/architecture.md) · [pipeline Blender](docs/blender-pipeline.md) · [danh mục asset](docs/assets.md) · [kết quả kiểm tra](docs/validation.md) · [ghi công](docs/credits.md) · [lựa chọn thư viện](docs/dependency-decisions.md).

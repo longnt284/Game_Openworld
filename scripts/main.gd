@@ -3,6 +3,10 @@ extends Node3D
 ## and saving together. Gameplay rules live in their own classes.
 
 const ECHO_COUNT: int = 3
+## The world runs at this speed while the Kiếm Quyết wheel is held open.
+const WHEEL_TIME_SCALE: float = 0.3
+## A miniboss keeps its bar on the HUD while it fights within this many metres.
+const MINIBOSS_BAR_RANGE: float = 34.0
 
 @export var save_path: String = SaveStore.SAVE_PATH
 @export var profile_path: String = PlayerProfile.PATH
@@ -46,17 +50,32 @@ var chime_sequence: Array[int] = []
 var title_angle: float = 0.0
 var hinted: Dictionary = {}
 var engaged: int = 0
+## The HUD boss bar is showing a valley miniboss (so it is hidden once the fight is over).
+var shown_miniboss: bool = false
 var death_serial: int = 0
 ## Browser build: no quit, fullscreen only from a click, Esc releases the pointer first.
 var web: bool = OS.has_feature("web")
 var had_pointer: bool = false
 var announced_ready: bool = false
+## Frame timing printout, only when asked for (PerfProbe.wanted).
+var probe: PerfProbe
+## Browser build: lowers the 3D resolution while play runs slow.
+var resolution: AdaptiveResolution
 ## World Tier elites and reward-chest drops (not the gacha: that RNG lives in the profile).
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().set_auto_accept_quit(false)
+	if PerfProbe.wanted():
+		probe = PerfProbe.new()
+		probe.name = "PerfProbe"
+		add_child(probe)
+	if web:
+		resolution = AdaptiveResolution.new()
+		resolution.name = "AdaptiveResolution"
+		resolution.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(resolution)
 	user_settings.load_file()
 	user_settings.apply_input()
 	profile = PlayerProfile.load_file(profile_path)
@@ -78,6 +97,9 @@ func _ready() -> void:
 	hud.dialogue_advanced.connect(_advance_dialogue)
 	hud.choice_selected.connect(_choose_dialogue)
 	hud.vision_closed.connect(_on_vision_closed)
+	hud.minimap.main = self
+	hud.wheel.chosen.connect(_on_wheel_chosen)
+	hud.wheel.visibility_changed.connect(_on_wheel_toggled)
 	menus = Menus.new()
 	add_child(menus)
 	menus.setup(self)
@@ -252,6 +274,12 @@ func show_title() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if not announced_ready:
 		announced_ready = true
+		# Every shader compiles here, behind the title, rather than at the first fight (Web stalls),
+		# and the shipped navmeshes are checked against the world data once.
+		ShaderWarmup.run(self, title_camera, assets)
+		NavBake.fingerprint()
+		if PerfProbe.wanted("vkbench"):
+			PerfProbe.bench(world, self)
 		print("VK_READY")
 
 func _begin_play() -> void:
@@ -324,12 +352,15 @@ func set_paused(value: bool) -> void:
 		return
 	get_tree().paused = value
 	had_pointer = false
+	if value:
+		hud.close_wheel(false)
 	menus.set_paused(value)
 	audio.ui("ui_open" if value else "ui_close")
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if value or _ui_blocking() else Input.MOUSE_MODE_CAPTURED
 
 func open_panel(name: String) -> void:
+	hud.close_wheel(false)
 	if not playing:
 		return
 	if not get_tree().paused:
@@ -343,6 +374,8 @@ func _ui_blocking() -> bool:
 # ------------------------------------------------------------------ frame
 
 func _process(delta: float) -> void:
+	if probe:
+		probe.label = mode
 	if not initialized:
 		if assets.poll():
 			_start_world()
@@ -352,6 +385,8 @@ func _process(delta: float) -> void:
 			hud.set_tracker("Vân Khê", "", "Đang tải thung lũng… %d%%" % roundi(assets.progress() * 100.0))
 		return
 	MapView.step(6)
+	if resolution:
+		resolution.active = playing and not get_tree().paused and not menus.panel_open() and player.state not in ["loading", "disabled", "dead"]
 	if in_title:
 		title_angle += delta * 0.05
 		var center: Vector3 = Vector3(-6, world.height_at(-6, 40) + 6.0, 40)
@@ -511,12 +546,38 @@ func _update_combat_state() -> void:
 		spawner.arena.start_fight()
 
 func _fighting_boss() -> Enemy:
-	## The boss whose bar is on screen: the arena guardian or the Trial's wave leader.
+	## The boss whose bar is on screen: the arena guardian, the Trial's wave leader, or a miniboss
+	## of the valley (the golem, the wolf pack leader) once it is awake and in the fight.
 	if trial.active and is_instance_valid(trial.boss):
 		return trial.boss
 	if spawner.arena.fighting:
 		return spawner.node_for("boss_truc_tuong") as Enemy
-	return null
+	return _engaged_miniboss()
+
+func _engaged_miniboss() -> Enemy:
+	var best: Enemy = null
+	var nearest: float = MINIBOSS_BAR_RANGE
+	for node: Node in get_tree().get_nodes_in_group("enemy"):
+		var enemy: Enemy = node as Enemy
+		if enemy == null or not enemy.data.get("miniboss", false) or enemy.is_dead() or enemy.state in ["idle", "return", "dormant"]:
+			continue
+		var distance: float = enemy.global_position.distance_to(player.global_position)
+		if distance < nearest:
+			nearest = distance
+			best = enemy
+	return best
+
+func _update_miniboss_bar() -> void:
+	## The valley's minibosses use the boss bar while they fight Lâm An (10 Hz with the HUD).
+	if spawner.arena.fighting or (trial.active and is_instance_valid(trial.boss)):
+		return
+	var boss: Enemy = _engaged_miniboss()
+	if boss:
+		hud.show_boss(boss.display_name(), String(boss.data.get("title", "")), boss.health / boss.max_health, boss.health, boss.max_health)
+		shown_miniboss = true
+	elif shown_miniboss:
+		shown_miniboss = false
+		hud.hide_boss()
 
 func boss_alive() -> bool:
 	## The arena guardian, once per World Tier after the story fight.
@@ -553,16 +614,21 @@ func _refresh_hud() -> void:
 	hud.set_statuses(player.statuses.list_for_hud())
 	# The icon shows the moon once the sun is down (halfway through dusk), as the sky does.
 	hud.set_clock(weather.clock_text(), weather.weather_name(), weather.icon(), weather.night_level() >= 0.5)
+	_update_miniboss_bar()
 	var boss: Enemy = _fighting_boss()
 	if boss:
 		hud.set_boss_poise(boss.poise_ratio(), boss.is_broken(), boss.is_finishable())
-	var style: String = player.style_id()
 	for slot: String in StyleBook.SLOTS:
+		var style: String = player.slot_style(slot)
 		var form: Dictionary = StyleBook.form(style, slot)
 		var skill: String = String(form.get("skill", ""))
 		var level: int = state.skill_level(skill)
 		var fill: float = player.meter / PlayerController.METER_MAX if slot == "x" else 1.0 - player.cooldown_ratio(skill)
-		hud.set_skill(slot, String(form.get("name", "")), level > 0, fill, level, StyleBook.color(style))
+		var seconds: float = float(player.cooldowns.get(skill, 0.0)) if slot != "x" else 0.0
+		hud.set_skill(slot, String(form.get("name", "")), level > 0, fill, level, StyleBook.color(style), style, seconds)
+	var learned: int = state.learned_styles().size()
+	hud.set_styles_hint("%s  Kiếm Quyết (%d/%d)%s" % [UserSettings.event_label("open_styles"), learned, StyleBook.styles().size(),
+		("  •  giữ %s: đổi hệ" % UserSettings.event_label("style_wheel")) if learned > 1 else ""] if learned > 0 else "")
 	var region_name: String = String(world.layout.region_at(player.global_position.z).get("name", ""))
 	var tracked: String = state.tracked_quest
 	if trial.active:
@@ -617,7 +683,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("interact") and focus and player.state == "move":
 		get_viewport().set_input_as_handled()
 		# Conversations, visions and shrines lock the controls, so they wait until the fight is over.
-		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate", "trial_gate"]):
+		if engaged > 0 and (focus is Npc or (focus as Interactable).kind in ["shrine", "echo", "diary", "memory_core", "seal_gate", "trial_gate", "relic"]):
 			hud.show_message("Không thể làm việc này khi đang giao chiến")
 			return
 		if focus is Npc:
@@ -630,6 +696,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		open_panel("journal")
 	elif event.is_action_pressed("open_inventory"):
 		open_panel("inventory")
+	elif event.is_action_pressed("open_styles"):
+		open_panel("styles")
+	elif event.is_action_pressed("style_wheel") and not event.is_echo():
+		get_viewport().set_input_as_handled()
+		_open_style_wheel()
 	elif event.is_action_pressed("save_game"):
 		save_game()
 	elif event.is_action_pressed("load_game"):
@@ -812,7 +883,60 @@ func give_rewards(rewards: Dictionary, title: String) -> void:
 	audio.play("quest_complete")
 	_add_xp(int(rewards.get("xp", 0)))
 	give_items(rewards.get("items", []))
+	for style: Variant in rewards.get("styles", []):
+		learn_style(String(style))
 	save_game(true)
+
+func learn_style(style: String, announce: bool = true) -> void:
+	## A quest reward teaches a Kiếm Quyết (its E and Q forms). The first new style explains
+	## the Kiếm Quyết panel and the style wheel.
+	if not state.learn_style(style) or not announce:
+		return
+	var data: Dictionary = ContentDB.style(style)
+	audio.play("level_up")
+	hud.show_banner("Lĩnh hội " + String(data.get("name", style)), "Kiếm Quyết hệ %s  •  %s" % [String(ContentDB.element(String(data.get("element", ""))).get("name", "")), String(data.get("role", ""))], 4.5)
+	hud.show_hint("Đã lĩnh hội %s.\n%s: mở Kiếm Quyết để gắn chiêu vào E / Q / X  •  giữ %s: vòng Kiếm Quyết đổi cả bộ giữa trận." % [
+		String(data.get("name", style)), UserSettings.event_label("open_styles"), UserSettings.event_label("style_wheel")], 11.0)
+
+func _repair_styles() -> void:
+	## Saves made before Kiếm Quyết were quest rewards: every finished quest that teaches a
+	## style teaches it now, quietly.
+	for quest_id: String in state.quests:
+		if quests.is_done(quest_id):
+			for style: Variant in (quests.definition(quest_id).get("rewards", {}) as Dictionary).get("styles", []):
+				state.learn_style(String(style))
+
+func _open_style_wheel() -> void:
+	## Held style-wheel key: the six Kiếm Quyết around the screen; the world slows meanwhile.
+	if not playing or player.state in ["dead", "disabled", "loading"] or not player.input_enabled:
+		return
+	if state.learned_styles().is_empty():
+		hud.show_message("Chưa lĩnh hội Kiếm Quyết nào")
+		return
+	hud.open_wheel(state.learned_styles(), player.slot_style("e"))
+
+func _on_wheel_toggled() -> void:
+	## Slow motion while the wheel is up (skipped headless); any pending slow-motion restore from
+	## an ultimate or finisher is cancelled so it cannot speed the world up under the wheel.
+	if DisplayServer.get_name() == "headless" or player == null:
+		return
+	player.slow_serial += 1
+	Engine.time_scale = WHEEL_TIME_SCALE if hud.wheel_open() else 1.0
+
+func _on_wheel_chosen(style: String) -> void:
+	if equip_style(style):
+		audio.ui("ui_confirm")
+		var data: Dictionary = ContentDB.style(style)
+		hud.show_message("Kiếm Quyết: %s" % String(data.get("name", style)), 2.0, StyleBook.color(style))
+
+func equip_style(style: String, slot: String = "") -> bool:
+	## Kiếm Quyết panel and wheel: one key ("e", "q", "x") or the whole set when slot is "".
+	var ok: bool = state.equip_style(style) if slot == "" else state.set_slot_style(slot, style)
+	if ok and playing:
+		var color: Color = StyleBook.color(style)
+		Vfx.ring(player.get_parent(), player.global_position + Vector3.UP * 0.15, 1.6, color, 0.35, 0.14)
+		Vfx.burst(player.get_parent(), player.global_position + Vector3.UP * 1.0, color, 12, 3.0, 0.08, 0.4)
+	return ok
 
 func _add_xp(amount: int) -> void:
 	if amount <= 0:
@@ -941,6 +1065,20 @@ func on_interact(item: Interactable) -> void:
 					item.refresh())
 		"chime":
 			_ring_chime(item)
+		"relic":
+			# Steles and altars: a vision, then what the relic takes, gives or starts.
+			audio.play("seal_hum", item.global_position)
+			show_vision(String(data.get("title", "")), data.get("lines", []), func() -> void:
+				state.set_flag(item.flag_key())
+				for entry: Array in data.get("take", []):
+					state.remove_item(String(entry[0]), int(entry[1]))
+				if data.has("give"):
+					give_items(data["give"])
+				if data.has("start_quest"):
+					quests.start(String(data["start_quest"]))
+				quests.notify("interact:" + item.entity_id)
+				if is_instance_valid(item):
+					item.refresh())
 		"memory_core":
 			audio.play("temple_bell")
 			show_vision(String(data.get("title", "")), data.get("lines", []), func() -> void:
@@ -1051,7 +1189,7 @@ func _on_fight_started() -> void:
 	audio.play("roar", boss.global_position if boss else null)
 	hud.show_banner("Trúc Tướng", "Kẻ gác rừng trúc")
 	if boss:
-		hud.show_boss(boss.display_name(), String(boss.data.get("title", "")), boss.health / boss.max_health)
+		hud.show_boss(boss.display_name(), String(boss.data.get("title", "")), boss.health / boss.max_health, boss.health, boss.max_health)
 
 func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 	if state.world_tier > 0 and data.has("enemy"):
@@ -1063,7 +1201,7 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 	if data.get("boss", false):
 		enemy.health_changed.connect(func(target: Enemy, current: float, maximum: float) -> void:
 			if spawner.arena.fighting:
-				hud.show_boss(target.display_name(), String(target.data.get("title", "")), current / maximum))
+				hud.show_boss(target.display_name(), String(target.data.get("title", "")), current / maximum, current, maximum))
 		if enemy is Guardian:
 			(enemy as Guardian).phase_changed.connect(func(_phase: int) -> void:
 				audio.play("roar", enemy.global_position, 3.0)
@@ -1075,6 +1213,17 @@ func on_enemy_spawned(enemy: Enemy, data: Dictionary) -> void:
 	enemy.status_damage.connect(_on_status_damage)
 	enemy.reaction_hit.connect(_on_reaction_hit)
 	enemy.poise_broken.connect(_on_poise_broken)
+	enemy.attack_started.connect(_on_enemy_engaged, CONNECT_ONE_SHOT)
+	if enemy is ShieldGuard:
+		(enemy as ShieldGuard).guarded.connect(_on_guarded)
+	if enemy is Wolf:
+		(enemy as Wolf).howled.connect(func(wolf: Wolf) -> void:
+			if wolf.data.get("miniboss", false):
+				hud.show_message("%s hú gọi bầy — sói quanh nó nổi cuồng nộ!" % wolf.display_name(), 3.0, Color("bfefff")))
+	if enemy is Golem:
+		(enemy as Golem).phase_changed.connect(func(_phase: int) -> void:
+			audio.play("roar", enemy.global_position, 3.0)
+			hud.show_banner("Khôi lỗi đá nổi giận!", "Văn phù rực sáng — đòn nện kéo theo gai đá"))
 
 func on_enemy_defeated(enemy: Enemy, data: Dictionary) -> void:
 	var id: String = String(data["id"])
@@ -1237,6 +1386,20 @@ func _on_player_statuses() -> void:
 			hud.show_hint(hint.format({"dodge": UserSettings.event_label("sprint")}), 8.0)
 			return
 
+func _on_enemy_engaged(enemy: Enemy, _attack: String) -> void:
+	## The first time each new kind of foe attacks, a hint explains how to fight it (data "hint").
+	var key: String = "enemy:" + enemy.kind
+	if enemy.data.has("hint") and not hinted.has(key) and not state.has_flag("hint_" + key):
+		hinted[key] = true
+		state.set_flag("hint_" + key)
+		hud.show_hint(String(enemy.data["hint"]), 10.0)
+
+func _on_guarded(guard: ShieldGuard, broke: bool) -> void:
+	## A blow on the tower shield: a clang, or the shield batted aside by a heavy blow.
+	audio.play("parry_metal" if broke else "block", guard.global_position + Vector3.UP, -4.0 if broke else -8.0)
+	if broke:
+		Vfx.label(guard.get_parent(), guard.global_position + Vector3.UP * 2.4, "Phá khiên!", UiTheme.GOLD)
+
 func _on_poise_broken(enemy: Enemy) -> void:
 	## A clang as the guard gives way; the first break explains the finisher.
 	audio.play("parry_metal", enemy.global_position + Vector3.UP, -3.0)
@@ -1305,6 +1468,8 @@ func apply_settings() -> void:
 	var viewport: Viewport = get_viewport()
 	viewport.msaa_3d = preset["msaa"]
 	viewport.scaling_3d_scale = float(preset["scale"])
+	if resolution:
+		resolution.reset(float(preset["scale"]))
 	if weather:
 		weather.set_dynamic(user_settings.dynamic_weather)
 	if world:
@@ -1382,6 +1547,7 @@ func load_game() -> bool:
 	weather.from_save(data)
 	storm.cancel()
 	_check_echo_skill(false)
+	_repair_styles()
 	spawner.clear_all()
 	chime_sequence.clear()
 	if spawner.arena.fighting:
@@ -1442,7 +1608,6 @@ func equip_armory(uid: int) -> void:
 	if item.is_empty() or not playing or player.state != "move":
 		return
 	var base: String = String(item["base"])
-	state.learn_style(base)
 	state.equip_sword(base, uid)
 	_equip_visuals()
 	audio.play("sword_draw")
@@ -1453,8 +1618,6 @@ func set_alt_sword(id: String, uid: int = -1) -> bool:
 		return false
 	if not state.set_alt(id, uid):
 		return false
-	if uid >= 0:
-		state.learn_style(id)
 	audio.ui("ui_confirm")
 	return true
 

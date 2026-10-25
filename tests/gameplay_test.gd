@@ -56,6 +56,8 @@ func kill(id: String) -> void:
 	if enemy == null:
 		check(false, "Enemy %s is spawned" % id)
 		return
+	# A wraith or mage caught mid-blink is untouchable for a moment; the test strikes regardless.
+	enemy.invulnerable = false
 	var damage: Combat.Damage = Combat.make_damage(game.player, {"poise": 999, "knockback": 0.0}, 99999.0, enemy.global_position)
 	enemy.take_damage(damage)
 	await frames(3)
@@ -161,6 +163,10 @@ func _run() -> void:
 	await go(18.5, 14.5)
 	await talk("npc_chu_bay")
 	check(game.quests.is_done("sq02_lo_ren") and state.sword == "sword_bamboo" and player.visual.weapon_key == "sword_bamboo", "Smith forges Thanh Trúc Kiếm")
+	check(state.style_learned("viem") and state.skill_level("viem_e") == 1 and state.skill_level("viem_q") == 1 and state.slot_style("e") == "phong",
+		"Rekindling the forge teaches Viêm Dương Quyết without rebinding the keys")
+	check(game.equip_style("viem", "q") and state.slot_style("q") == "viem" and state.slot_style("e") == "phong", "A learned Kiếm Quyết can be bound to one key")
+	state.loadout = {}
 
 	# --- Khinh công physics
 	await go(0, -240)
@@ -199,6 +205,9 @@ func _run() -> void:
 	game.spawner.update_now()
 	await use("memory_core")
 	check(game.quests.is_done("mq04_vuot_khe") and state.has_flag("slice_complete"), "Memory core completes the slice")
+
+	# --- Kiếm Quyết side quests: each of the other four styles comes from its own quest
+	await _kiem_quyet_quests(state)
 
 	# --- Persistence across streaming and save/load
 	check(game.save_game(), "Save after the slice")
@@ -266,11 +275,29 @@ func _run() -> void:
 	boar.queue_free()
 
 	# --- Navigation and migration
+	var shipped_ok: bool = true
+	for zone: Dictionary in NavBake.zones():
+		shipped_ok = shipped_ok and NavBake.prebaked(String(zone["id"]), 284) != null
+	var loaded: bool = not game.spawner.navzones.is_empty()
+	for id: String in game.spawner.navzones:
+		var region: NavigationRegion3D = game.spawner.navzones[id]
+		loaded = loaded and region.navigation_mesh == NavBake.prebaked(id, 284)
+	check(shipped_ok and loaded, "Every encounter ships its navmesh for this world data (else run tools/run.sh navbake) and uses it")
+	# Another seed (or stale data) bakes live from the streamed colliders instead.
+	NavBake._manifest = {"seed": -1}
+	game.spawner.reset_navzones()
+	await frames(2)
+	game.spawner.update_now()
 	var baked: bool = false
-	for region: NavigationRegion3D in game.spawner.navzones.values():
-		if region.navigation_mesh and region.navigation_mesh.get_polygon_count() > 0:
-			baked = true
-	check(baked, "Encounter navmesh bakes from streamed colliders")
+	for step: int in range(120):
+		await frames(1)
+		for region: NavigationRegion3D in game.spawner.navzones.values():
+			if region.navigation_mesh and region.navigation_mesh.get_polygon_count() > 0 and region.navigation_mesh.resource_path == "":
+				baked = true
+		if baked:
+			break
+	NavBake._manifest = {}
+	check(baked, "Encounter navmesh bakes from streamed colliders when none ships for the world")
 	var legacy: FileAccess = FileAccess.open(TEST_SAVE, FileAccess.WRITE)
 	legacy.store_string(JSON.stringify({"version": 1, "seed": 284, "position": [3.0, 1.0, -5.0], "checkpoint": [3.0, 1.0, -5.0], "beacon_active": true}))
 	legacy.close()
@@ -289,6 +316,73 @@ func _run() -> void:
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)
+
+func _kiem_quyet_quests(state: GameState) -> void:
+	var loadout_before: Dictionary = state.loadout.duplicate()
+	# The new camps fight back while the test walks through them.
+	game.player.invulnerable = 9999.0
+	# Thủy — the ferryman's ghosts on the reed bank.
+	await go(-15.5, 67.5)
+	await talk("villager_fisher")
+	check(game.quests.is_active("sq03_hon_song"), "The ferryman asks about the ghosts on the reed bank")
+	await go(46, 60)
+	for id: String in ["en_reed_1", "en_reed_2", "en_reed_3"]:
+		await kill(id)
+	check(stage("sq03_hon_song") == 1 and state.has_flag("camp_clear:reed_wraiths"), "Laying the reed-bank wraiths to rest clears their camp")
+	game.spawner.update_now()
+	await frames(3)
+	await use("echo_reed")
+	check(stage("sq03_hon_song") == 2, "The memory under the reeds is heard")
+	await go(-15.5, 67.5)
+	await talk("villager_fisher")
+	check(game.quests.is_done("sq03_hon_song") and state.style_learned("thuy") and state.skill_level("thuy_e") == 1, "Telling the ferryman teaches Thủy Nguyệt Quyết")
+	# Lôi — the storm mage's camp on the west of Đồi Gió.
+	await go(4, 23)
+	await talk("npc_tieu_mac")
+	check(game.quests.is_active("sq04_loi_su"), "Tiểu Mạc tells of the lightning on the west hill")
+	await go(-46, -68)
+	check(stage("sq04_loi_su") == 1, "Reaching the storm camp advances Lôi sư")
+	for id: String in ["en_storm_mage", "en_storm_archer_1", "en_storm_archer_2", "en_storm_guard", "en_storm_bandit"]:
+		await kill(id)
+	check(stage("sq04_loi_su") == 2, "Defeating the storm mage and his band clears the camp")
+	game.spawner.update_now()
+	await frames(3)
+	await use("altar_storm")
+	check(stage("sq04_loi_su") == 3 and state.count("loi_phu") == 1, "The storm altar yields the thunder talisman")
+	await go(4, 23)
+	await talk("npc_tieu_mac")
+	check(game.quests.is_done("sq04_loi_su") and state.style_learned("loi") and state.count("loi_phu") == 0, "Bringing the talisman back teaches Lôi Ảnh Quyết")
+	# Băng — the frost wolves and their leader.
+	await go(20, -181)
+	await talk("npc_a_luc")
+	check(game.quests.is_active("sq05_soi_suong"), "The hunter asks after the frost wolves")
+	await go(-60, -230)
+	check(stage("sq05_soi_suong") == 1, "Reaching Khe Sương advances the wolf hunt")
+	await kill("boss_soi_chua")
+	check(stage("sq05_soi_suong") == 2 and state.count("tinh_suong") == 1, "The pack leader falls and leaves its frost crystal")
+	await go(20, -181)
+	await talk("npc_a_luc")
+	check(game.quests.is_done("sq05_soi_suong") and state.style_learned("bang"), "The hunter teaches Hàn Sương Quyết")
+	# Thổ — the stone golem of the eastern ruins.
+	await go(36, -296)
+	await use("stele_ruins")
+	check(game.quests.is_active("sq06_khoi_loi"), "The old stele starts Khôi lỗi giữ đền")
+	game.spawner.update_now()
+	await frames(3)
+	var golem: Golem = game.spawner.node_for("boss_khoi_loi") as Golem
+	check(golem != null and golem.is_dormant(), "The stone golem sleeps among the ruins until disturbed")
+	if golem:
+		golem.wake()
+		await frames(170)
+		check(golem.state == "chase" or golem.state == "attack" or golem.state == "recover", "The golem rises and joins the fight (%s)" % golem.state)
+	await kill("boss_khoi_loi")
+	check(stage("sq06_khoi_loi") == 1 and state.count("hach_nham") == 1, "The golem leaves its rock core")
+	game.spawner.update_now()
+	await frames(3)
+	await use("stele_ruins_core")
+	check(game.quests.is_done("sq06_khoi_loi") and state.style_learned("tho") and state.count("hach_nham") == 0, "Setting the core in the stele teaches Nham Sơn Quyết")
+	check(state.learned_styles().size() == 6 and state.loadout == loadout_before, "All six Kiếm Quyết learned, each from its own quest, without rebinding the keys")
+	game.player.invulnerable = 0.0
 
 func _check_sequence_breaks() -> void:
 	## Exploring ahead must never lock a quest: world facts done early count when the quest asks.

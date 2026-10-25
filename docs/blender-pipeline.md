@@ -8,7 +8,8 @@ Chạy `blender --background --factory-startup --python tools/blender/build_robl
 |---|---|
 | `tools/blender/build_characters.py` | 8 nhân vật người: Lâm An, Tiểu Mạc, bà Lục, chú Bảy, bà Hạnh, Tịch Phong, Tàn binh, Trúc Tướng — mesh, xương 20 khớp, animation |
 | `tools/blender/build_creatures.py` | Heo gió (4 chân, 12 khớp) |
-| `tools/blender/build_weapons.py` | Kiếm Cũ, Thanh Trúc Kiếm, Phong Ngân Kiếm, đao tàn binh, kích Trúc Tướng |
+| `tools/blender/build_monsters.py`, `anim_monsters.py` | 7 quái GĐ3: Cung thủ, Hộ vệ khiên, Lôi sư, Hồn ảnh (người, rig 20 khớp, bảng màu nén), Khôi lỗi đá (khối đá, rig người), Sói sương và Sói đầu đàn (4 chân, 16 khớp) — mesh, rig, 10–12 animation mỗi loại theo `data/anim_timings.json` |
+| `tools/blender/build_weapons.py` | Kiếm Cũ, Thanh Trúc Kiếm, Phong Ngân Kiếm, đao tàn binh, kích Trúc Tướng, giáo hộ vệ (`spear`), gậy lôi sư (`staff`, chữ phù phát sáng) |
 | `tools/blender/build_props.py` | Cây, trúc, cỏ, đá, nhà, cổng, miếu, cầu, bến, thuyền, đèn, rương, trại, chuông gió, cổng phong ấn… (36 asset) |
 | `tools/blender/humanoid.py`, `anim_humanoid.py`, `vk_lib.py` | Thư viện chung: dựng mesh bằng bmesh, tóc/áo/mặt nạ, rig, tư thế, keyframe, bảng màu, export |
 | `tools/blender/contact_sheet.py` | Ghép ảnh xem trước (Python hệ thống + Pillow) |
@@ -21,6 +22,8 @@ blender --background --factory-startup --python tools/blender/build_characters.p
 blender --background --factory-startup --python tools/blender/build_props.py -- house_small dock
 blender --background --factory-startup --python tools/blender/build_weapons.py
 blender --background --factory-startup --python tools/blender/build_creatures.py
+blender --background --factory-startup --python tools/blender/build_monsters.py -- soi_chua --preview
+blender --background --factory-startup --python tools/blender/build_weapons.py -- spear staff
 python3 tools/blender/contact_sheet.py lam_an 4      # ghép ảnh .cache/blender_previews/lam_an_*.png
 python3 tools/asset_manifest.py                      # cập nhật docs/assets.md
 ./tools/run.ps1 -Mode test                           # import lại và kiểm tra

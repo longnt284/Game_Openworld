@@ -2,6 +2,8 @@
 // (software WebGL2), waits for the game to report VK_READY, starts a new game and checks
 // that no script errors were logged. Screenshots go to .cache/web_smoke/.
 //   node tools/web_smoke.cjs [--keep-open]
+// VK_QUERY=?vkperf prints the game's frame timing, ?vkbench its streaming costs (PerfProbe);
+// VK_WALK=<ms> walks longer.
 // Needs Playwright (global install is fine: NODE_PATH or /opt/node22/lib/node_modules).
 const fs = require('fs');
 const http = require('http');
@@ -47,6 +49,7 @@ async function main() {
   page.on('console', (message) => {
     const text = message.text();
     if (text.includes('VK_READY')) ready = true;
+    if (text.includes('VK_PERF') || text.includes('VK_BENCH')) console.log(text);
     if (/SCRIPT ERROR|Parse Error|Invalid call|Attempt to call/.test(text)) errors.push(text);
     if (process.env.VK_VERBOSE) console.log('[page]', text);
   });
@@ -64,7 +67,7 @@ async function main() {
     await page.waitForTimeout(25000);
     await page.screenshot({ path: path.join(OUT, 'play.png') });
     await page.keyboard.down('KeyW');
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(Number(process.env.VK_WALK || 4000));
     await page.keyboard.up('KeyW');
     await page.screenshot({ path: path.join(OUT, 'walk.png') });
   }

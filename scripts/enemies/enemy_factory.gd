@@ -7,6 +7,12 @@ extends RefCounted
 const CLASSES: Dictionary = {
 	"boar": preload("res://scripts/enemies/boar.gd"),
 	"guardian": preload("res://scripts/enemies/guardian.gd"),
+	"archer": preload("res://scripts/enemies/archer.gd"),
+	"shield_guard": preload("res://scripts/enemies/shield_guard.gd"),
+	"mage": preload("res://scripts/enemies/mage.gd"),
+	"wolf": preload("res://scripts/enemies/wolf.gd"),
+	"wraith": preload("res://scripts/enemies/wraith.gd"),
+	"golem": preload("res://scripts/enemies/golem.gd"),
 }
 
 static func script_for(data: Dictionary) -> GDScript:

@@ -1,27 +1,44 @@
 {
-	"phong": {"name": "Phong Ảnh Quyết", "element": "wind", "color": "9ff5e0", "forms": {
+	"phong": {"name": "Phong Ảnh Quyết", "element": "wind", "color": "9ff5e0", "icon": "wind", "role": "Cơ động, gom địch, phá thế nhanh",
+		"unlock": {"quest": "mq02_lang_quen", "story": true, "hint": "Cốt truyện: Làng quên tên (Phong Trảm) và Dấu ký ức trong rừng trúc (Toàn Phong)"},
+		"forms": {
 		"e": {"skill": "gust", "attack": "skill_gust", "cooldown": 6.0, "name": "Phong Trảm", "description": "Chém ra lưỡi gió xuyên địch."},
 		"q": {"skill": "cyclone", "attack": "skill_cyclone", "cooldown": 14.0, "name": "Toàn Phong", "description": "Xoáy kiếm trên không, hút và chém liên tục quanh mình."},
 		"x": {"skill": "phong_x", "attack": "ult_phong", "cooldown": 1.0, "meter": 100, "name": "Thiên Phong Lạc", "description": "Vút lên trời rồi giáng xuống thành vòi rồng, cuốn mọi kẻ địch quanh mình."}
 	}},
-	"thuy": {"name": "Thủy Nguyệt Quyết", "element": "water", "color": "5fb8ff", "forms": {
+	"thuy": {"name": "Thủy Nguyệt Quyết", "element": "water", "color": "5fb8ff", "icon": "water", "role": "Làm Ướt, kéo cụm, mở Điện Giật và Đông Kết",
+		"unlock": {"quest": "sq03_hon_song", "hint": "Nhiệm vụ phụ Hồn trên bãi lau — Ông lái đò ở Bến Vân Khê"},
+		"forms": {
 		"e": {"skill": "thuy_e", "attack": "thuy_e", "cooldown": 7.0, "name": "Lưu Thủy Trảm", "description": "Lướt tới như dòng nước, chém mọi kẻ trên đường đi. Làm ướt địch."},
 		"q": {"skill": "thuy_q", "attack": "thuy_q", "cooldown": 13.0, "name": "Xoáy Nước", "description": "Kiếm vẽ xoáy nước hút địch vào giữa và chém liên tục."},
 		"x": {"skill": "thuy_x", "attack": "ult_thuy", "cooldown": 1.0, "meter": 100, "name": "Đại Hải Triều", "description": "Một con sóng lớn cuộn ra phía trước, xô ngã và làm ướt sũng kẻ địch."}
 	}},
-	"loi": {"name": "Lôi Ảnh Quyết", "element": "thunder", "color": "ffe066", "forms": {
+	"loi": {"name": "Lôi Ảnh Quyết", "element": "thunder", "color": "ffe066", "icon": "thunder", "role": "Bùng nổ, lướt bất tử, sét nảy nhiều mục tiêu",
+		"unlock": {"quest": "sq04_loi_su", "hint": "Nhiệm vụ phụ Lôi sư trên Đồi Gió — Tiểu Mạc ở làng"},
+		"forms": {
 		"e": {"skill": "loi_e", "attack": "loi_e", "cooldown": 6.0, "name": "Lôi Thiểm", "description": "Lướt nhanh như chớp, bất khả xâm phạm khi lướt. Gây tê liệt."},
 		"q": {"skill": "loi_q", "attack": "loi_q", "cooldown": 12.0, "name": "Lôi Võng", "description": "Tia sét nảy qua tối đa 4 kẻ địch gần nhau."},
 		"x": {"skill": "loi_x", "attack": "ult_loi", "cooldown": 1.0, "meter": 100, "name": "Thiên Lôi Giáng", "description": "Gọi sét đánh xuống từng kẻ địch quanh mình."}
 	}},
-	"viem": {"name": "Viêm Dương Quyết", "element": "flame", "color": "ff7a3a", "forms": {
+	"viem": {"name": "Viêm Dương Quyết", "element": "flame", "color": "ff7a3a", "icon": "flame", "role": "Thiêu đốt theo thời gian, nổ diện rộng",
+		"unlock": {"quest": "sq02_lo_ren", "hint": "Nhiệm vụ phụ Lò rèn nguội lửa — chú Bảy ở làng"},
+		"forms": {
 		"e": {"skill": "viem_e", "attack": "viem_e", "cooldown": 6.0, "name": "Viêm Luân", "description": "Xoay kiếm thành vòng lửa quanh mình. Gây thiêu đốt."},
 		"q": {"skill": "viem_q", "attack": "viem_q", "cooldown": 14.0, "name": "Hỏa Long Toàn", "description": "Rồng lửa cuộn quanh thân, đốt cháy liên tục."},
 		"x": {"skill": "viem_x", "attack": "ult_viem", "cooldown": 1.0, "meter": 100, "name": "Nhật Viêm Trảm", "description": "Nhát chém mặt trời: nổ một vầng lửa lớn, thiêu đốt 3 tầng."}
 	}},
-	"bang": {"name": "Hàn Sương Quyết", "element": "frost", "color": "bfefff", "forms": {
+	"bang": {"name": "Hàn Sương Quyết", "element": "frost", "color": "bfefff", "icon": "frost", "role": "Đánh xa, làm chậm, đóng băng",
+		"unlock": {"quest": "sq05_soi_suong", "hint": "Nhiệm vụ phụ Bầy sói sương — thợ săn A Lực ở Miếu Gió Trúc Hải"},
+		"forms": {
 		"e": {"skill": "bang_e", "attack": "bang_e", "cooldown": 6.0, "name": "Băng Tiễn", "description": "Bắn ba mũi băng hình quạt. Làm lạnh cóng."},
 		"q": {"skill": "bang_q", "attack": "bang_q", "cooldown": 15.0, "name": "Sương Giá Trận", "description": "Dựng trận sương giá phía trước, làm chậm và đóng băng dần kẻ địch."},
 		"x": {"skill": "bang_x", "attack": "ult_bang", "cooldown": 1.0, "meter": 100, "name": "Hàn Băng Thiên Kiếm", "description": "Những thanh kiếm băng khổng lồ cắm xuống kẻ địch, đóng băng ngay lập tức."}
+	}},
+	"tho": {"name": "Nham Sơn Quyết", "element": "earth", "color": "e0a94f", "icon": "earth", "role": "Phá giáp, khiên đá, chấn địa diện rộng",
+		"unlock": {"quest": "sq06_khoi_loi", "hint": "Nhiệm vụ phụ Khôi lỗi giữ đền — bia đá cổ phía đông Rừng Chuông"},
+		"forms": {
+		"e": {"skill": "tho_e", "attack": "tho_e", "cooldown": 7.0, "name": "Địa Liệt Trảm", "description": "Bổ kiếm xuống đất, dãy gai đá trồi lên thành hàng phía trước. Gây Nứt giáp."},
+		"q": {"skill": "tho_q", "attack": "tho_q", "cooldown": 16.0, "name": "Thạch Giáp Trận", "description": "Dậm đất bật sóng chấn quanh mình rồi khoác giáp đá: giảm sát thương nhận vào trong 8 giây."},
+		"x": {"skill": "tho_x", "attack": "ult_tho", "cooldown": 1.0, "meter": 100, "name": "Sơn Băng Địa Liệt", "description": "Ba đợt địa chấn nối nhau, cột đá phá đất quanh mình: Nứt giáp 3 tầng."}
 	}}
 }

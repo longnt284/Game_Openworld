@@ -22,6 +22,9 @@ SCRIPTS = {
     "weapons": "tools/blender/build_weapons.py",
     "env": "tools/blender/build_props.py",
 }
+# Models built by a script other than their folder's generator.
+SCRIPT_OVERRIDES = {"heo_gio": "tools/blender/build_creatures.py"}
+SCRIPT_OVERRIDES.update({name: "tools/blender/build_monsters.py" for name in ("cung_thu", "ho_ve", "phap_su", "hon_anh", "khoi_loi", "soi_suong", "soi_chua")})
 KENNEY_PATTERNS = [
     r"step_(grass|wood|stone|leaves|dirt)_\d", r"hit_flesh_\d", r"block_\d", r"boar_hit_\d", r"hit_heavy_\d",
     r"parry", r"parry_metal", r"chest_open", r"coins", r"pickup", r"book", r"sword_draw", r"cloth", r"wood_knock",
@@ -87,7 +90,7 @@ def model_rows():
             source = "tools/blender/build_assets.py"
         else:
             status = "Dùng trong slice"
-            source = "tools/blender/build_creatures.py" if path.stem == "heo_gio" else SCRIPTS.get(group, "?")
+            source = SCRIPT_OVERRIDES.get(path.stem, SCRIPTS.get(group, "?"))
         blend = ROOT / "art" / (group if group in SCRIPTS else "") / (path.stem + ".blend")
         rows.append((relative, status, source, blend.relative_to(ROOT).as_posix() if blend.exists() else "—", stats))
     return rows

@@ -2,7 +2,8 @@ class_name SkillRunner
 extends RefCounted
 ## Starts a sword form when its strike frame arrives. Sweeps, dashes and spinning ticks
 ## are resolved frame by frame in PlayerController; everything here (missiles, chain
-## lightning, delayed strikes, novas, fields) runs on its own nodes after the cast.
+## lightning, delayed strikes, rock fissures, novas, fields) runs on its own nodes after the
+## cast. A form with "self_buff" also puts that buff on Lâm An as it fires.
 
 static func fire(player: PlayerController, data: Dictionary, scale: float) -> void:
 	var color: Color = form_color(data)
@@ -15,6 +16,8 @@ static func fire(player: PlayerController, data: Dictionary, scale: float) -> vo
 			_chain(player, data, scale, color)
 		"strikes":
 			_strikes(player, data, scale, color)
+		"fissure":
+			_fissure(player, data, scale, color)
 		"nova":
 			var nova: AreaEffect = AreaEffect.spawn(player, data, scale, "nova", color)
 			for pulse: int in range(int(data.get("pulses", 1))):
@@ -27,6 +30,8 @@ static func fire(player: PlayerController, data: Dictionary, scale: float) -> vo
 			pass
 		_:
 			Vfx.slash(parent, player.global_position, player.facing, data, Color(color.r, color.g, color.b, 0.9) if data.has("element") else Color(1, 1, 1, 0.8))
+	if data.has("self_buff"):
+		player.apply_status(String(data["self_buff"]), 1, 0.0, float(data.get("buff_time", 0.0)))
 	match String(data.get("vfx", "")):
 		"flame_wheel":
 			Vfx.flames(parent, player.global_position, float(data.get("radius", 2.0)), 0.6, 50)
@@ -116,6 +121,18 @@ static func _chain(player: PlayerController, data: Dictionary, scale: float, col
 		if next == null:
 			break
 		current = next
+
+static func _fissure(player: PlayerController, data: Dictionary, scale: float, color: Color) -> void:
+	## A line of rock spikes bursting out one after another ahead of Lâm An; a foe standing
+	## where two spikes overlap is hit once ("hit_once").
+	var effect: AreaEffect = AreaEffect.spawn(player, data, scale, "strikes", color)
+	var step: float = float(data.get("step", 1.7))
+	var origin: Vector3 = player.global_position
+	for index: int in range(int(data.get("steps", 6))):
+		var point: Vector3 = origin + player.facing * (float(data.get("start", 1.3)) + index * step)
+		if player.world and (not player.world.layout.inside_bounds(point.x, point.z) or player.world.layout.in_chasm(point.x, point.z)):
+			break
+		effect.add_strike(point, 0.02 + index * float(data.get("interval", 0.06)), float(data.get("strike_radius", 1.4)))
 
 static func _strikes(player: PlayerController, data: Dictionary, scale: float, color: Color) -> void:
 	var effect: AreaEffect = AreaEffect.spawn(player, data, scale, "strikes", color)

@@ -10,7 +10,7 @@ extends RefCounted
 ##   regen_max_hp  healing per tick × the holder's max health
 
 ## Shown on the model in this order when several statuses are active.
-const PRIORITY: PackedStringArray = ["freeze", "stun", "burn", "poison", "bleed", "shock", "chill", "soak", "gale", "weaken", "forget", "enemy_rage"]
+const PRIORITY: PackedStringArray = ["freeze", "stun", "mire", "burn", "poison", "bleed", "shock", "chill", "soak", "sunder", "gale", "weaken", "forget", "enemy_rage"]
 
 ## id -> {"stacks", "time", "duration", "tick", "interval", "power"}
 var active: Dictionary = {}

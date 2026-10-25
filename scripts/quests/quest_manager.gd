@@ -10,7 +10,7 @@ signal quest_updated(id: String)
 signal quest_completed(id: String)
 
 ## Interactables are used once and leave one of these flags (see Interactable.flag_key()).
-const ONE_TIME_PREFIXES: PackedStringArray = ["read:", "opened:", "echo_seen:", "memory:", "lit:"]
+const ONE_TIME_PREFIXES: PackedStringArray = ["read:", "opened:", "echo_seen:", "memory:", "lit:", "used:"]
 
 var state: GameState
 var rewarder: Callable

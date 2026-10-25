@@ -5,14 +5,14 @@ extends RefCounted
 const PATH: String = "user://settings.cfg"
 const REBINDABLE: PackedStringArray = [
 	"move_forward", "move_back", "move_left", "move_right", "jump", "sprint", "attack", "block", "skill_1", "skill_2", "skill_ult",
-	"interact", "heal", "use_item", "swap_sword", "lock_on", "open_map", "open_journal", "open_inventory",
+	"interact", "heal", "use_item", "swap_sword", "style_wheel", "lock_on", "open_map", "open_journal", "open_inventory", "open_styles",
 ]
 const ACTION_NAMES: Dictionary = {
 	"move_forward": "Đi tới", "move_back": "Lùi", "move_left": "Sang trái", "move_right": "Sang phải", "jump": "Nhảy / Khinh công",
 	"sprint": "Né / Chạy nhanh", "attack": "Đánh (giữ: trọng kích)", "block": "Đỡ / Phản đòn", "skill_1": "Chiêu thức 1", "skill_2": "Chiêu thức 2",
 	"skill_ult": "Tuyệt kỹ (đủ nộ khí)",
 	"interact": "Tương tác", "heal": "Dùng thuốc", "use_item": "Dùng vật phẩm nhanh", "swap_sword": "Đổi kiếm phụ", "lock_on": "Khóa mục tiêu", "open_map": "Bản đồ",
-	"open_journal": "Nhật ký", "open_inventory": "Túi đồ",
+	"open_journal": "Nhật ký", "open_inventory": "Túi đồ", "open_styles": "Kiếm Quyết (chọn chiêu)", "style_wheel": "Vòng Kiếm Quyết (giữ)",
 }
 ## Distances in metres. density thins grass, flowers and ground cover only (trees never move);
 ## view_radius is the streamed area in chunks around the player; ambient is the particle budget;

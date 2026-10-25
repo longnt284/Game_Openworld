@@ -40,6 +40,34 @@ var flora_kinds: Array = []
 var cluster: FastNoiseLite = FastNoiseLite.new()
 ## KEEPOUT_CELL grid cell -> [[centre, radius, colliders_only], ...]
 var keepouts: Dictionary = {}
+## Hot-path copies of the tables above as packed doubles (height_at runs thousands of times per
+## streamed chunk, single-threaded on the Web): the same values and maths, without Dictionary
+## lookups or string-to-float conversions per sample.
+var _elev_z: PackedFloat64Array = PackedFloat64Array()
+var _elev_h: PackedFloat64Array = PackedFloat64Array()
+var _amp_z: PackedFloat64Array = PackedFloat64Array()
+var _amp_h: PackedFloat64Array = PackedFloat64Array()
+## Edge rise: [start_x, power, scale, north_z, south_z]; empty when the layout has none.
+var _edge: PackedFloat64Array = PackedFloat64Array()
+## Ridges and chasms: [min_x, max_x, min_z, max_z, height or depth, edge] each.
+var _ridge_boxes: Array[PackedFloat64Array] = []
+var _chasm_boxes: Array[PackedFloat64Array] = []
+## Flats: x, z, r, r + blend, target height, and (r + blend)² for a quick reject.
+var _flat_x: PackedFloat64Array = PackedFloat64Array()
+var _flat_z: PackedFloat64Array = PackedFloat64Array()
+var _flat_r: PackedFloat64Array = PackedFloat64Array()
+var _flat_reach: PackedFloat64Array = PackedFloat64Array()
+var _flat_h: PackedFloat64Array = PackedFloat64Array()
+var _flat_reach_sq: PackedFloat64Array = PackedFloat64Array()
+## Region id -> [grass low, grass high] parsed once.
+var _palettes: Dictionary = {}
+
+const PATH_DIRT: Color = Color("c9b38a")
+const SANDY_EARTH: Color = Color("d2b886")
+const RIVER_SAND: Color = Color("cdbf98")
+const STREAM_BANK: Color = Color("8f9a86")
+const BARE_ROCK: Color = Color("8e8a78")
+const GORGE_SHADE: Color = Color("2f3b37")
 
 static func load_default(world_seed: int) -> WorldLayout:
 	## Main thread only: reads ContentDB, which is not thread-safe. The result is then immutable.
@@ -97,11 +125,18 @@ func _init(data: Dictionary, world_seed: int) -> void:
 	clearings = data.get("clearings", [])
 	for biome: Dictionary in data.get("biomes", []):
 		biomes[biome["region"]] = biome
+	_cache_tables()
 	for flat: Dictionary in data.get("flats", []):
 		var entry: Dictionary = flat.duplicate()
 		if not entry.has("h"):
 			entry["h"] = _shaped_base(float(flat["x"]), float(flat["z"]))
 		flats.append(entry)
+		_flat_x.append(float(entry["x"]))
+		_flat_z.append(float(entry["z"]))
+		_flat_r.append(float(entry["r"]))
+		_flat_reach.append(float(entry["r"]) + float(entry["blend"]))
+		_flat_h.append(float(entry["h"]))
+		_flat_reach_sq.append(pow(float(entry["r"]) + float(entry["blend"]), 2.0))
 	for path: Dictionary in data.get("paths", []):
 		paths.append(_prepare_line(path, func(x: float, z: float) -> float: return _with_flats(x, z, _shaped_base(x, z)), float(path["width"]) * 0.5 + PATH_BLEND))
 	for water: Dictionary in data.get("waters", []):
@@ -112,6 +147,81 @@ func _init(data: Dictionary, world_seed: int) -> void:
 				levels.append(value - float(water["depth"]) + float(water.get("level_offset", 0.6)))
 			entry["levels"] = levels
 		waters.append(entry)
+
+## Features this far beyond a view's area cannot touch a sample inside it (flat blends, flora
+## margins and chasm rims are all well under this).
+const VIEW_MARGIN: float = 24.0
+
+func view(area: Rect2) -> WorldLayout:
+	## A copy that keeps only the flats, roads, waters, chasms, ridges and clearings able to reach
+	## `area`, sharing everything else. Every height, colour and flora test inside `area` matches
+	## the full layout exactly (lines outside their box already answer INF), with far fewer features
+	## to walk per sample — chunk streaming builds through one of these.
+	var local: WorldLayout = WorldLayout.new({}, 0)
+	local.source = source
+	local.noise = noise
+	local.detail = detail
+	local.cluster = cluster
+	local.bounds = bounds
+	local.elevation = elevation
+	local.amplitude = amplitude
+	local.edge = edge
+	local.regions = regions
+	local.biomes = biomes
+	local.flora = flora
+	local.flora_kinds = flora_kinds
+	local.keepouts = keepouts
+	local._elev_z = _elev_z
+	local._elev_h = _elev_h
+	local._amp_z = _amp_z
+	local._amp_h = _amp_h
+	local._edge = _edge
+	local._palettes = _palettes
+	var reach: Rect2 = area.grow(VIEW_MARGIN)
+	local.ridges = ridges.filter(func(box: Dictionary) -> bool: return _box_rect(box).intersects(reach))
+	local.chasms = chasms.filter(func(box: Dictionary) -> bool: return _box_rect(box).intersects(reach))
+	for box: Dictionary in local.ridges:
+		local._ridge_boxes.append(_ridge_boxes[ridges.find(box)])
+	for box: Dictionary in local.chasms:
+		local._chasm_boxes.append(_chasm_boxes[chasms.find(box)])
+	local.paths = paths.filter(func(line: Dictionary) -> bool: return (line["box"] as Rect2).intersects(reach))
+	local.waters = waters.filter(func(line: Dictionary) -> bool: return (line["box"] as Rect2).intersects(reach))
+	local.clearings = clearings.filter(func(spot: Dictionary) -> bool: return _circle_meets(spot, reach))
+	for index: int in range(flats.size()):
+		if _circle_meets(flats[index], reach.grow(float(flats[index].get("blend", 0.0)))):
+			local.flats.append(flats[index])
+			local._flat_x.append(_flat_x[index])
+			local._flat_z.append(_flat_z[index])
+			local._flat_r.append(_flat_r[index])
+			local._flat_reach.append(_flat_reach[index])
+			local._flat_h.append(_flat_h[index])
+			local._flat_reach_sq.append(_flat_reach_sq[index])
+	return local
+
+static func _box_rect(box: Dictionary) -> Rect2:
+	return Rect2(float(box["min_x"]), float(box["min_z"]), float(box["max_x"]) - float(box["min_x"]), float(box["max_z"]) - float(box["min_z"]))
+
+static func _circle_meets(spot: Dictionary, area: Rect2) -> bool:
+	var center: Vector2 = Vector2(float(spot["x"]), float(spot["z"]))
+	var nearest: Vector2 = center.clamp(area.position, area.end)
+	return center.distance_to(nearest) <= float(spot["r"])
+
+func _cache_tables() -> void:
+	for row: Array in elevation:
+		_elev_z.append(float(row[0]))
+		_elev_h.append(float(row[1]))
+	for row: Array in amplitude:
+		_amp_z.append(float(row[0]))
+		_amp_h.append(float(row[1]))
+	if not edge.is_empty():
+		_edge = PackedFloat64Array([float(edge["start_x"]), float(edge["power"]), float(edge["scale"]), float(edge["north_z"]), float(edge["south_z"])])
+	for ridge: Dictionary in ridges:
+		_ridge_boxes.append(PackedFloat64Array([float(ridge["min_x"]), float(ridge["max_x"]), float(ridge["min_z"]), float(ridge["max_z"]), float(ridge["height"]), float(ridge["edge"])]))
+	for chasm: Dictionary in chasms:
+		_chasm_boxes.append(PackedFloat64Array([float(chasm["min_x"]), float(chasm["max_x"]), float(chasm["min_z"]), float(chasm["max_z"]), float(chasm["depth"]), float(chasm["edge"])]))
+	for region: Dictionary in regions:
+		var palette: Array = region.get("grass", ["7d9c58", "b8bf78"])
+		_palettes[String(region.get("id", ""))] = [Color(palette[0]), Color(palette[1])]
 
 func _prepare_line(line: Dictionary, height_fn: Callable, reach: float) -> Dictionary:
 	var points: PackedVector2Array = PackedVector2Array()
@@ -131,37 +241,51 @@ func _prepare_line(line: Dictionary, height_fn: Callable, reach: float) -> Dicti
 
 # ------------------------------------------------------------------ height
 
-func _curve(table: Array, z: float) -> float:
-	if table.is_empty():
+func _curve_packed(keys: PackedFloat64Array, values: PackedFloat64Array, z: float) -> float:
+	## _curve over the packed copy of a table: the same rows and the same easing.
+	if keys.is_empty():
 		return 0.0
-	if z >= float(table[0][0]):
-		return float(table[0][1])
-	for index: int in range(1, table.size()):
-		var upper: Array = table[index - 1]
-		var lower: Array = table[index]
-		if z >= float(lower[0]):
-			var t: float = (float(upper[0]) - z) / (float(upper[0]) - float(lower[0]))
-			return lerpf(float(upper[1]), float(lower[1]), smoothstep(0.0, 1.0, t))
-	return float(table[-1][1])
+	if z >= keys[0]:
+		return values[0]
+	for index: int in range(1, keys.size()):
+		if z >= keys[index]:
+			var t: float = (keys[index - 1] - z) / (keys[index - 1] - keys[index])
+			return lerpf(values[index - 1], values[index], smoothstep(0.0, 1.0, t))
+	return values[-1]
+
+func base_elevation(z: float) -> float:
+	## The regional elevation curve alone (no noise or features).
+	return _curve_packed(_elev_z, _elev_h, z)
 
 func _shaped_base(x: float, z: float) -> float:
-	var h: float = _curve(elevation, z) + noise.get_noise_2d(x, z) * _curve(amplitude, z)
-	if not edge.is_empty():
+	var h: float = _curve_packed(_elev_z, _elev_h, z) + noise.get_noise_2d(x, z) * _curve_packed(_amp_z, _amp_h, z)
+	if not _edge.is_empty():
 		var rise: float = 0.0
-		var over_x: float = absf(x) - float(edge["start_x"])
+		var over_x: float = absf(x) - _edge[0]
 		if over_x > 0.0:
-			rise += pow(over_x, float(edge["power"])) * float(edge["scale"])
-		var over_north: float = float(edge["north_z"]) - z
+			rise += pow(over_x, _edge[1]) * _edge[2]
+		var over_north: float = _edge[3] - z
 		if over_north > 0.0:
-			rise += pow(over_north, float(edge["power"])) * float(edge["scale"]) * 1.5
-		var over_south: float = z - float(edge["south_z"])
+			rise += pow(over_north, _edge[1]) * _edge[2] * 1.5
+		var over_south: float = z - _edge[4]
 		if over_south > 0.0:
-			rise += pow(over_south, float(edge["power"])) * float(edge["scale"]) * 2.0
+			rise += pow(over_south, _edge[1]) * _edge[2] * 2.0
 		# Saturate so the rim reads as mountains without turning into vertical walls.
 		h += EDGE_CAP * tanh(rise / EDGE_CAP)
-	for ridge: Dictionary in ridges:
-		h += float(ridge["height"]) * _box_weight(x, z, ridge, float(ridge["edge"]))
+	for ridge: PackedFloat64Array in _ridge_boxes:
+		h += ridge[4] * _packed_box_weight(x, z, ridge, ridge[5])
 	return h
+
+func _packed_box_weight(x: float, z: float, box: PackedFloat64Array, soft: float) -> float:
+	## _box_weight for a packed [min_x, max_x, min_z, max_z, …] box.
+	var dx: float = maxf(box[0] - x, x - box[1])
+	var dz: float = maxf(box[2] - z, z - box[3])
+	var outside: float = maxf(dx, dz)
+	if outside >= soft:
+		return 0.0
+	if outside <= 0.0:
+		return 1.0
+	return 1.0 - smoothstep(0.0, soft, outside)
 
 func _box_weight(x: float, z: float, box: Dictionary, soft: float) -> float:
 	var dx: float = maxf(float(box["min_x"]) - x, x - float(box["max_x"]))
@@ -174,11 +298,16 @@ func _box_weight(x: float, z: float, box: Dictionary, soft: float) -> float:
 	return 1.0 - smoothstep(0.0, soft, outside)
 
 func _with_flats(x: float, z: float, h: float) -> float:
-	for flat: Dictionary in flats:
-		var distance: float = Vector2(x - float(flat["x"]), z - float(flat["z"])).length()
-		var reach: float = float(flat["r"]) + float(flat["blend"])
+	for index: int in range(_flat_x.size()):
+		var dx: float = x - _flat_x[index]
+		var dz: float = z - _flat_z[index]
+		# Clearly out of reach (with a margin, so the exact test below decides every edge case).
+		if dx * dx + dz * dz > _flat_reach_sq[index] * 1.0001 + 0.01:
+			continue
+		var distance: float = Vector2(dx, dz).length()
+		var reach: float = _flat_reach[index]
 		if distance < reach:
-			h = lerpf(h, float(flat["h"]), 1.0 - smoothstep(float(flat["r"]), reach, distance))
+			h = lerpf(h, _flat_h[index], 1.0 - smoothstep(_flat_r[index], reach, distance))
 	return h
 
 func _line_query(line: Dictionary, x: float, z: float) -> Vector3:
@@ -234,10 +363,10 @@ func water_level_hit(water: Dictionary, hit: Vector3) -> float:
 	return float(water.get("level", 0.0))
 
 func _with_chasms(x: float, z: float, h: float) -> float:
-	for chasm: Dictionary in chasms:
-		var weight: float = _box_weight(x, z, chasm, float(chasm["edge"]))
+	for chasm: PackedFloat64Array in _chasm_boxes:
+		var weight: float = _packed_box_weight(x, z, chasm, chasm[5])
 		if weight > 0.0:
-			h -= float(chasm["depth"]) * weight
+			h -= chasm[4] * weight
 	return h
 
 func height_at(x: float, z: float) -> float:
@@ -375,26 +504,26 @@ func surface_at(x: float, z: float) -> String:
 
 func ground_color(x: float, z: float, h: float, slope: float) -> Color:
 	var region: Dictionary = region_at(z)
-	var palette: Array = region.get("grass", ["7d9c58", "b8bf78"])
+	var palette: Array = _palettes.get(String(region.get("id", "")), [Color("7d9c58"), Color("b8bf78")])
 	var variation: float = detail.get_noise_2d(x, z) * 0.5 + 0.5
-	var base: Color = Color(palette[0]).lerp(Color(palette[1]), clampf(variation * 0.8 + (h - _curve(elevation, z)) * 0.04, 0.0, 1.0))
+	var base: Color = (palette[0] as Color).lerp(palette[1], clampf(variation * 0.8 + (h - base_elevation(z)) * 0.04, 0.0, 1.0))
 	var path_gap: float = path_distance(x, z)
 	if path_gap < 1.2:
-		base = base.lerp(Color("c9b38a"), 1.0 - smoothstep(0.0, 1.2, path_gap) * 0.9)
+		base = base.lerp(PATH_DIRT, 1.0 - smoothstep(0.0, 1.2, path_gap) * 0.9)
 	var flat: Dictionary = flat_at(x, z)
 	if flat.get("surface", "") == "stone":
 		# Packed sandy earth with tufts of grass surviving at the edges of trodden ground.
 		var patch: float = smoothstep(0.55, 0.7, cluster.get_noise_2d(x * 2.0, z * 2.0) * 0.5 + 0.5)
-		base = base.lerp(Color("d2b886"), (0.85 - variation * 0.15) * (1.0 - patch * 0.7))
+		base = base.lerp(SANDY_EARTH, (0.85 - variation * 0.15) * (1.0 - patch * 0.7))
 	for water: Dictionary in waters:
 		var hit: Vector3 = _line_query(water, x, z)
 		var half: float = float(water["width"]) * 0.5
 		if hit.x < half + 3.0:
-			base = base.lerp(Color("cdbf98") if water.get("kind", "") == "river" else Color("8f9a86"), 1.0 - smoothstep(half - 2.0, half + 3.0, hit.x))
+			base = base.lerp(RIVER_SAND if water.get("kind", "") == "river" else STREAM_BANK, 1.0 - smoothstep(half - 2.0, half + 3.0, hit.x))
 	if slope > 0.55:
-		base = base.lerp(Color("8e8a78"), smoothstep(0.55, 0.8, slope))
+		base = base.lerp(BARE_ROCK, smoothstep(0.55, 0.8, slope))
 	if in_chasm(x, z):
 		# Darken the gorge walls with depth so the drop reads clearly from the path.
-		var depth: float = _curve(elevation, z) - h
-		base = base.lerp(Color("2f3b37"), clampf((depth - 1.0) / 16.0, 0.0, 0.85))
+		var depth: float = base_elevation(z) - h
+		base = base.lerp(GORGE_SHADE, clampf((depth - 1.0) / 16.0, 0.0, 0.85))
 	return base

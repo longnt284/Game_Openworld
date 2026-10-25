@@ -52,6 +52,9 @@ static func validate(data: Variant) -> bool:
 	# Optional in v4 (the secondary sword): absent means none.
 	if not state.get("sword_alt", "") is String or not _is_number(state.get("alt_uid", -1)):
 		return false
+	# Optional in v4 (Kiếm Quyết on each key): absent means the old sword-bound forms.
+	if not state.get("loadout", {}) is Dictionary:
+		return false
 	return _valid_clock(data)
 
 static func _valid_clock(data: Dictionary) -> bool:

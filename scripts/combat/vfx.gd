@@ -10,6 +10,10 @@ const SEAL: Color = Color(0.95, 0.32, 0.25)
 ## Group of effects timed to an enemy's blow: their tweens run at Enemy.time_dilation.
 const ENEMY_CLOCK: String = "vfx_enemy_clock"
 
+## Shared toon materials of the earth pillars, one per shade.
+static var _rock_materials: Dictionary = {}
+static var _star: ArrayMesh
+
 static func _material(color: Color, additive: bool = true) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -157,21 +161,42 @@ static func follow_enemy_clock(holder: Node, tweens: Array[Tween]) -> void:
 		tween.set_speed_scale(Enemy.time_dilation)
 
 static func glint(parent: Node, position: Vector3, color: Color = SPARK, size: float = 0.5) -> void:
-	var quad: QuadMesh = QuadMesh.new()
-	quad.size = Vector2(size, size)
+	## A four-pointed star flash (hits, parries, pickups), white at the heart, fading to its tips.
 	var instance: MeshInstance3D = MeshInstance3D.new()
-	instance.mesh = quad
+	instance.mesh = _star_mesh()
 	var material: StandardMaterial3D = _material(color)
-	material.vertex_color_use_as_albedo = false
 	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(instance)
 	instance.global_position = position
-	instance.scale = Vector3.ONE * 0.2
+	instance.scale = Vector3.ONE * 0.2 * size
 	var tween: Tween = instance.create_tween()
-	tween.tween_property(instance, "scale", Vector3.ONE * 1.4, 0.12)
-	tween.tween_property(instance, "scale", Vector3.ONE * 0.1, 0.18)
+	tween.tween_property(instance, "scale", Vector3.ONE * 1.4 * size, 0.12)
+	tween.tween_property(instance, "scale", Vector3.ONE * 0.1 * size, 0.18)
 	tween.tween_callback(instance.queue_free)
+
+static func _star_mesh() -> ArrayMesh:
+	## Shared by every glint: long tips on the axes, short ones between, alpha 1 at the centre.
+	if _star != null:
+		return _star
+	var vertices: PackedVector3Array = PackedVector3Array([Vector3.ZERO])
+	var colors: PackedColorArray = PackedColorArray([Color(1, 1, 1, 1)])
+	var indices: PackedInt32Array = PackedInt32Array()
+	for index: int in range(8):
+		var angle: float = TAU * index / 8.0
+		var reach: float = 0.5 if index % 2 == 0 else 0.11
+		vertices.append(Vector3(cos(angle), sin(angle), 0.0) * reach)
+		colors.append(Color(1, 1, 1, 0.0 if index % 2 == 0 else 0.55))
+		indices.append_array(PackedInt32Array([0, 1 + index, 1 + (index + 1) % 8]))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	_star = ArrayMesh.new()
+	_star.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return _star
 
 static func number(parent: Node, position: Vector3, value: float, color: Color = Color(1, 0.95, 0.8)) -> void:
 	_float_text(parent, position + Vector3(randf_range(-0.3, 0.3), 0.4, randf_range(-0.3, 0.3)), str(roundi(value)), color, 52, 0.7)
@@ -344,6 +369,44 @@ static func shards(parent: Node, center: Vector3, color: Color = Color("bfefff")
 		instance.rotation = Vector3(randf_range(-0.35, 0.35), randf_range(0, TAU), randf_range(-0.35, 0.35))
 		instance.scale = Vector3(1, 0.05, 1)
 		instance.create_tween().tween_property(instance, "scale", Vector3.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+static func rock_spikes(parent: Node, center: Vector3, radius: float, count: int = 4, height: float = 1.4, duration: float = 0.9) -> void:
+	## Blocky earth pillars punching up out of the ground (Thổ forms), sinking back as they fade.
+	## Pillars between the camera and the centre stay low, so a quake around Lâm An never walls
+	## off the view.
+	var shades: Array[Color] = [Color("8a6d48"), Color("a8865a"), Color("6f5a40"), Color("c9a25e")]
+	var camera: Camera3D = parent.get_viewport().get_camera_3d() if parent.is_inside_tree() else null
+	var toward_camera: Vector3 = Vector3.ZERO
+	if camera:
+		toward_camera = camera.global_position - center
+		toward_camera.y = 0.0
+		toward_camera = toward_camera.normalized()
+	for index: int in range(count):
+		var angle: float = TAU * index / maxf(1.0, count) + randf_range(-0.4, 0.4)
+		var block: BoxMesh = BoxMesh.new()
+		var width: float = randf_range(0.32, 0.55)
+		var tall: float = height * randf_range(0.6, 1.15)
+		block.size = Vector3(width, tall, width * randf_range(0.8, 1.2))
+		var offset: float = radius * (0.0 if count <= 1 and index == 0 else randf_range(0.15, 0.85))
+		var point: Vector3 = center + Vector3(cos(angle), 0, sin(angle)) * offset
+		if toward_camera != Vector3.ZERO and offset > 0.5 and Vector3(cos(angle), 0, sin(angle)).dot(toward_camera) > 0.55:
+			tall *= 0.35
+			block.size.y = tall
+		# Solid toon rock (the world's own shader, cached per shade), sinking away instead of fading.
+		var instance: MeshInstance3D = MeshInstance3D.new()
+		instance.mesh = block
+		var shade: Color = shades[index % shades.size()]
+		if not _rock_materials.has(shade):
+			_rock_materials[shade] = Toon.flat_material(shade)
+		instance.material_override = _rock_materials[shade]
+		parent.add_child(instance)
+		instance.global_position = point + Vector3.DOWN * tall * 0.5
+		instance.rotation = Vector3(randf_range(-0.3, 0.3), randf_range(0, TAU), randf_range(-0.3, 0.3))
+		var tween: Tween = instance.create_tween()
+		tween.tween_property(instance, "global_position", point + Vector3.UP * tall * 0.35, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_interval(maxf(0.0, duration - 0.45))
+		tween.tween_property(instance, "global_position", point + Vector3.DOWN * tall * 0.55, 0.35).set_ease(Tween.EASE_IN)
+		tween.tween_callback(instance.queue_free)
 
 static func ice_sword(parent: Node, position: Vector3, fall_time: float = 0.45) -> void:
 	## Giant frost blade dropping from the sky; shatters into shards on impact.

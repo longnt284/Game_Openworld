@@ -17,6 +17,15 @@
 			"hint": "Đông Kết: đòn Băng vào kẻ đang Ướt đóng băng ngay lập tức; kẻ quá mạnh để đóng băng thì lạnh cóng thêm hai lớp."},
 		{"id": "storm_chain", "name": "Lôi Phong", "needs": ["gale"], "element": "thunder", "mult": 1.15, "radius": 6.0, "chain": 2, "splash": 0.6,
 			"splash_status": {"status": "shock", "stacks": 1}, "consume": ["gale"], "color": "e8f58a", "vfx": "bolt", "sfx": "thunder_chain",
-			"hint": "Lôi Phong: đòn Lôi vào kẻ đang bị Gió cuốn phóng sét nảy sang hai kẻ đứng gần."}
+			"hint": "Lôi Phong: đòn Lôi vào kẻ đang bị Gió cuốn phóng sét nảy sang hai kẻ đứng gần."},
+		{"id": "quagmire", "name": "Sa Lầy", "needs": ["soak"], "element": "earth", "mult": 1.25, "radius": 4.0, "spread_needs": ["soak"], "splash": 0.3,
+			"apply": {"status": "mire", "stacks": 1}, "splash_status": {"status": "mire", "stacks": 1}, "consume": ["soak"], "color": "8a6a3a", "vfx": "shards", "sfx": "ground_slam",
+			"hint": "Sa Lầy: đòn Thổ vào kẻ đang Ướt biến đất thành bùn, kẻ đó và mọi kẻ ướt quanh đó bị sa lầy — chậm hẳn và dễ phá thế."},
+		{"id": "magma", "name": "Nham Hỏa", "needs": ["burn"], "element": "earth", "mult": 1.6, "radius": 3.5, "splash": 0.5, "knockback": 3.0,
+			"splash_status": {"status": "sunder", "stacks": 1}, "consume": ["burn"], "color": "ff8a3a", "vfx": "flames", "sfx": "flame_burst",
+			"hint": "Nham Hỏa: đòn Thổ vào kẻ đang Thiêu đốt nổ thành dung nham, gây sát thương lớn và nứt giáp những kẻ đứng quanh."},
+		{"id": "sandstorm", "name": "Cát Lốc", "needs": ["sunder"], "element": "wind", "mult": 1.3, "radius": 4.5, "splash": 0.4,
+			"splash_status": {"status": "sunder", "stacks": 1}, "consume": ["sunder"], "color": "e8c98a", "vfx": "shards", "sfx": "wind_cyclone",
+			"hint": "Cát Lốc: đòn Phong vào kẻ đang Nứt giáp cuốn đá vụn thành lốc, lan nứt giáp sang kẻ đứng gần."}
 	]
 }

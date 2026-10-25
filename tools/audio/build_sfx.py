@@ -1,6 +1,6 @@
 """Build sound effects and ambience loops.
 
-python3 tools/audio/build_sfx.py <kenney_dir>   (or --elemental / --weather to rebuild only those clips)
+python3 tools/audio/build_sfx.py <kenney_dir>   (or --elemental / --weather / --monsters to rebuild only those clips)
 - Synthesises whooshes, wind skills, impacts, creature sounds and ambience loops with numpy/scipy
   (original work for this project).
 - Copies selected CC0 clips from Kenney's "RPG Audio", "Impact Sounds" and "Interface Sounds" packs
@@ -310,6 +310,48 @@ def weather():
     RNG = saved
 
 
+def monsters():
+    """Chapter-one monsters and the earth style (own RNG, so every clip above stays byte-identical)."""
+    global RNG
+    saved, RNG = RNG, np.random.default_rng(2842)
+    # Bow: the creak of a drawn bow, then the string's twang.
+    creak = bandpass(RNG.standard_normal(int(0.5 * RATE)), 300, 1400) * env(0.5, 0.3, 0.15) * (0.6 + 0.4 * np.sin(2 * np.pi * 23 * t(0.5)))
+    twang = (sine(np.linspace(190, 160, int(0.4 * RATE)), 0.4) + 0.4 * sine(np.linspace(380, 330, int(0.4 * RATE)), 0.4)) * env(0.4, 0.002, 0.38, 3.0)
+    write(SFX / "bow_draw.ogg", np.concatenate([creak * 0.5, twang + whoosh(0.4, 1800, 600, 0.3) * 0.4]))
+    write(SFX / "arrow_hit.ogg", lowpass(RNG.standard_normal(int(0.2 * RATE)), 1800) * env(0.2, 0.001, 0.18, 3.0) + 0.3 * sine(np.linspace(900, 300, int(0.2 * RATE)), 0.2) * env(0.2, 0.001, 0.15))
+    # Wolves: a low snarl, a snapping bite and a long howl that rises and falls.
+    snarl_len = 0.6
+    snarl_f = 140 + 30 * np.sin(2 * np.pi * 18 * t(snarl_len))
+    snarl = (signal.sawtooth(2 * np.pi * np.cumsum(snarl_f) / RATE) * 0.4 + bandpass(RNG.standard_normal(int(snarl_len * RATE)), 200, 1600)) * env(snarl_len, 0.04, 0.3)
+    write(SFX / "wolf_snarl.ogg", lowpass(snarl, 2000))
+    bite = bandpass(RNG.standard_normal(int(0.16 * RATE)), 800, 5000) * env(0.16, 0.001, 0.14, 4.0)
+    write(SFX / "wolf_bite.ogg", np.concatenate([bite, np.zeros(int(0.04 * RATE)), bite * 0.6]))
+    howl_len = 2.6
+    howl_f = np.interp(t(howl_len), [0, 0.4, 1.6, 2.6], [420, 640, 600, 380]) + 8 * np.sin(2 * np.pi * 5 * t(howl_len))
+    howl = (sine(howl_f, howl_len) + 0.25 * sine(howl_f * 2, howl_len) + 0.15 * bandpass(RNG.standard_normal(int(howl_len * RATE)), 500, 2500)) * env(howl_len, 0.3, 1.2)
+    write(SFX / "wolf_howl.ogg", howl * 0.8)
+    # Wraith: a breathy wail between two pitches with a hollow whisper under it.
+    wail_len = 1.6
+    wail_f = np.interp(t(wail_len), [0, 0.6, 1.6], [520, 780, 460])
+    wail = (sine(wail_f, wail_len) * 0.5 + sine(wail_f * 1.5, wail_len) * 0.2) * (0.6 + 0.4 * np.sin(2 * np.pi * 6 * t(wail_len)))
+    wail = wail * env(wail_len, 0.25, 0.8) + bandpass(RNG.standard_normal(int(wail_len * RATE)), 900, 4200) * env(wail_len, 0.4, 0.9) * 0.4
+    write(SFX / "ghost_wail.ogg", wail)
+    # Golem: grinding stone, and a boulder shattering.
+    grind_len = 0.9
+    grind = bandpass(RNG.standard_normal(int(grind_len * RATE)), 70, 600) * (0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 11 * t(grind_len)))) * env(grind_len, 0.1, 0.4)
+    write(SFX / "golem_grind.ogg", grind + 0.3 * sine(np.linspace(55, 40, int(grind_len * RATE)), grind_len) * env(grind_len, 0.1, 0.5))
+    crash_len = 1.1
+    crash = lowpass(RNG.standard_normal(int(crash_len * RATE)), 900) * env(crash_len, 0.002, 1.0, 2.5)
+    for _ in range(14):
+        start = int(RNG.uniform(0.02, 0.7) * RATE)
+        chip = bandpass(RNG.standard_normal(int(0.05 * RATE)), 1200, 6000) * env(0.05, 0.001, 0.045, 3.0) * RNG.uniform(0.2, 0.5)
+        crash[start:start + len(chip)] += chip
+    write(SFX / "rock_crash.ogg", crash + 0.6 * sine(np.linspace(80, 38, int(crash_len * RATE)), crash_len) * env(crash_len, 0.002, 0.9))
+    # Earth style: pillars punching up out of the ground.
+    write(SFX / "earth_spike.ogg", 0.8 * sine(np.linspace(110, 50, int(0.5 * RATE)), 0.5) * env(0.5, 0.002, 0.45) + lowpass(RNG.standard_normal(int(0.5 * RATE)), 1400) * env(0.5, 0.002, 0.4, 3.0))
+    RNG = saved
+
+
 def copy_kenney(base):
     for pack, mapping in KENNEY.items():
         for target, source in mapping.items():
@@ -338,9 +380,13 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--weather"]:
         weather()
         sys.exit()
+    if sys.argv[1:] == ["--monsters"]:
+        monsters()
+        sys.exit()
     if len(sys.argv) > 1:
         copy_kenney(Path(sys.argv[1]))
     effects()
     ambience()
     elemental()
     weather()
+    monsters()
