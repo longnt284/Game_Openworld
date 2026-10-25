@@ -16,6 +16,9 @@ signal quit_requested
 var main: Node
 var root: Control
 var title_screen: Control
+## The title's column of buttons and the credit line under it (the smoke test checks they never meet).
+var title_box: VBoxContainer
+var title_credit: Label
 var continue_button: Button
 var new_game_button: Button
 var pause_panel: PanelContainer
@@ -88,7 +91,8 @@ func _build_title() -> void:
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_screen.add_child(band)
 	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	# Tight enough that the raised buttons of the theme end above the credit line.
+	box.add_theme_constant_override("separation", 6)
 	box.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	box.offset_left = 90
 	box.offset_right = 620
@@ -107,7 +111,7 @@ func _build_title() -> void:
 		storage.custom_minimum_size.x = 480
 		box.add_child(storage)
 	var spacer: Control = Control.new()
-	spacer.custom_minimum_size.y = 26
+	spacer.custom_minimum_size.y = 12
 	box.add_child(spacer)
 	continue_button = UiTheme.button("Tiếp tục hành trình", func() -> void: emit_signal("continue_requested"), 300)
 	box.add_child(continue_button)
@@ -127,6 +131,8 @@ func _build_title() -> void:
 	credit.offset_right = 700
 	credit.offset_bottom = -20
 	title_screen.add_child(credit)
+	title_box = box
+	title_credit = credit
 	title_screen.visible = false
 
 func show_title(has_save: bool) -> void:

@@ -72,6 +72,8 @@ var prompt_tint: Color = UiTheme.CREAM
 var marker: Label
 var reticle: Label
 var dialogue_panel: PanelContainer
+## Bottom HUD blocks hidden while the dialogue box is open, shown again when it closes.
+var dialogue_hidden: Array[Control] = []
 var dialogue_name: Label
 var dialogue_text: RichTextLabel
 var dialogue_hint: Label
@@ -763,6 +765,13 @@ func hide_boss() -> void:
 	boss_finishable = false
 
 func open_dialogue(speaker: String, text: String, choices: Array = []) -> void:
+	if not dialogue_panel.visible:
+		# The dialogue box covers the bottom of the screen: the vitals and skills step aside.
+		dialogue_hidden.clear()
+		for node: Control in _bottom_hud():
+			if node.visible:
+				node.visible = false
+				dialogue_hidden.append(node)
 	dialogue_panel.visible = true
 	dialogue_name.text = speaker
 	dialogue_text.text = text
@@ -781,6 +790,17 @@ func open_dialogue(speaker: String, text: String, choices: Array = []) -> void:
 
 func close_dialogue() -> void:
 	dialogue_panel.visible = false
+	# Back only while gameplay shows (leaving for the title hides the HUD before closing this).
+	for node: Control in dialogue_hidden:
+		if is_instance_valid(node) and tracker_panel.visible:
+			node.visible = true
+	dialogue_hidden.clear()
+
+func _bottom_hud() -> Array[Control]:
+	var nodes: Array[Control] = [vitals_frame, status_row, alt_label, styles_hint]
+	for skill: String in skill_boxes:
+		nodes.append(skill_boxes[skill]["panel"] as Control)
+	return nodes
 
 func dialogue_open() -> bool:
 	return dialogue_panel.visible

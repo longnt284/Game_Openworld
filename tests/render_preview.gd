@@ -442,6 +442,7 @@ func _run() -> void:
 					guardian._begin_attack("slam")
 					await frames(40)
 					await shot("boss_slam")
+					game.hud.hide_boss()
 			"bamboo":
 				await place(4, -128, 0, -0.18)
 				await frames(30)

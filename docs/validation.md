@@ -13,14 +13,14 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 | Bộ test | Lệnh | Kết quả |
 |---|---|---|
 | Import asset | `godot --headless --path . --editor --import` | Thành công |
-| Smoke test (bản nền + thực vật, vùng cấm, preset; GĐ3: bố cục HUD không chồng nhau, vùng dựng theo lát giống hệt vùng dựng một lần, stream theo lát lấp đủ tầm nhìn, nội suy mô hình, tự hạ độ phân giải, biên dịch trước shader) | `tests/smoke_test.gd` | **41/41 PASS** |
+| Smoke test (bản nền + thực vật, vùng cấm, preset; GĐ3: bố cục HUD không chồng nhau, vùng dựng theo lát giống hệt vùng dựng một lần, stream theo lát lấp đủ tầm nhìn, nội suy mô hình, tự hạ độ phân giải, biên dịch trước shader, HUD dưới nhường chỗ hộp hội thoại, nút màn hình chính không đè dòng ghi công) | `tests/smoke_test.gd` | **43/43 PASS** |
 | Gameplay test (chơi trọn đoạn mẫu; GĐ3: Viêm Dương từ *Lò rèn nguội lửa*, 4 nhiệm vụ phụ mới mở đủ 6 hệ, navmesh dựng sẵn khớp dữ liệu và bake trực tiếp khi không có) | `tests/gameplay_test.gd` | **70/70 PASS** |
 | Combat test (18 thức của 6 hệ, trạng thái, nộ khí; GĐ1: trạng thái trên người chơi, chỉ số, phản ứng, phá thế, kết liễu, Tâm Nhãn, địch dùng AoE; GĐ2: kiếm phụ; GĐ3: mở hệ theo nhiệm vụ, gắn hệ theo ô, hợp hệ +15%, Nứt giáp, 9 phản ứng, Địa Liệt Trảm trúng mỗi địch một lần, khiên đá) | `tests/combat_test.gd` | **177/177 PASS** |
 | Progression test (save v4, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới; GĐ1: vật phẩm, quầy thuốc, affix mới, Ngọc bội, hồ sơ v1 → v2; GĐ3: cầm kiếm không dạy hệ) | `tests/progression_test.gd` | **120/120 PASS** |
 | World test (GĐ2: đồng hồ, thời tiết theo vùng, mức chuyển mượt, khí quyển nhiều lớp, điều kiện `time:`/`weather:`, save v4 + migrate, nghỉ ở miếu, mưa, sét, đèn đêm, âm thanh thời tiết, thời tiết trong trận) | `tests/world_test.gd` | **92/92 PASS** |
 | Monster test (GĐ3: 7 quái mới — cung thủ giữ cự ly và bắn trúng, tên bay vòng cung, hộ vệ đỡ phía trước và bị trọng kích/Thổ phá khiên, lôi sư dịch chuyển và gọi sét có báo trước, sói vồ, sói đầu đàn hú tăng nộ, hồn ảnh chớp ra sau lưng và gào, khôi lỗi ngủ, thức, sang pha 2) | `tests/monster_test.gd` | **23/23 PASS** |
 
-Tổng **523/523 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả sáu bộ. CI GitHub Actions chạy trên `windows-latest`.
+Tổng **525/525 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả sáu bộ. CI GitHub Actions chạy trên `windows-latest`.
 
 **Combat test:** mỗi thức E/Q/X của 5 hệ khởi động, gây sát thương và gây đúng trạng thái; thiêu đốt gây sát thương theo thời gian không làm khựng; lạnh cóng làm chậm, 3 lớp thành đóng băng, boss không bị đóng băng; mục tiêu ướt chỉ nhận thêm sát thương sấm; tuyệt kỹ bị từ chối khi nộ khí chưa đầy và tiêu hết khi dùng; Phong Trảm vẫn bằng công lực × 1,6 như bản trước.
 

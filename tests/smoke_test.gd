@@ -49,6 +49,13 @@ func _run() -> void:
 	check(world.active.size() == game.settings.chunk_capacity(), "All nearby chunks load within bounded capacity")
 	check(player.is_on_floor(), "Player stands on generated terrain collision")
 	check(game.hud.region_label.get_global_rect().position.x > 0, "Tracker HUD is inside viewport")
+	game.menus.show_title(false)
+	await frames(2)
+	var last_button: Control = game.menus.title_box.get_child(game.menus.title_box.get_child_count() - 1) as Control
+	var column: Rect2 = last_button.get_global_rect()
+	check(column.end.y <= game.menus.title_credit.get_global_rect().position.y and column.end.y <= 720.0,
+		"The title's buttons end above the credit line (%.0f ≤ %.0f)" % [column.end.y, game.menus.title_credit.get_global_rect().position.y])
+	game.menus.hide_title()
 	await _check_hud_layout(game)
 	check(world.coord_at(Vector3(-0.1, 0, -32.1)) == Vector2i(-1, -2), "Negative world coordinates map to correct chunks")
 	var second: WorldLayout = WorldLayout.load_default(game.settings.world_seed)
@@ -179,6 +186,11 @@ func _check_hud_layout(game: Node) -> void:
 	hud.hide_boss()
 	hud.show_prompt("")
 	game._refresh_hud()
+	hud.open_dialogue("Bà Lục", "Cháu là người lạ?")
+	var stepped_aside: bool = not hud.vitals_frame.visible and not (hud.skill_boxes["e"]["panel"] as Control).visible
+	hud.close_dialogue()
+	check(stepped_aside and hud.vitals_frame.visible and (hud.skill_boxes["x"]["panel"] as Control).visible and hud.status_row.visible,
+		"The vitals and skills step aside under the dialogue box and come back when it closes")
 
 func _check_sliced(game: Node) -> void:
 	## Single-threaded web builds step each chunk a few ms per frame: same chunk, nothing stalls.
