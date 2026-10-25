@@ -63,14 +63,22 @@
 	"sq02_lo_ren": {
 		"kind": "side", "order": 11, "title": "Lò rèn nguội lửa",
 		"cause": "Chú Bảy quên cách giữ lửa lò. Đá gió trên Trúc Hải có thể giúp lò cháy đều.",
-		"result": "Lò rèn đỏ lửa trở lại. Chú Bảy rèn thanh kiếm cũ thành Thanh Trúc Kiếm và nhớ ra công thức của cha mình.",
+		"result": "Lò rèn đỏ lửa trở lại. Chú Bảy rèn thanh kiếm cũ thành Thanh Trúc Kiếm, nhớ ra công thức của cha mình và truyền cho Lâm An cách giữ lửa trong lưỡi kiếm: Viêm Dương Quyết.",
 		"objectives": [
 			{"text": "Gom 3 Đá gió (trại tàn binh trong Trúc Hải)", "have": "da_gio", "count": 3, "marker": [-45, -200]},
 			{"text": "Mang Đá gió về cho chú Bảy", "event": "talk:chu_bay", "marker": [21, 14]}
 		],
-		"rewards": {"xp": 90, "items": [["to_ky_uc", 1]]},
+		"rewards": {"xp": 90, "items": [["to_ky_uc", 1]], "styles": ["viem"]},
 		"next": []
 	},
+	"sq03_hon_song": {"kind": "side", "order": 12, "title": "Hồn trên bãi lau", "cause": "Ông lái đò kể từ ngày chuông núi đổ, đêm nào cũng có bóng trắng lượn trên bãi lau phía đông bến, hễ ai lại gần là quên đường về.", "result": "Hồn ảnh tan đi. Ký ức dưới bãi lau là của em trai ông lái đò, người chèo chuyến đò cuối giữa cơn bão năm xưa. Nước sông dạy Lâm An Thủy Nguyệt Quyết.", "objectives": [{"text": "Dẹp những bóng hồn trên Bãi Lau Sông phía đông bến", "event": "camp_clear:reed_wraiths", "marker": [46, 63]}, {"text": "Lắng nghe ký ức đọng giữa bãi lau", "event": "interact:echo_reed", "marker": [47, 65]}, {"text": "Kể lại cho ông lái đò", "event": "talk:lai_do", "marker": [-15.5, 70]}], "rewards": {"xp": 120, "items": [["coins", 40], ["tra_sen", 1]], "styles": ["thuy"]}, "next": []},
+
+	"sq04_loi_su": {"kind": "side", "order": 13, "title": "Lôi sư trên Đồi Gió", "cause": "Tiểu Mạc kể người đưa thư bị sét đánh giữa trời quang trên sườn tây Đồi Gió. Bọn tàn binh có một kẻ gọi được sét.", "result": "Lôi sư gục ngã. Đàn tế sét của hắn khắc ba thế kiếm gọi sấm — Lâm An lĩnh hội Lôi Ảnh Quyết, còn Lôi phù về tay Tiểu Mạc để báo cho cả làng.", "objectives": [{"text": "Tìm trại Lôi sư trên sườn tây Đồi Gió", "event": "reach:storm_camp", "marker": [-48, -72]}, {"text": "Hạ Lôi sư cùng cung thủ và hộ vệ của hắn", "event": "camp_clear:storm_camp", "marker": [-48, -72]}, {"text": "Xem đàn tế sét của Lôi sư", "event": "interact:altar_storm", "marker": [-53.2, -79.2]}, {"text": "Mang Lôi phù về cho Tiểu Mạc ở làng", "event": "talk:tieu_mac_storm", "marker": [4, 25]}], "rewards": {"xp": 180, "items": [["coins", 50], ["kim_cang_dan", 1]], "styles": ["loi"]}, "next": []},
+
+	"sq05_soi_suong": {"kind": "side", "order": 14, "title": "Bầy sói sương", "cause": "Thợ săn A Lực mất dấu hai người bạn ở Khe Sương phía tây trại tàn binh. Bầy sói ở đó lạnh như băng, dẫn đầu là một con sói chúa lông bạc.", "result": "Sói chúa Bạch Sương ngã xuống. A Lực dùng Tinh sương làm bùa giữ ấm, chỉ cho Lâm An cách giữ hơi lạnh trên lưỡi kiếm: Hàn Sương Quyết.", "objectives": [{"text": "Lần theo dấu sói tới Khe Sương", "event": "reach:frost_den", "marker": [-62, -232]}, {"text": "Hạ Sói chúa Bạch Sương", "event": "kill:soi_chua", "marker": [-65, -236]}, {"text": "Mang Tinh sương về cho thợ săn A Lực", "event": "talk:a_luc", "marker": [22, -183]}], "rewards": {"xp": 220, "items": [["coins", 60], ["hoa_on_dan", 2]], "styles": ["bang"]}, "next": []},
+
+	"sq06_khoi_loi": {"kind": "side", "order": 15, "title": "Khôi lỗi giữ đền", "cause": "Bia đá cổ phía đông Rừng Chuông nhắc tới Nham Sơn Quyết và một người giữ đá đang ngủ giữa phế tích.", "result": "Khôi lỗi đá vỡ thành sỏi. Hạch nham thạch đặt vào bia, văn phù sáng lên: Lâm An lĩnh hội Nham Sơn Quyết, thế kiếm đứng vững như núi.", "objectives": [{"text": "Đánh thức và hạ Khôi lỗi đá giữa phế tích", "event": "kill:khoi_loi", "marker": [54, -304]}, {"text": "Đặt Hạch nham thạch vào bia đá cổ", "event": "interact:stele_ruins_core", "marker": [38.6, -296]}], "rewards": {"xp": 300, "items": [["coins", 80], ["kim_cang_dan", 2]], "styles": ["tho"]}, "next": []},
+
 	"ev01_chan_duong": {
 		"kind": "event", "order": 20, "title": "Tàn binh chặn đường",
 		"cause": "Bọn tàn binh chặn lối lên Đồi Gió, cướp của người qua lại.",

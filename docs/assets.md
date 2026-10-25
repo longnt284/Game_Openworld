@@ -10,8 +10,15 @@ Sinh tự động bằng `python3 tools/asset_manifest.py` từ các file thật
 | `assets/models/characters/ba_hanh.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/ba_hanh.blend` | 6,428 | 0 | 4 | 0 | 20 | idle, talk, walk, wave |
 | `assets/models/characters/ba_luc.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/ba_luc.blend` | 6,264 | 0 | 3 | 0 | 20 | idle, talk, walk, wave |
 | `assets/models/characters/chu_bay.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/chu_bay.blend` | 6,766 | 0 | 6 | 0 | 20 | idle, talk, walk, wave, work |
+| `assets/models/characters/cung_thu.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/cung_thu.blend` | 7,142 | 0 | 1 | 0 | 20 | alert, bash, death, hit, hop, idle, run, shoot, stagger, walk |
 | `assets/models/characters/heo_gio.glb` | Dùng trong slice | `tools/blender/build_creatures.py` | `art/characters/heo_gio.blend` | 1,346 | 0 | 6 | 0 | 12 | charge, death, hit, idle, run, stagger, walk, windup |
+| `assets/models/characters/ho_ve.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/ho_ve.blend` | 10,498 | 0 | 2 | 0 | 20 | alert, bash, block, death, hit, idle, run, stagger, thrust, walk |
+| `assets/models/characters/hon_anh.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/hon_anh.blend` | 6,394 | 0 | 2 | 0 | 20 | alert, blink, claw, death, hit, idle, run, scream, stagger, walk |
+| `assets/models/characters/khoi_loi.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/khoi_loi.blend` | 4,102 | 0 | 2 | 0 | 20 | alert, awaken, death, hit, idle, punch, roar, run, slam, stagger, throw, walk |
 | `assets/models/characters/lam_an.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/lam_an.blend` | 8,718 | 0 | 6 | 0 | 20 | air_leap, attack_1, attack_2, attack_3, block, dash_slash, death, dodge, fall, glide, heavy, hit, idle, interact, jump, land, parry, run, skill_cyclone, skill_gust, ultimate, walk |
+| `assets/models/characters/phap_su.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/phap_su.blend` | 6,814 | 0 | 2 | 0 | 20 | alert, blink, cast, death, hit, idle, run, stagger, storm, walk |
+| `assets/models/characters/soi_chua.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/soi_chua.blend` | 3,762 | 0 | 2 | 0 | 16 | alert, bite, death, hit, howl, idle, pounce, run, stagger, walk |
+| `assets/models/characters/soi_suong.glb` | Dùng trong slice | `tools/blender/build_monsters.py` | `art/characters/soi_suong.blend` | 2,760 | 0 | 2 | 0 | 16 | alert, bite, death, hit, howl, idle, pounce, run, stagger, walk |
 | `assets/models/characters/tan_binh.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tan_binh.blend` | 7,656 | 0 | 1 | 0 | 20 | alert, attack, death, hit, idle, run, stagger, walk |
 | `assets/models/characters/tich_phong.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tich_phong.blend` | 6,368 | 0 | 2 | 0 | 20 | idle, talk, walk, wave |
 | `assets/models/characters/tieu_mac.glb` | Dùng trong slice | `tools/blender/build_characters.py` | `art/characters/tieu_mac.blend` | 7,502 | 0 | 3 | 0 | 20 | idle, talk, walk, wave |
@@ -78,6 +85,8 @@ Sinh tự động bằng `python3 tools/asset_manifest.py` từ các file thật
 | `assets/models/tree.glb` | Legacy (bản nền cũ, runtime không dùng) | `tools/blender/build_assets.py` | `art/tree.blend` | 60 | 0 | 4 | 0 | — | — |
 | `assets/models/weapons/glaive.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/glaive.blend` | 504 | 0 | 6 | 0 | — | — |
 | `assets/models/weapons/sabre.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sabre.blend` | 530 | 0 | 4 | 0 | — | — |
+| `assets/models/weapons/spear.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/spear.blend` | 354 | 0 | 5 | 0 | — | — |
+| `assets/models/weapons/staff.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/staff.blend` | 446 | 0 | 5 | 0 | — | — |
 | `assets/models/weapons/sword_bamboo.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_bamboo.blend` | 462 | 0 | 7 | 0 | — | — |
 | `assets/models/weapons/sword_flame.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_flame.blend` | 648 | 0 | 5 | 0 | — | — |
 | `assets/models/weapons/sword_frost.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_frost.blend` | 650 | 0 | 4 | 0 | — | — |
@@ -86,7 +95,7 @@ Sinh tự động bằng `python3 tools/asset_manifest.py` từ các file thật
 | `assets/models/weapons/sword_water.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_water.blend` | 856 | 0 | 5 | 0 | — | — |
 | `assets/models/weapons/sword_wind.glb` | Dùng trong slice | `tools/blender/build_weapons.py` | `art/weapons/sword_wind.blend` | 630 | 0 | 5 | 0 | — | — |
 
-Tổng: 79 model, 148,804 tam giác hiển thị. Mọi model của dự án được dựng bằng script Blender 5.2.2 chạy nền (`blender --background --factory-startup --python <script>`), giấy phép: Của dự án (chủ repo chọn giấy phép).
+Tổng: 88 model, 191,076 tam giác hiển thị. Mọi model của dự án được dựng bằng script Blender 5.2.2 chạy nền (`blender --background --factory-startup --python <script>`), giấy phép: Của dự án (chủ repo chọn giấy phép).
 
 ## Âm thanh
 
@@ -107,6 +116,7 @@ Tổng: 79 model, 148,804 tam giác hiển thị. Mọi model của dự án đ�
 | `assets/audio/music/temple.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/music/title.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/music/village.ogg` | music | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
+| `assets/audio/sfx/arrow_hit.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/barrier.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/block_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 | `assets/audio/sfx/block_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
@@ -117,6 +127,7 @@ Tổng: 79 model, 148,804 tam giác hiển thị. Mọi model của dự án đ�
 | `assets/audio/sfx/boar_hit_1.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 | `assets/audio/sfx/boar_hit_2.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 | `assets/audio/sfx/book.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
+| `assets/audio/sfx/bow_draw.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/chest_open.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 | `assets/audio/sfx/chime_1.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/sfx/chime_2.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
@@ -128,15 +139,18 @@ Tổng: 79 model, 148,804 tam giác hiển thị. Mọi model của dự án đ�
 | `assets/audio/sfx/death.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/sfx/discovery.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/sfx/dodge.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/earth_spike.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/echo_whisper.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/enemy_down.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/flame_burst.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/flute_call.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/sfx/frost_cast.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/frost_shatter.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/ghost_wail.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/glaive_slam.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/glaive_sweep.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/glint.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/golem_grind.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/ground_slam.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/heal.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/hit_flesh_0.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
@@ -155,6 +169,7 @@ Tổng: 79 model, 148,804 tam giác hiển thị. Mọi model của dự án đ�
 | `assets/audio/sfx/plank.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 | `assets/audio/sfx/quest_complete.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
 | `assets/audio/sfx/roar.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/rock_crash.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/sabre_swing.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/seal_hum.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/shrine_bell.ogg` | sfx | tools/audio/compose_music.py (MIDI → FluidSynth, FluidR3_GM) | Của dự án (chủ repo chọn giấy phép); soundfont MIT |
@@ -208,9 +223,12 @@ Tổng: 79 model, 148,804 tam giác hiển thị. Mọi model của dự án đ�
 | `assets/audio/sfx/water_swirl.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/wind_cyclone.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/wind_slash.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/wolf_bite.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/wolf_howl.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
+| `assets/audio/sfx/wolf_snarl.ogg` | sfx | tools/audio/build_sfx.py (tổng hợp numpy/scipy) | Của dự án (chủ repo chọn giấy phép) |
 | `assets/audio/sfx/wood_knock.ogg` | sfx | Kenney (kenney.nl) — Impact Sounds / RPG Audio / Interface Sounds | CC0 1.0 |
 
-Tổng: 117 file OGG Vorbis. Nhạc được soạn bằng code (giai điệu ngũ cung Rê thứ) và render qua soundfont General MIDI; cần người nghe duyệt lại trước khi phát hành (xem `docs/progress.md`).
+Tổng: 126 file OGG Vorbis. Nhạc được soạn bằng code (giai điệu ngũ cung Rê thứ) và render qua soundfont General MIDI; cần người nghe duyệt lại trước khi phát hành (xem `docs/progress.md`).
 
 ## Font
 

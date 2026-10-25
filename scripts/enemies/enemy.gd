@@ -78,7 +78,7 @@ var broken: bool = false
 var finish_time: float = 0.0
 ## Seconds since a blow last landed (drives the overhead poise bar).
 var since_hit: float = 99.0
-## Overhead poise gauge, built the first time it is needed (never for bosses).
+## Overhead health and poise gauges, built the first time they are needed (never for bosses).
 var poise_bar: PoiseBar
 
 func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManager) -> void:
@@ -88,6 +88,10 @@ func setup(entity: Dictionary, library: AssetLibrary, world_manager: WorldManage
 	entity_id = String(entity["id"])
 	camp = String(entity.get("camp", ""))
 	persistent = bool(entity.get("persistent", false))
+	# Minibosses (the golem, the wolf pack leader) fight like bosses: the HUD bar instead of the
+	# overhead gauges, no waiting for attack slots, a short finisher window.
+	if data.get("miniboss", false):
+		boss = true
 	assets = library
 	world = world_manager
 	max_health = float(data.get("hp", 60))
@@ -586,7 +590,7 @@ func update_poise_bar(delta: float) -> void:
 		poise_bar.name = "PoiseBar"
 		add_child(poise_bar)
 		poise_bar.setup(float(data.get("height", 1.8)))
-	poise_bar.show_poise(wanted, poise_ratio(), is_finishable(), delta)
+	poise_bar.show_poise(wanted, poise_ratio(), is_finishable(), delta, health / maxf(max_health, 1.0))
 
 # ------------------------------------------------------------------ helpers
 
@@ -642,7 +646,42 @@ func _stop(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
 	velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
 
+func fire_missile(origin: Vector3, aim: Vector3, attack: Dictionary, shape: String, tint: Color) -> WindProjectile:
+	## Looses one missile of this attack (data "damage", "missile_speed", "range", "gravity") at
+	## `aim`: straight, or lobbed on a ballistic arc that lands on the aim point when "gravity" is set.
+	var missile: WindProjectile = WindProjectile.new()
+	missile.process_mode = Node.PROCESS_MODE_PAUSABLE
+	missile.radius = float(attack.get("width", 0.5)) * 0.5
+	missile.max_distance = float(attack.get("range", 28.0))
+	missile.pierce = false
+	get_parent().add_child(missile)
+	var speed: float = float(attack.get("missile_speed", 22.0))
+	var direction: Vector3 = (aim - origin).normalized()
+	var gravity: float = float(attack.get("gravity", 0.0))
+	if gravity > 0.0:
+		var flat: Vector3 = Vector3(aim.x - origin.x, 0.0, aim.z - origin.z)
+		var time: float = maxf(0.35, flat.length() / speed)
+		var rise: float = (aim.y - origin.y + 0.5 * gravity * time * time) / time
+		var launch_velocity: Vector3 = flat / time + Vector3.UP * rise
+		missile.gravity = gravity
+		missile.max_distance = maxf(missile.max_distance, launch_velocity.length() * time * 1.5)
+		speed = launch_velocity.length()
+		direction = launch_velocity.normalized()
+	missile.launch(origin, direction, speed, float(attack.get("damage", 10)) * float(data.get("damage_scale", 1.0)) * maxf(0.2, 1.0 + statuses.stat_bonus("attack_bonus")),
+		attack, Combat.LAYER_HURT_PLAYER, self, tint, shape)
+	return missile
+
+func aim_point(speed: float, lead: float = 0.6) -> Vector3:
+	## Where to aim a missile at the target: its chest, led by part of its run over the flight.
+	if target == null:
+		return global_position + facing * 10.0 + Vector3.UP
+	var chest: Vector3 = target.global_position + Vector3.UP * 1.1
+	var flight: float = global_position.distance_to(chest) / maxf(speed, 1.0)
+	var run: Vector3 = Vector3(target.velocity.x, 0.0, target.velocity.z)
+	return chest + run * flight * lead
+
 func _face_target(delta: float, rate: float) -> void:
+	rate *= float(data.get("turn_rate", 1.0))
 	if target:
 		var direction: Vector3 = target.global_position - global_position
 		direction.y = 0.0
@@ -678,7 +717,7 @@ func _move_toward(point: Vector3, speed: float, delta: float, turn: bool = true)
 	velocity.x = move_toward(velocity.x, direction.x * speed, 18.0 * delta)
 	velocity.z = move_toward(velocity.z, direction.z * speed, 18.0 * delta)
 	if turn:
-		facing = facing.slerp(direction, clampf(delta * 8.0, 0.0, 1.0)).normalized()
+		facing = facing.slerp(direction, clampf(delta * 8.0 * float(data.get("turn_rate", 1.0)), 0.0, 1.0)).normalized()
 		_apply_facing()
 
 func _avoid(direction: Vector3) -> Vector3:

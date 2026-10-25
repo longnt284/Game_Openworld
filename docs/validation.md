@@ -1,4 +1,4 @@
-# Kết quả kiểm tra — 23/10/2026
+# Kết quả kiểm tra — 25/10/2026
 
 Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** trong môi trường phát triển.
 
@@ -13,13 +13,14 @@ Phân biệt rõ: **đã chạy** (có log/ảnh) và **chưa chạy được** 
 | Bộ test | Lệnh | Kết quả |
 |---|---|---|
 | Import asset | `godot --headless --path . --editor --import` | Thành công |
-| Smoke test (bản nền + thực vật, vùng cấm, preset) | `tests/smoke_test.gd` | **35/35 PASS** |
-| Gameplay test (chơi trọn đoạn mẫu) | `tests/gameplay_test.gd` | **48/48 PASS** |
-| Combat test (15 thức của 5 hệ, trạng thái, nộ khí; GĐ1: trạng thái trên người chơi, chỉ số, phản ứng, phá thế, kết liễu, Tâm Nhãn, địch dùng AoE; GĐ2: kiếm phụ) | `tests/combat_test.gd` | **155/155 PASS** |
-| Progression test (save v4, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới; GĐ1: vật phẩm, quầy thuốc, affix mới, Ngọc bội, hồ sơ v1 → v2) | `tests/progression_test.gd` | **119/119 PASS** |
+| Smoke test (bản nền + thực vật, vùng cấm, preset; GĐ3: bố cục HUD không chồng nhau, vùng dựng theo lát giống hệt vùng dựng một lần, stream theo lát lấp đủ tầm nhìn, nội suy mô hình, tự hạ độ phân giải, biên dịch trước shader, HUD dưới nhường chỗ hộp hội thoại, nút màn hình chính không đè dòng ghi công) | `tests/smoke_test.gd` | **43/43 PASS** |
+| Gameplay test (chơi trọn đoạn mẫu; GĐ3: Viêm Dương từ *Lò rèn nguội lửa*, 4 nhiệm vụ phụ mới mở đủ 6 hệ, navmesh dựng sẵn khớp dữ liệu và bake trực tiếp khi không có) | `tests/gameplay_test.gd` | **70/70 PASS** |
+| Combat test (18 thức của 6 hệ, trạng thái, nộ khí; GĐ1: trạng thái trên người chơi, chỉ số, phản ứng, phá thế, kết liễu, Tâm Nhãn, địch dùng AoE; GĐ2: kiếm phụ; GĐ3: mở hệ theo nhiệm vụ, gắn hệ theo ô, hợp hệ +15%, Nứt giáp, 9 phản ứng, Địa Liệt Trảm trúng mỗi địch một lần, khiên đá) | `tests/combat_test.gd` | **177/177 PASS** |
+| Progression test (save v4, hồ sơ, gacha, nhiệm vụ ngày, Ải Vô Tận, cảnh giới; GĐ1: vật phẩm, quầy thuốc, affix mới, Ngọc bội, hồ sơ v1 → v2; GĐ3: cầm kiếm không dạy hệ) | `tests/progression_test.gd` | **120/120 PASS** |
 | World test (GĐ2: đồng hồ, thời tiết theo vùng, mức chuyển mượt, khí quyển nhiều lớp, điều kiện `time:`/`weather:`, save v4 + migrate, nghỉ ở miếu, mưa, sét, đèn đêm, âm thanh thời tiết, thời tiết trong trận) | `tests/world_test.gd` | **92/92 PASS** |
+| Monster test (GĐ3: 7 quái mới — cung thủ giữ cự ly và bắn trúng, tên bay vòng cung, hộ vệ đỡ phía trước và bị trọng kích/Thổ phá khiên, lôi sư dịch chuyển và gọi sét có báo trước, sói vồ, sói đầu đàn hú tăng nộ, hồn ảnh chớp ra sau lưng và gào, khôi lỗi ngủ, thức, sang pha 2) | `tests/monster_test.gd` | **23/23 PASS** |
 
-Tổng **449/449 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả năm bộ. CI GitHub Actions chạy trên `windows-latest`.
+Tổng **525/525 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.sh test` (Linux) chạy import rồi cả sáu bộ. CI GitHub Actions chạy trên `windows-latest`.
 
 **Combat test:** mỗi thức E/Q/X của 5 hệ khởi động, gây sát thương và gây đúng trạng thái; thiêu đốt gây sát thương theo thời gian không làm khựng; lạnh cóng làm chậm, 3 lớp thành đóng băng, boss không bị đóng băng; mục tiêu ướt chỉ nhận thêm sát thương sấm; tuyệt kỹ bị từ chối khi nộ khí chưa đầy và tiêu hết khi dùng; Phong Trảm vẫn bằng công lực × 1,6 như bản trước.
 
@@ -54,6 +55,14 @@ Tổng **449/449 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.s
 | ![Bão có chớp](screenshots/w_bamboo_storm_flash.jpg) | ![Sét sắp đánh](screenshots/w_bamboo_storm_warn.jpg) |
 | ![Bão đêm](screenshots/w_bamboo_storm_night.jpg) | ![Đèn lồng ban đêm](screenshots/w_village_night_lights.jpg) |
 
+**Giai đoạn 3 (Kiếm Quyết, giao diện, quái mới, Web):** cầm kiếm không còn dạy hệ; mỗi hệ chỉ mở bằng nhiệm vụ của nó, đủ 6 hệ sau 5 nhiệm vụ mà không phải gắn lại phím; gắn hệ khác nhau cho E/Q/X và lưu/tải giữ nguyên; save cũ tự suy ra bộ gắn từ kiếm; trùng hệ với kiếm +15%; Địa Liệt Trảm trúng mỗi địch một lần trên cả hàng gai; khiên đá giảm sát thương nhận; 3 phản ứng Thổ; 7 quái mới với hành vi riêng (monster test); thanh máu boss không chồng lên khối HUD nào kể cả khi chữ trên viên thuốc dài; vùng dựng theo lát giống hệt từng bit.
+
+| | |
+|---|---|
+| ![Kiếm Quyết](screenshots/kiem_quyet.jpg) | ![Vòng chọn hệ](screenshots/style_wheel.jpg) |
+| ![Địa Liệt Trảm](screenshots/earth_fissure.jpg) | ![Sơn Băng Địa Liệt](screenshots/earth_quake.jpg) |
+| ![Bảy quái mới](screenshots/bestiary.jpg) | ![Thanh máu boss](screenshots/boss_slam.jpg) |
+
 ## Kiểm tra hình ảnh — đã chạy (renderer phần mềm)
 
 `tests/render_preview.gd` chụp các cảnh thật trong game (1920 × 1080, giao diện cơ sở 1280 × 720): bến sông, làng, hội thoại, giao tranh, Trúc Hải, Khe Gió, đấu trường, boss, bản đồ, nhật ký, túi đồ, thiết lập, ghi công, Kỳ Ngộ, kho kiếm, nhiệm vụ ngày, cảnh giới, Ải Vô Tận và bảng phúc lành. Cảnh "moves" tua từng đòn tới giữa khung gây sát thương (lấy từ `data/anim_timings.json`) và chụp nhìn ngang; một ảnh riêng chạy đòn thật ở tốc độ chậm để kiểm tra vệt kiếm. Đã kiểm tra bằng mắt: vật liệu toon, bóng, viền, vũ khí gắn tay, tư thế đòn khớp khung sát thương, chữ tiếng Việt đủ dấu, UI nằm trong khung hình.
@@ -73,8 +82,9 @@ Tổng **449/449 PASS**. `./tools/run.ps1 -Mode test` (Windows) và `tools/run.s
 
 ## Bản Web — đã build, đã chạy trong Chromium, đã deploy preview
 
-- `tools/run.sh web` (cũng là lệnh build của Vercel qua `vercel.json`) tạo `build/web` **51 MB** trước nén: `index.wasm` 39,5 MB, `index.pck` 12,7 MB, `index.js` 0,3 MB. Bản không luồng nên không cần header COOP/COEP.
-- `tools/run.sh websmoke`: Playwright + Chromium (SwiftShader) mở bản build, tới màn hình chính sau ~5–7 s, vào chơi và đi bộ; **PASS**, không có `pageerror` hay `SCRIPT ERROR`. Cảnh báo duy nhất: navmesh làm tròn `agent_radius` (không ảnh hưởng).
+- `tools/run.sh web` (cũng là lệnh build của Vercel qua `vercel.json`) tạo `build/web` **55 MB** trước nén: `index.wasm` 39,5 MB, `index.pck` 16,9 MB (thêm 7 model quái, 9 âm thanh, navmesh dựng sẵn 37 KB), `index.js` 0,3 MB. Bản không luồng nên không cần header COOP/COEP.
+- `tools/run.sh websmoke`: Playwright + Chromium (SwiftShader) mở bản build, tới màn hình chính sau ~8 s (gồm biên dịch trước shader), vào chơi và đi bộ; **PASS**, không có `pageerror` hay `SCRIPT ERROR`.
+- Chi phí stream đo **trong trình duyệt** (`VK_QUERY='?vkbench' node tools/web_smoke.cjs`, WebAssembly, 25/10): tính trọn một vùng 26–38 ms (một khung bị khựng nếu làm một lần); chia lát: 6–8 lát, lát lâu nhất 4,5–5,6 ms; navmesh vùng nhỏ nhất bake trực tiếp 24–36 ms, nạp bản dựng sẵn 1,5–1,8 ms (4 lần chạy, máy không chạy việc khác; khi CPU bị chiếm, số tăng gấp rưỡi tới gấp đôi). Native cùng máy: một vùng 19,4 ms (trước tối ưu `WorldLayout` ~36 ms), lát lâu nhất 4,5 ms. FPS trong Chromium headless (~1 khung/s, dựng hình phần mềm) không có ý nghĩa và không dùng để kết luận.
 - Vercel (project `game-openworld`) tự build mỗi lần push nhánh; các bản preview của nhánh đều ở trạng thái READY. Preview đang bật Vercel Authentication nên chỉ tài khoản trong team xem được.
 
 ## Hiệu năng — chưa đo được trên GPU thật
@@ -98,7 +108,7 @@ Script in `PROFILE setup` (độ phân giải, GPU, chất lượng) rồi ba d�
 
 Bộ nhớ và số draw call không phụ thuộc GPU nên đã dùng được làm ngân sách ban đầu: ~106 MB RAM tĩnh, ~51 MB VRAM, tối đa ~1 250 draw call khi chuyển vùng (cao nhất ở bến sông/chuyển vùng do nhiều đạo cụ riêng lẻ). Nếu đo trên GPU thật thấy nghẽn ở CPU/driver, ưu tiên gộp đạo cụ tĩnh cùng vật liệu thành MultiMesh.
 
-Các biện pháp đã có: pool vùng cố định 25 node, tính mesh trên worker thread, MultiMesh cho cây/cỏ/đá, khoảng hiển thị theo chất lượng (cỏ 26/46/60 m, cây chi tiết 48/72/96 m, xa hơn dùng bóng cây ít đa giác), giới hạn bóng đổ 0/55/90 m, MSAA 0/2×/4×, NPC/địch/vật tương tác chỉ được tạo trong bán kính 85 m và hủy khi xa hơn 115 m, navmesh chỉ bake ở khu giao tranh.
+Các biện pháp đã có: pool vùng cố định 25 node, tính mesh trên worker thread (bản Web: chia lát ≤ 5 ms mỗi khung), navmesh dựng sẵn, biên dịch trước shader, nội suy mô hình Lâm An và camera giữa hai bước vật lý, tự hạ độ phân giải 3D trên Web khi chậm, MultiMesh cho cây/cỏ/đá, khoảng hiển thị theo chất lượng (cỏ 26/46/60 m, cây chi tiết 48/72/96 m, xa hơn dùng bóng cây ít đa giác), giới hạn bóng đổ 0/55/90 m, MSAA 0/2×/4×, NPC/địch/vật tương tác chỉ được tạo trong bán kính 85 m và hủy khi xa hơn 115 m, navmesh chỉ bake ở khu giao tranh.
 
 ## Bản Windows — đã build, chưa chạy thử trên Windows
 

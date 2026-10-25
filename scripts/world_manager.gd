@@ -1,10 +1,19 @@
 class_name WorldManager
 extends Node3D
 ## Streams a bounded pool of terrain chunks around the player. Heights come from
-## WorldLayout; chunk geometry is computed on WorkerThreadPool and applied here.
+## WorldLayout; chunk geometry is computed on WorkerThreadPool and applied here. Single-threaded
+## (web) builds have no workers, so there each chunk is a ChunkJob stepped a few ms per frame.
 
-## Without threads a task runs inline on the main thread, so build one chunk per frame there.
-var max_tasks: int = 1 if OS.has_feature("nothreads") else 2
+## Main-thread time per frame for sliced chunk builds: while the player's own ground is missing
+## (the player is frozen then, so a longer stall costs nothing), while the ring around it is
+## (where fights and colliders are), and for the far chunks.
+const LOADING_BUDGET_MS: float = 40.0
+const NEAR_BUDGET_MS: float = 10.0
+const SLICE_BUDGET_MS: float = 4.0
+
+var max_tasks: int = 2
+## Build chunks as ChunkJobs on the main thread instead of worker tasks.
+var sliced: bool = OS.has_feature("nothreads")
 
 var settings: GameSettings
 var assets: AssetLibrary
@@ -97,7 +106,8 @@ func configure(radius: int, density: float) -> void:
 func _wait_for_builds() -> void:
 	for coordinate: Vector2i in building.keys():
 		var job: Dictionary = building[coordinate]
-		WorkerThreadPool.wait_for_task_completion(job["task"])
+		if job.has("task"):
+			WorkerThreadPool.wait_for_task_completion(job["task"])
 		(job["chunk"] as WorldChunk).deactivate()
 		pool.append(job["chunk"])
 	building.clear()
@@ -111,7 +121,11 @@ func _process(_delta: float) -> void:
 	var next_center: Vector2i = coord_at(target.global_position)
 	if next_center != center:
 		_recenter(next_center)
-	_collect_builds()
+	var applied: bool = _collect_builds()
+	if sliced:
+		if not applied:
+			_step_sliced()
+		return
 	while not pending.is_empty() and not pool.is_empty() and building.size() < max_tasks:
 		var coordinate: Vector2i = pending.pop_front()
 		var chunk: WorldChunk = pool.pop_back()
@@ -128,12 +142,47 @@ func _process(_delta: float) -> void:
 			job["compute_ms"] = (Time.get_ticks_usec() - started) / 1000.0)
 		building[coordinate] = job
 
-func _collect_builds() -> void:
+func _step_sliced() -> void:
+	## One chunk at a time, nearest first, worked on until this frame's budget runs out; a
+	## finished chunk is applied on the next frame so its upload never shares a frame with work.
+	var budget: float = SLICE_BUDGET_MS
+	if not active.has(center):
+		budget = LOADING_BUDGET_MS
+	elif not pending.is_empty() and pending[0].distance_squared_to(center) <= 2 or building.keys().any(func(key: Vector2i) -> bool: return key.distance_squared_to(center) <= 2):
+		budget = NEAR_BUDGET_MS
+	var deadline: int = Time.get_ticks_usec() + int(budget * 1000.0)
+	for coordinate: Vector2i in building.keys():
+		if not _in_range(coordinate):
+			# The player outran it: give the chunk back rather than finish work nobody will see.
+			var dropped: WorldChunk = building[coordinate]["chunk"]
+			dropped.deactivate()
+			pool.append(dropped)
+			building.erase(coordinate)
+	if building.is_empty() and not pending.is_empty() and not pool.is_empty():
+		var coordinate: Vector2i = pending.pop_front()
+		var job: ChunkJob = ChunkJob.new(coordinate, layout, settings.chunk_size, settings.subdivisions, settings.world_seed, density_scale, part_transforms)
+		building[coordinate] = {"chunk": pool.pop_back(), "job": job, "layout": layout, "compute_ms": 0.0}
+	for entry: Dictionary in building.values():
+		var job: ChunkJob = entry["job"]
+		if job.stage == ChunkJob.DONE:
+			continue
+		var started: int = Time.get_ticks_usec()
+		if job.step(deadline):
+			entry["result"] = job.result
+		entry["compute_ms"] = float(entry["compute_ms"]) + (Time.get_ticks_usec() - started) / 1000.0
+
+func _collect_builds() -> bool:
+	## Applies every finished build; true when one was applied this frame.
+	var applied: bool = false
 	for coordinate: Vector2i in building.keys():
 		var job: Dictionary = building[coordinate]
-		if not WorkerThreadPool.is_task_completed(job["task"]):
+		if job.has("job"):
+			if (job["job"] as ChunkJob).stage != ChunkJob.DONE:
+				continue
+		elif not WorkerThreadPool.is_task_completed(job["task"]):
 			continue
-		WorkerThreadPool.wait_for_task_completion(job["task"])
+		else:
+			WorkerThreadPool.wait_for_task_completion(job["task"])
 		building.erase(coordinate)
 		var chunk: WorldChunk = job["chunk"]
 		if job["layout"] != layout or not _in_range(coordinate) or active.has(coordinate):
@@ -143,8 +192,10 @@ func _collect_builds() -> void:
 		var start: int = Time.get_ticks_usec()
 		chunk.apply(job["result"], settings.chunk_size, layout)
 		active[coordinate] = chunk
+		applied = true
 		last_build_ms = (Time.get_ticks_usec() - start) / 1000.0
 		last_compute_ms = float(job.get("compute_ms", 0.0))
+	return applied
 
 func _in_range(coordinate: Vector2i) -> bool:
 	return absi(coordinate.x - center.x) <= settings.view_radius and absi(coordinate.y - center.y) <= settings.view_radius

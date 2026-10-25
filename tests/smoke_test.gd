@@ -49,6 +49,14 @@ func _run() -> void:
 	check(world.active.size() == game.settings.chunk_capacity(), "All nearby chunks load within bounded capacity")
 	check(player.is_on_floor(), "Player stands on generated terrain collision")
 	check(game.hud.region_label.get_global_rect().position.x > 0, "Tracker HUD is inside viewport")
+	game.menus.show_title(false)
+	await frames(2)
+	var last_button: Control = game.menus.title_box.get_child(game.menus.title_box.get_child_count() - 1) as Control
+	var column: Rect2 = last_button.get_global_rect()
+	check(column.end.y <= game.menus.title_credit.get_global_rect().position.y and column.end.y <= 720.0,
+		"The title's buttons end above the credit line (%.0f ≤ %.0f)" % [column.end.y, game.menus.title_credit.get_global_rect().position.y])
+	game.menus.hide_title()
+	await _check_hud_layout(game)
 	check(world.coord_at(Vector3(-0.1, 0, -32.1)) == Vector2i(-1, -2), "Negative world coordinates map to correct chunks")
 	var second: WorldLayout = WorldLayout.load_default(game.settings.world_seed)
 	check(is_equal_approx(world.height_at(18, -73), second.height_at(18, -73)) and is_equal_approx(world.height_at(-61, -150), second.height_at(-61, -150)), "Seed reproduces terrain")
@@ -70,9 +78,13 @@ func _run() -> void:
 	var start: Vector3 = player.position
 	Input.action_press("move_forward")
 	await frames(30)
+	var lag: float = player.visual.global_position.distance_to(player.global_position)
+	var step: float = player.velocity.length() / Engine.physics_ticks_per_second
 	Input.action_release("move_forward")
 	await frames(12)
 	check(player.position.distance_to(start) > 1.0, "WASD movement changes player position")
+	check(step > 0.0 and lag <= step + 0.001,
+		"The model is drawn between the last two physics steps (%.3f m behind, one step %.3f m)" % [lag, step])
 	var ground_y: float = player.position.y
 	player.queue_input("jump")
 	await frames(8)
@@ -99,6 +111,13 @@ func _run() -> void:
 		reused = reused and previous_chunk_ids.has(chunk.get_instance_id())
 	check(reused, "Chunk nodes are reused across world streaming")
 	check(player.is_on_floor(), "Collision remains valid after distant teleport")
+	await _check_sliced(game)
+	_check_resolution()
+	var warmup: ShaderWarmup = ShaderWarmup.run(game, game.player.camera_rig.camera, game.assets)
+	var drawn: int = warmup.drawn
+	await frames(ShaderWarmup.FRAMES + 2)
+	check(drawn > game.assets.scenes.size() and not is_instance_valid(warmup),
+		"Shader warm-up draws every model and effect once (%d nodes), then frees itself" % drawn)
 	player.teleport(Vector3(6, world.height_at(6, 27) + 0.6, 27))
 	await frames(2)
 	await settle(game)
@@ -146,6 +165,94 @@ func _run() -> void:
 	game.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)
+
+func _check_hud_layout(game: Node) -> void:
+	## The boss bar, prompt and fixed HUD blocks never cover one another, even with long pill text.
+	var hud: GameHUD = game.hud
+	hud.quick_label.text = "C  •  Đan Hồi Nguyên ×12"
+	hud.heal_label.text = "R  •  Bánh ngải ×12  •  Trà sen ×10"
+	hud.show_boss("Khôi lỗi giữ đền", "Tượng đá thức giấc", 0.6, 840.0, 1400.0)
+	await frames(3)
+	hud.show_prompt("F  •  Kết liễu", UiTheme.GOLD)
+	var blocks: Dictionary = {"tracker": hud.tracker_panel, "minimap": hud.minimap, "vitals": hud.vitals_frame, "pills": hud.quick_label, "heal": hud.heal_label,
+		"skill e": hud.skill_boxes["e"]["panel"], "skill q": hud.skill_boxes["q"]["panel"], "skill x": hud.skill_boxes["x"]["panel"], "prompt": hud.prompt_panel}
+	var clashes: Array[String] = []
+	var boss: Rect2 = hud.boss_box.get_global_rect()
+	var view: Rect2 = hud.get_viewport().get_visible_rect()
+	for name: String in blocks:
+		if (blocks[name] as Control).get_global_rect().intersects(boss):
+			clashes.append(name)
+	check(clashes.is_empty() and view.encloses(boss), "The boss bar sits clear of the other HUD blocks (clashes: %s)" % (", ".join(clashes) if not clashes.is_empty() else "none"))
+	hud.hide_boss()
+	hud.show_prompt("")
+	game._refresh_hud()
+	hud.open_dialogue("Bà Lục", "Cháu là người lạ?")
+	var stepped_aside: bool = not hud.vitals_frame.visible and not (hud.skill_boxes["e"]["panel"] as Control).visible
+	hud.close_dialogue()
+	check(stepped_aside and hud.vitals_frame.visible and (hud.skill_boxes["x"]["panel"] as Control).visible and hud.status_row.visible,
+		"The vitals and skills step aside under the dialogue box and come back when it closes")
+
+func _check_sliced(game: Node) -> void:
+	## Single-threaded web builds step each chunk a few ms per frame: same chunk, nothing stalls.
+	var world: WorldManager = game.world
+	var coord: Vector2i = Vector2i(-1, -5)
+	var whole: Dictionary = WorldChunk.compute(coord, world.layout, game.settings.chunk_size, game.settings.subdivisions, game.settings.world_seed, 1.0, world.part_transforms)
+	var job: ChunkJob = ChunkJob.new(coord, world.layout, game.settings.chunk_size, game.settings.subdivisions, game.settings.world_seed, 1.0, world.part_transforms)
+	while not job.step(0):
+		pass
+	check(job.steps > 20 and str(job.result) == str(whole) and job.result == whole, "A chunk built in %d slices is identical to one built at once" % job.steps)
+	world.sliced = true
+	# Driven by hand here so each frame's streaming work (slices and uploads) can be timed.
+	world.set_process(false)
+	var player: PlayerController = game.player
+	player.teleport(Vector3(-40, world.height_at(-40, -180) + 1, -180))
+	var worst: float = 0.0
+	var frames_taken: int = 0
+	for index: int in range(3000):
+		var started: int = Time.get_ticks_usec()
+		world._process(0.0)
+		var spent: float = (Time.get_ticks_usec() - started) / 1000.0
+		if world.active.has(world.center):
+			worst = maxf(worst, spent)
+		frames_taken += 1
+		await frames(1)
+		if world.active.size() == game.settings.chunk_capacity() and world.building.is_empty() and world.pending.is_empty():
+			break
+	await frames(4)
+	var here: Vector2i = world.coord_at(player.global_position)
+	var expected: Dictionary = WorldChunk.compute(here, world.layout, game.settings.chunk_size, game.settings.subdivisions, game.settings.world_seed,
+		world.density_scale, world.part_transforms)
+	var built: WorldChunk = world.active.get(here)
+	var same: bool = built != null and built.ground.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] == expected["vertices"]
+	check(world.active.size() == game.settings.chunk_capacity() and same and player.is_on_floor() and worst < WorldManager.NEAR_BUDGET_MS * 3.0,
+		"Sliced streaming fills the view radius with the same terrain in %d frames (longest frame of work %.1f ms)" % [frames_taken, worst])
+	world.sliced = false
+	world.set_process(true)
+
+func _check_resolution() -> void:
+	## Web: a slow median lowers the 3D resolution a step; fast play or one long stall does not.
+	var adaptive: AdaptiveResolution = AdaptiveResolution.new()
+	root.add_child(adaptive)
+	adaptive.set_process(false)
+	var viewport: Viewport = adaptive.get_viewport()
+	var before: float = viewport.scaling_3d_scale
+	adaptive.reset(1.0)
+	adaptive.active = true
+	for index: int in range(200):
+		adaptive.sample(1000.0 / 60.0)
+	adaptive.sample(2000.0)
+	var steady: bool = is_equal_approx(adaptive.scale, 1.0)
+	for index: int in range(80):
+		adaptive.sample(40.0)
+	var lowered: bool = is_equal_approx(adaptive.scale, 0.9) and is_equal_approx(viewport.scaling_3d_scale, 0.9)
+	for index: int in range(1000):
+		adaptive.sample(40.0)
+	var floored: bool = is_equal_approx(adaptive.scale, AdaptiveResolution.MIN_SCALE)
+	adaptive.reset(0.85)
+	check(steady and lowered and floored and is_equal_approx(adaptive.scale, 0.85),
+		"Adaptive resolution steps down only while play runs slow, never below %.1f, and a preset restarts it" % AdaptiveResolution.MIN_SCALE)
+	viewport.scaling_3d_scale = before
+	adaptive.free()
 
 func _check_flora(game: Node, layout: WorldLayout) -> void:
 	var size: int = game.settings.chunk_size

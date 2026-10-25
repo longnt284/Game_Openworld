@@ -1,6 +1,7 @@
 class_name WindProjectile
 extends Node3D
-## Elemental missile travelling in a straight line (wind crescent, water wave, ice shard);
+## Missile travelling in a straight line (wind crescent, water wave, ice shard, an archer's
+## arrow, a storm mage's thunder orb) or a lobbed arc ("gravity": a golem's thrown rock);
 ## hits each hurtbox once and stops on terrain or props.
 
 var velocity: Vector3 = Vector3.ZERO
@@ -18,6 +19,10 @@ var pierce: bool = true
 var strike_scale: float = -1.0
 ## Thrown by an enemy: flies on the enemy clock, so Tâm Nhãn slows it too.
 var enemy_owned: bool = false
+## Downward pull in m/s² for lobbed missiles (0 flies straight); the body turns along its path.
+var gravity: float = 0.0
+## Solid missiles (arrow, rock) are drawn opaque with the world's toon shader colours.
+static var _solid: Dictionary = {}
 
 func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: float, attack_data: Dictionary, hit_mask: int, owner_node: Node3D, tint: Color = Vfx.WIND, shape: String = "crescent") -> void:
 	global_position = origin
@@ -30,7 +35,18 @@ func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: fl
 	color = tint
 	look_at(origin + velocity, Vector3.UP)
 	var body: MeshInstance3D = MeshInstance3D.new()
+	if shape in ["arrow", "rock"]:
+		_solid_body(body, shape)
+		add_child(body)
+		return
 	match shape:
+		"orb":
+			var orb: SphereMesh = SphereMesh.new()
+			orb.radius = 0.32
+			orb.height = 0.64
+			orb.radial_segments = 10
+			orb.rings = 5
+			body.mesh = orb
 		"wave":
 			body.mesh = Vfx.wave_mesh(radius * 2.0)
 			body.position.y = -1.0
@@ -63,9 +79,43 @@ func launch(origin: Vector3, direction: Vector3, speed: float, damage_amount: fl
 	add_child(body)
 	Vfx.wisps(self, color, 18 if shape == "wave" else 10, radius * 0.6)
 
+func _solid_body(body: MeshInstance3D, shape: String) -> void:
+	## An arrow (shaft, iron head, red fletching) or a tumbling block of rock.
+	if shape == "arrow":
+		var shaft: BoxMesh = BoxMesh.new()
+		shaft.size = Vector3(0.05, 0.05, 0.9)
+		body.mesh = shaft
+		body.material_override = _solid_material(Color("8a5a3b"))
+		for part: Array in [[Vector3(0.09, 0.09, 0.18), Vector3(0, 0, -0.5), Color("5d666a")], [Vector3(0.16, 0.02, 0.16), Vector3(0, 0, 0.4), Color("c8402e")]]:
+			var piece: MeshInstance3D = MeshInstance3D.new()
+			var box: BoxMesh = BoxMesh.new()
+			box.size = part[0]
+			piece.mesh = box
+			piece.position = part[1]
+			piece.material_override = _solid_material(part[2])
+			piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			body.add_child(piece)
+	else:
+		var rock: BoxMesh = BoxMesh.new()
+		rock.size = Vector3(0.9, 0.75, 0.85)
+		body.mesh = rock
+		body.material_override = _solid_material(Color("8d8473"))
+		body.rotation = Vector3(0.4, 0.7, 0.2)
+		Vfx.wisps(self, Color(0.75, 0.68, 0.55), 8, 0.5)
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+static func _solid_material(tint: Color) -> Material:
+	if not _solid.has(tint):
+		_solid[tint] = Toon.flat_material(tint)
+	return _solid[tint]
+
 func _physics_process(delta: float) -> void:
 	if enemy_owned:
 		delta *= Enemy.time_dilation
+	if gravity > 0.0:
+		velocity.y -= gravity * delta
+		if velocity.length() > 0.1:
+			look_at(global_position + velocity, Vector3.UP)
 	var step: Vector3 = velocity * delta
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var ray: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(global_position, global_position + step, Combat.LAYER_WORLD)

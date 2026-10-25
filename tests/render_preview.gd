@@ -132,7 +132,7 @@ func _run() -> void:
 	game._on_vision_closed()
 	await settle()
 	var scenes: Array[String] = ["dock", "village", "village_day", "village_dusk", "village_night", "village_night_lights", "village_rain", "clock", "dialogue", "combat", "statuses",
-		"reactions", "finisher", "focus", "moves", "bamboo", "bamboo_storm", "gorge", "gorge_fog", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
+		"reactions", "finisher", "focus", "moves", "kiem_quyet", "style_wheel", "earth", "bestiary", "bamboo", "bamboo_storm", "gorge", "gorge_fog", "arena", "boss", "map", "journal", "inventory", "character", "shop", "settings", "credits", "gacha", "armory", "talismans", "daily", "tier", "trial"]
 	for scene: String in scenes:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -249,6 +249,7 @@ func _run() -> void:
 				game._end_dialogue()
 			"combat":
 				await place(-5, 56, 0, -0.32)
+				game.player.invulnerable = 999.0
 				await frames(20)
 				var enemy: Enemy = game.spawner.node_for("en_rescue_1") as Enemy
 				if enemy:
@@ -435,9 +436,13 @@ func _run() -> void:
 				var guardian: Enemy = game.spawner.node_for("boss_truc_tuong") as Enemy
 				if guardian:
 					guardian.global_position = game.player.global_position + Vector3(0, 0.2, -5.0)
+					# The HUD boss bar as in the fight, a third of its health already gone.
+					guardian.health = guardian.max_health * 0.64
+					game.hud.show_boss(guardian.display_name(), String(guardian.data.get("title", "")), 0.64, guardian.health, guardian.max_health)
 					guardian._begin_attack("slam")
 					await frames(40)
 					await shot("boss_slam")
+					game.hud.hide_boss()
 			"bamboo":
 				await place(4, -128, 0, -0.18)
 				await frames(30)
@@ -607,6 +612,109 @@ func _run() -> void:
 				game.menus.close_panel()
 				game.menus.inventory_tab = 0
 				game.set_paused(false)
+			"kiem_quyet":
+				# Kiếm Quyết panel: four styles learned, a mixed loadout, Nham Sơn Quyết selected.
+				for style: String in ["phong", "thuy", "viem", "tho"]:
+					game.state.learn_style(style)
+				game.state.skill_points = 3
+				game.state.set_slot_style("e", "tho")
+				game.state.set_slot_style("q", "thuy")
+				game.state.set_slot_style("x", "phong")
+				game.menus.selected_style = "tho"
+				game.open_panel("styles")
+				await frames(12)
+				await shot("kiem_quyet")
+				game.menus.selected_style = "bang"
+				game.menus.refresh_panel()
+				await frames(8)
+				await shot("kiem_quyet_locked")
+				game.menus.close_panel()
+				game.set_paused(false)
+			"style_wheel":
+				# The wheel held open mid-field over the HUD, Viêm Dương picked.
+				for style: String in ["phong", "thuy", "viem", "tho"]:
+					game.state.learn_style(style)
+				await place(-20, 66, 0, -0.25)
+				game.hud.open_wheel(game.state.learned_styles(), game.player.slot_style("e"))
+				game.hud.wheel.pick(3)
+				await frames(20)
+				await shot("style_wheel")
+				game.hud.close_wheel(true)
+				Engine.time_scale = 1.0
+				await frames(10)
+				game._refresh_hud()
+				await frames(2)
+				await shot("style_equipped")
+			"bestiary":
+				# The seven new foes side by side, AI held, each in its idle loop.
+				await place(-25, 70, 0, -0.1)
+				game.player.invulnerable = 999.0
+				game.player.visual.visible = false
+				var lineup: Array = [["cung_thu", -4.6, 6.2], ["ho_ve", -3.0, 6.0], ["phap_su", -1.4, 6.2], ["khoi_loi", 0.5, 7.6], ["hon_anh", 2.3, 6.2],
+					["soi_chua", 3.9, 5.8], ["soi_suong", 5.4, 5.6]]
+				var shown: Array[Enemy] = []
+				for entry: Array in lineup:
+					var foe: Enemy = EnemyFactory.create(ContentDB.enemy(String(entry[0])))
+					foe.setup({"id": "preview_bestiary_%s" % entry[0], "enemy": entry[0], "yaw": 180.0}, game.assets, game.world)
+					game.add_child(foe)
+					var spot: Vector3 = game.player.global_position + Vector3(float(entry[1]), 0, -float(entry[2]))
+					spot.y = game.world.height_at(spot.x, spot.z) + 0.05
+					foe.activate(spot, game.player)
+					foe.set_physics_process(false)
+					foe._face_target(1.0, 100.0)
+					foe.visual.play_loop("idle")
+					shown.append(foe)
+				await frames(40)
+				await shot("bestiary")
+				for foe: Enemy in shown:
+					foe.queue_free()
+				game.player.visual.visible = true
+				await frames(2)
+			"earth":
+				# Nham Sơn Quyết: Địa Liệt Trảm's spike line, then Sơn Băng Địa Liệt's quake.
+				game.state.learn_style("tho")
+				game.state.equip_style("tho")
+				game.state.skills["tho_x"] = 1
+				await place(-20, 66, 0, -0.25)
+				game.player.invulnerable = 999.0
+				var dummies: Array[Enemy] = []
+				for offset: Vector3 in [Vector3(0, 0, -4.5), Vector3(2.2, 0, -7.0), Vector3(-2.2, 0, -7.5)]:
+					var dummy: Enemy = EnemyFactory.create(ContentDB.enemy("tan_binh"))
+					dummy.setup({"id": "preview_earth_%d" % dummies.size(), "enemy": "tan_binh", "yaw": 180.0}, game.assets, game.world)
+					game.add_child(dummy)
+					var spot: Vector3 = game.player.global_position + offset
+					spot.y = game.world.height_at(spot.x, spot.z) + 0.05
+					dummy.activate(spot, game.player)
+					dummy.set_physics_process(false)
+					dummy.max_health = 5000.0
+					dummy.health = 5000.0
+					game.on_enemy_spawned(dummy, {"id": dummy.entity_id})
+					dummies.append(dummy)
+				game.player.face_direction(Vector3(0, 0, -1), true)
+				await frames(4)
+				Engine.time_scale = 0.25
+				game.player._try_skill("e")
+				for step: int in range(40):
+					await frames(1)
+					if game.player.action.get("fired", false):
+						break
+				await frames(6)
+				await shot("earth_fissure")
+				Engine.time_scale = 1.0
+				await frames(60)
+				game.player.set_meter(PlayerController.METER_MAX)
+				Engine.time_scale = 0.3
+				game.player._try_skill("x")
+				for step: int in range(120):
+					await frames(1)
+					if game.player.action.get("fired", false):
+						break
+				await frames(4)
+				await shot("earth_quake")
+				Engine.time_scale = 1.0
+				for dummy: Enemy in dummies:
+					dummy.queue_free()
+				await frames(30)
 			"journal", "inventory", "settings", "credits", "armory", "daily", "tier":
 				game.open_panel(scene)
 				await frames(10)

@@ -1,6 +1,6 @@
 # Tiến độ
 
-Cập nhật: 23/10/2026. Nhánh `claude/p2-weather` (giai đoạn 2 của kế hoạch mở rộng thành Chương I hoàn chỉnh). Đọc file này đầu mỗi phiên để biết đang ở đâu.
+Cập nhật: 25/10/2026. Nhánh `claude/ui-skills-web-monsters` (giao diện mới, Kiếm Quyết 6 hệ theo nhiệm vụ, 7 quái mới, bản Web mượt hơn). Đọc file này đầu mỗi phiên để biết đang ở đâu.
 
 ## Tổng quan theo mốc
 
@@ -12,11 +12,12 @@ Cập nhật: 23/10/2026. Nhánh `claude/p2-weather` (giai đoạn 2 của kế 
 | 4. Đóng gói Windows | Đã có export preset, script tải template có kiểm tra SHA-512, bản build tạo được; **chưa chạy thử trên máy Windows** |
 | 5. Bản Web trên Vercel | Xong: preset Web không luồng, `tools/build_web.sh`, `vercel.json`; smoke test Chromium PASS; bản build 51 MB |
 | 6. Đồ họa theo concept | Xong: rừng dày (13 loài cây, cụm, vùng cấm), trời cel, núi đá vôi, nước, preset Thấp/Trung bình/Cao, 10 đạo cụ làng/đền, Lâm An và Trúc Tướng theo ảnh concept, hạt bay theo vùng, vệt kiếm |
-| 7. Ngũ hành kiếm quyết | Xong: 5 hệ × E/Q/X, 6 trạng thái, nộ khí, tuyệt kỹ, 4 kiếm nguyên tố, 2 clip mới, SFX |
+| 7. Ngũ hành kiếm quyết | Xong: 6 hệ × E/Q/X (thêm Thổ — Nham Sơn Quyết), mỗi hệ mở bằng một nhiệm vụ, gắn hệ riêng cho từng ô, 9 trạng thái, nộ khí, tuyệt kỹ, 4 kiếm nguyên tố, 2 clip mới, SFX |
 | 8. Chơi dài hạn | Xong: Ải Vô Tận, Cảnh giới 1–5 và tinh anh, Kỳ Ngộ (công khai tỉ lệ, bảo hiểm), rương thưởng, kiếm có chỉ số, trang phục, nhiệm vụ ngày, điểm danh 7 ngày; save v3 + hồ sơ dùng chung |
 | 9. Mở rộng GĐ1 — lõi combat | Xong: trạng thái/buff/debuff trên người chơi có icon HUD, vật phẩm tiêu hao theo dữ liệu + ô nhanh (C) + quầy thuốc, 13 chỉ số mới + bảng Nhân vật, Ngọc bội (3 ô, 4 bộ), 6 phản ứng nguyên tố, phá thế + kết liễu (F), Tâm Nhãn (né/phản hoàn hảo làm chậm địch); hồ sơ v2 |
 | 10. Mở rộng GĐ2 — thời tiết, ngày–đêm | Xong: đồng hồ 24 phút/ngày, 6 kiểu thời tiết theo vùng, khí quyển nhiều lớp (vùng × giờ × thời tiết), trời đêm có sao/trăng, mưa, sấm sét và sét đánh có báo trước, sương, gió bão, đèn lồng ban đêm, âm thanh mưa/bão/dế, ảnh hưởng nhẹ trong trận, nghỉ ở miếu, kiếm phụ đổi nhanh (V); save v4 |
-| 11. Mở rộng GĐ3–6 | Chưa làm: quái mới (GĐ3), bản đồ phía bắc (GĐ4), Hồi 3 + boss cuối (GĐ5), cân bằng và phát hành (GĐ6) |
+| 11. Mở rộng GĐ3 — quái mới, Kiếm Quyết, giao diện | Xong: 7 quái mới (5 thường, 2 miniboss) có model/animation Blender và AI riêng, 4 nhiệm vụ phụ mới mở hệ, HUD và bảng Kiếm Quyết kiểu Roblox, vòng chọn hệ, bản Web mượt hơn (xem mục dưới) |
+| 12. Mở rộng GĐ4–6 | Chưa làm: bản đồ phía bắc (GĐ4), Hồi 3 + boss cuối (GĐ5), cân bằng và phát hành (GĐ6) |
 
 ## Đã xong trong đoạn chơi mẫu
 
@@ -39,6 +40,19 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 - **AI:** tàn binh chỉ lượn vòng mà không áp sát (lỗi token tấn công); địch dùng navmesh của khu khác hoặc đứng im ở mép navmesh; tường gió bị bake vào navmesh làm boss kẹt; hit-stop làm lệch thời điểm đòn của địch; heo trượt xa sau khi bị phản; khối va chạm heo không xoay theo hướng; sóng xung kích vẫn gây sát thương sau khi boss chết; vòng báo đòn nện lệch vùng sát thương thật; phản lưỡi gió từ xa làm boss choáng.
 - **Người chơi:** chết vì sát thương xuyên đỡ không kích hoạt; nút đỡ/đánh bị "kẹt" sau khi tạm dừng hoặc hội thoại; thể lực không hồi sau khi chạy rồi đánh; animation tiếp đất mạnh không bao giờ chạy; nhấn đỡ trong lúc bất tử sau hồi sinh vẫn bị đánh; Phong Trảm trúng hai lần ở cự ly gần.
 - **Luồng game:** tải save trong màn hình gục ngã bị hồi sinh đè lên; bắt đầu game mới giữa trận boss giữ nguyên trạng thái trận; mở hội thoại/thị kiến/miếu giữa lúc giao chiến.
+
+## Giai đoạn 3 — Kiếm Quyết 6 hệ, giao diện mới, quái mới, Web mượt hơn (24–25/10)
+
+- **Kiếm Quyết tách khỏi thanh kiếm:** cầm kiếm không còn dạy hệ. 6 hệ, mỗi hệ mở bằng một nhiệm vụ (`data/styles.json` → `unlock`): Phong Ảnh — cốt truyện; Viêm Dương — *Lò rèn nguội lửa* (chú Bảy); Thủy Nguyệt — *Hồn trên bãi lau* (ông lái đò, hồn ảnh ở bãi lau); Lôi Ảnh — *Lôi sư trên Đồi Gió* (Tiểu Mạc, trại lôi sư + cung thủ + hộ vệ khiên, bùa sét ở tế đàn); Hàn Sương — *Bầy sói sương* (thợ săn A Lực, Khe Sương, sói đầu đàn); Nham Sơn (Thổ, mới) — *Khôi lỗi giữ đền* (bia đá cổ phía đông, khôi lỗi đá). Mỗi ô E/Q/X gắn hệ riêng (`GameState.loadout`, lưu trong save; save cũ tự suy ra từ kiếm). Trùng hệ với kiếm đang cầm: +15% sát thương.
+- **Hệ Thổ:** Địa Liệt Trảm (hàng gai đá lao về trước, kiểu `fissure`), Thạch Giáp Trận (sóng chấn + khiên đá giảm 30% sát thương nhận), Sơn Băng Địa Liệt (3 đợt địa chấn, Nứt giáp 3 tầng). Trạng thái Nứt giáp (−18 phòng ngự mỗi tầng), Sa lầy; 3 phản ứng mới: Sa Lầy (Thổ + Ướt), Nham Hỏa (Thổ + Thiêu đốt), Cát Lốc (Phong + Nứt giáp) — tổng 9.
+- **Giao diện kiểu Roblox:** khung bo tròn có gờ nổi, nút nổi, chữ viền; HUD mới — huy hiệu hệ, thanh máu có vệt mất máu, thanh thể lực/kinh nghiệm, viên thuốc và ô nhanh, bản đồ nhỏ góc phải, 3 ô kỹ năng tròn có biểu tượng hệ, vòng hồi chiêu và số giây, chấm bậc; thanh máu boss và miniboss ở giữa trên; lời nhắc có phím riêng; toast dạng viên; dải banner. Bảng **Kiếm Quyết (K)**: 6 huy chương hệ, chiêu đang gắn, mô tả, nâng bậc, gắn vào ô, "Trang bị cả bộ", bảng tương tác nguyên tố. **Vòng chọn hệ (giữ Tab)**: rê chuột hoặc 1–6, thời gian chậm ×0,3 khi mở.
+- **7 quái mới** (model + animation Blender, âm thanh tổng hợp): Cung thủ (giữ cự ly, bắn đón đầu), Hộ vệ khiên (đỡ phía trước, trọng kích/Thổ phá khiên), Lôi sư (dịch chuyển, cầu sét, gọi sét có báo trước), Sói sương (bầy, vồ; ban đêm có bầy lảng vảng ở Khe Sương), Sói đầu đàn (miniboss, hú tăng nộ cả bầy), Hồn ảnh (bay, chớp ra sau lưng, gào Suy nhược), Khôi lỗi đá (miniboss ngủ, 2 pha, nện vòng, ném đá, gai đá). Mỗi loại có gợi ý cách đánh lần đầu gặp. 4 khu mới: bãi lau, trại lôi sư, Khe Sương, phế tích phía đông.
+- **Bản Web mượt hơn** (đo trong Chromium/WebAssembly, `?vkbench`): một vùng địa hình trước kia tính trọn trong một khung (26–38 ms trên Web; native ~36 ms trước khi tối ưu `WorldLayout`, nay ~19 ms) nay chia thành 6–8 lát, lát lâu nhất 4,5–5,6 ms; navmesh vùng giao tranh nạp từ bản dựng sẵn (~1,5–1,8 ms thay vì parse + bake đồng bộ 24–36 ms cho vùng nhỏ nhất); shader biên dịch trước sau màn hình chính; Lâm An và camera nội suy giữa hai bước vật lý; tự hạ độ phân giải 3D khi khung hình chậm.
+- Test: 525 check (smoke 43, gameplay 70, combat 177, progression 120, world 92, monster 23 — bộ mới), tất cả PASS; web smoke PASS.
+
+![Kiếm Quyết](screenshots/kiem_quyet.jpg)
+![Vòng chọn hệ](screenshots/style_wheel.jpg)
+![Quái mới](screenshots/bestiary.jpg)
 
 ## Giai đoạn 2 — thời tiết, ngày–đêm, kiếm phụ (21–23/10)
 
@@ -77,8 +91,9 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 - Model low-poly dựng bằng script, không texture vẽ tay; mặt/tóc còn đơn giản. Animation keyframe tay; các đòn chính nên được animator chỉnh lại.
 - Cân bằng Ải Vô Tận và Cảnh giới mới qua test tự động, chưa qua người chơi thật; số liệu nằm hết trong `data/*.json` để chỉnh nhanh.
 - Bản Web tải ~51 MB (wasm 39,5 MB, pck 12,7 MB) trước khi nén; Vercel nén khi truyền.
-- Chỉ có 2 loại địch thường + 1 miniboss (mục tiêu chương: 6 mẫu thuộc 4 nhóm — thiếu nhóm đánh xa và hộ vệ nặng).
-- Phản ứng nguyên tố: từ GĐ2 tự tạo được bằng kiếm phụ (đổi hệ) và mưa/bão (Ướt); quái gây trạng thái đến ở GĐ3.
+- Quái: 7 loại thường + 3 miniboss/boss; cân bằng mới qua test tự động (AI, sát thương, luồng nhiệm vụ), chưa qua người chơi thật.
+- Phản ứng nguyên tố: tự tạo bằng các ô gắn hệ khác nhau, kiếm phụ và mưa/bão (Ướt).
+- Hiệu năng Web chỉ đo được trong Chromium headless dựng hình phần mềm (SwiftShader): số liệu chi phí script (`?vkbench`) đáng tin, FPS thì không — cần đo lại trên máy có GPU thật.
 - Ngọc bội đang đeo áp dụng cho mọi bản lưu, kể cả hành trình mới.
 - Điều khiển chỉ hỗ trợ bàn phím + chuột; chưa hỗ trợ gamepad.
 - Hiệu năng chỉ đo được trên renderer phần mềm (llvmpipe) trong môi trường phát triển, không có ý nghĩa cho mục tiêu 60 FPS.
@@ -87,7 +102,6 @@ Review tự động theo 4 nhóm (người chơi/chiến đấu, địch/thế g
 
 Theo kế hoạch đã duyệt (6 giai đoạn, mỗi giai đoạn một PR):
 
-1. **GĐ3:** cung thủ, hộ vệ khiên, bầy sói đêm + sói đầu đàn, hồn ảnh ký ức, pháp sư tàn binh, khôi lỗi đá.
-2. **GĐ4:** bản đồ nối dài phía bắc (Sơn Đạo, Hắc Lâm, Nội Điện) + hang riêng.
-3. **GĐ5:** Hồi 3, boss cuối Tịch Phong 3 pha, kết thường / kết thật (đủ 5 Tơ ký ức).
-4. **GĐ6:** cân bằng, hiệu năng, tài liệu, phát hành.
+1. **GĐ4:** bản đồ nối dài phía bắc (Sơn Đạo, Hắc Lâm, Nội Điện) + hang riêng.
+2. **GĐ5:** Hồi 3, boss cuối Tịch Phong 3 pha, kết thường / kết thật (đủ 5 Tơ ký ức).
+3. **GĐ6:** cân bằng, hiệu năng, tài liệu, phát hành.

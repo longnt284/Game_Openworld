@@ -16,6 +16,9 @@ signal quit_requested
 var main: Node
 var root: Control
 var title_screen: Control
+## The title's column of buttons and the credit line under it (the smoke test checks they never meet).
+var title_box: VBoxContainer
+var title_credit: Label
 var continue_button: Button
 var new_game_button: Button
 var pause_panel: PanelContainer
@@ -42,6 +45,8 @@ var inventory_tab: int = 0
 ## Armory tab (0 Kiếm & trang phục, 1 Ngọc bội), kept across refreshes.
 var armory_tab: int = 0
 var shop_id: String = ""
+## Kiếm Quyết panel: the style whose forms are shown, kept across refreshes.
+var selected_style: String = ""
 ## Panels opened from the world (a shop counter) close straight back into play, not to the pause menu.
 var resume_on_close: bool = false
 
@@ -86,7 +91,8 @@ func _build_title() -> void:
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title_screen.add_child(band)
 	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	# Tight enough that the raised buttons of the theme end above the credit line.
+	box.add_theme_constant_override("separation", 6)
 	box.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	box.offset_left = 90
 	box.offset_right = 620
@@ -105,7 +111,7 @@ func _build_title() -> void:
 		storage.custom_minimum_size.x = 480
 		box.add_child(storage)
 	var spacer: Control = Control.new()
-	spacer.custom_minimum_size.y = 26
+	spacer.custom_minimum_size.y = 12
 	box.add_child(spacer)
 	continue_button = UiTheme.button("Tiếp tục hành trình", func() -> void: emit_signal("continue_requested"), 300)
 	box.add_child(continue_button)
@@ -125,6 +131,8 @@ func _build_title() -> void:
 	credit.offset_right = 700
 	credit.offset_bottom = -20
 	title_screen.add_child(credit)
+	title_box = box
+	title_credit = credit
 	title_screen.visible = false
 
 func show_title(has_save: bool) -> void:
@@ -158,6 +166,7 @@ func _build_pause() -> void:
 	box.add_child(grid)
 	for entry: Array in [["Tiếp tục", func() -> void: emit_signal("resume_requested")], ["Bản đồ  (M)", func() -> void: open_panel("map")],
 			["Nhật ký  (J)", func() -> void: open_panel("journal")], ["Túi đồ & tu luyện  (I)", func() -> void: open_panel("inventory")],
+			["Kiếm Quyết  (K)", func() -> void: open_panel("styles")],
 			["Kiếm, Ngọc bội & trang phục", func() -> void: open_panel("armory")], ["Kỳ Ngộ", func() -> void: open_panel("gacha")],
 			["Nhiệm vụ ngày", func() -> void: open_panel("daily")], ["Cảnh giới thế giới", func() -> void: open_panel("tier")],
 			["Thiết lập", func() -> void: open_panel("settings")], ["Về Miếu Gió gần nhất", func() -> void: emit_signal("checkpoint_requested")],
@@ -230,6 +239,9 @@ func open_panel(name: String) -> void:
 		"inventory":
 			panel_title.text = "Túi đồ & tu luyện"
 			panel_body.add_child(_inventory_view())
+		"styles":
+			panel_title.text = "Kiếm Quyết — ngũ hành kiếm pháp"
+			panel_body.add_child(StylesPanel.build(self))
 		"settings":
 			panel_title.text = "Thiết lập"
 			panel_body.add_child(_settings_view())
@@ -380,6 +392,8 @@ func _journal_view() -> Control:
 		var reward_parts: Array[String] = ["%d kinh nghiệm" % int(rewards.get("xp", 0))]
 		for item: Array in rewards.get("items", []):
 			reward_parts.append("%s ×%d" % [("Đồng" if item[0] == "coins" else ContentDB.item(item[0]).get("name", item[0])), int(item[1])])
+		for style: Variant in rewards.get("styles", []):
+			reward_parts.append("[color=#%s]Kiếm Quyết %s[/color]" % [StyleBook.color(String(style)).to_html(false), String(ContentDB.style(String(style)).get("name", style))])
 		text += "\n[color=#b8b09a]Phần thưởng:[/color] %s" % ", ".join(reward_parts)
 		if main.quests.is_active(id):
 			main.state.tracked_quest = id
@@ -465,11 +479,10 @@ func _inventory_view() -> Control:
 	right.add_child(UiTheme.label("Lâm An — Cấp %d" % state.level, 20, UiTheme.GOLD, true))
 	right.add_child(UiTheme.label("Kinh nghiệm: %d / %d   •   Điểm tu luyện: %d" % [state.xp, state.xp_for_next(), state.skill_points], 16))
 	right.add_child(UiTheme.label("Khí huyết tối đa: %d   •   Công lực: %d" % [roundi(state.max_health()), roundi(state.attack_power())], 16))
-	var style: String = StyleBook.style_of(state.sword)
-	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ContentDB.style(style).get("name", "")], 16, UiTheme.JADE_LIGHT, true))
+	var element: String = String(ContentDB.weapon(state.sword).get("element", ""))
+	right.add_child(UiTheme.label("Kiếm: %s  •  %s" % [ContentDB.weapon(state.sword).get("name", state.sword), ("hệ " + String(ContentDB.element(element).get("name", ""))) if element != "" else "kiếm thường"], 16, UiTheme.JADE_LIGHT, true))
 	if state.has_alt():
-		right.add_child(UiTheme.label("Kiếm phụ (%s): %s  •  %s" % [UserSettings.event_label("swap_sword"), ContentDB.weapon(state.sword_alt).get("name", state.sword_alt),
-			ContentDB.style(StyleBook.style_of(state.sword_alt)).get("name", "")], 15, UiTheme.MUTED))
+		right.add_child(UiTheme.label("Kiếm phụ (%s): %s" % [UserSettings.event_label("swap_sword"), ContentDB.weapon(state.sword_alt).get("name", state.sword_alt)], 15, UiTheme.MUTED))
 	right.add_child(UiTheme.label("Tơ ký ức đã kết: %d" % state.count("to_ky_uc"), 16, UiTheme.CREAM))
 	# Cultivation and the character sheet share the rest of the column as two tabs.
 	var tabs: TabContainer = TabContainer.new()
@@ -484,18 +497,15 @@ func _inventory_view() -> Control:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 6)
 	scroll.add_child(list)
-	# The equipped sword's style first, then any other style with a learned form.
-	var shown: Array = [style]
-	for other: String in StyleBook.styles():
-		if other != style and ["e", "q"].any(func(slot: String) -> bool: return state.skill_level(String(StyleBook.form(other, slot).get("skill", ""))) > 0):
-			shown.append(other)
-	for shown_style: String in shown:
-		list.add_child(UiTheme.label(String(ContentDB.style(shown_style).get("name", "")), 16, StyleBook.color(shown_style), true))
-		for slot: String in StyleBook.SLOTS:
-			var form: Dictionary = StyleBook.form(shown_style, slot)
-			_skill_row(list, String(form["skill"]), "%s [%s]" % [form.get("name", ""), UserSettings.event_label(StyleBook.SLOT_ACTIONS[slot])],
-				String(form.get("description", "")) + ("  Tốn đầy nộ khí." if slot == "x" else "  Mỗi bậc: +25% sát thương, -15% hồi chiêu."),
-				String(StyleBook.form(shown_style, "q").get("skill", "")) if slot == "x" else "")
+	# Kiếm Quyết live in their own panel; this tab sums up the keys and keeps khinh công.
+	for slot: String in StyleBook.SLOTS:
+		var bound: String = state.slot_style(slot)
+		var form: Dictionary = StyleBook.form(bound, slot)
+		var level: int = state.skill_level(String(form.get("skill", "")))
+		list.add_child(UiTheme.label("%s  •  %s — %s" % [UserSettings.event_label(StyleBook.SLOT_ACTIONS[slot]), form.get("name", ""), ("bậc %d" % level) if level > 0 else "chưa lĩnh hội"],
+			16, StyleBook.color(bound) if level > 0 else UiTheme.MUTED, true))
+	list.add_child(UiTheme.label("Đã lĩnh hội %d/%d Kiếm Quyết." % [state.learned_styles().size(), StyleBook.styles().size()], 15, UiTheme.CREAM))
+	list.add_child(UiTheme.button("Mở Kiếm Quyết  (%s)" % UserSettings.event_label("open_styles"), func() -> void: open_panel("styles"), 300, true))
 	_skill_row(list, "khinh_cong", "Khinh công", "Nhảy trên không (Space) và lướt gió (giữ Space). Mỗi bậc giảm thể lực tiêu hao.", "")
 	tabs.add_child(_character_view())
 	tabs.current_tab = clampi(inventory_tab, 0, tabs.get_tab_count() - 1)

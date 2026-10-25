@@ -1,14 +1,17 @@
 class_name StyleBook
 extends RefCounted
-## Sword styles (data/styles.json): the element of a sword and the three forms it grants,
-## bound to the E (skill_1), Q (skill_2) and X (skill_ult, costs the full charge meter) keys.
-## Story swords without an element use the wind style.
+## Kiếm Quyết (data/styles.json): six elemental sword arts, each with three forms for the E
+## (skill_1), Q (skill_2) and X (skill_ult, costs the full charge meter) keys. Each style is
+## learned through its own quest ("unlock") and bound per key in GameState.loadout; a sword only
+## names the style it is attuned to ("style" in data/weapons.json). Story swords lean to Phong.
 
 const SLOTS: PackedStringArray = ["e", "q", "x"]
 const SLOT_ACTIONS: Dictionary = {"e": "skill_1", "q": "skill_2", "x": "skill_ult"}
 const DEFAULT_STYLE: String = "phong"
 ## Learning an ultimate costs this many cultivation points and needs the style's Q form.
 const ULT_COST: int = 2
+## A form landing with the same element as the sword in hand deals this much more.
+const ATTUNE_BONUS: float = 0.15
 
 static func style_of(sword: String) -> String:
 	var style: String = String(ContentDB.weapon(sword).get("style", DEFAULT_STYLE))
@@ -47,3 +50,17 @@ static func color(style: String) -> Color:
 
 static func element_color(element: String) -> Color:
 	return Color(String(ContentDB.element(element).get("color", "ffffff"))) if element != "" else Color(1, 1, 1)
+
+static func unlock_quest(style: String) -> String:
+	## The quest whose completion teaches this style ("" when none is named).
+	return String((ContentDB.style(style).get("unlock", {}) as Dictionary).get("quest", ""))
+
+static func unlock_hint(style: String) -> String:
+	return String((ContentDB.style(style).get("unlock", {}) as Dictionary).get("hint", ""))
+
+static func style_for_quest(quest: String) -> String:
+	## The style a quest teaches when it completes, or "".
+	for style: String in styles():
+		if unlock_quest(style) == quest:
+			return style
+	return ""

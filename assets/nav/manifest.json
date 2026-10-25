@@ -1,0 +1,17 @@
+{
+	"fingerprint": "e3fb6d327f1c5a556fc2123b6f008ff5a14ddcb779c31f789cd93a669e8a3a1b",
+	"format": 1,
+	"seed": 284,
+	"zones": [
+		"nav_rescue",
+		"nav_meadow",
+		"nav_hill",
+		"nav_bamboo",
+		"nav_camp",
+		"nav_arena",
+		"nav_reed",
+		"nav_storm",
+		"nav_frost",
+		"nav_ruins"
+	]
+}

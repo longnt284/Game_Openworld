@@ -161,7 +161,7 @@ func _create(data: Dictionary) -> Node3D:
 			enemy.defeated.connect(main.on_enemy_defeated.bind(data))
 			main.on_enemy_spawned(enemy, data)
 			return enemy
-		"shrine", "chest", "echo", "diary", "chime", "memory_core", "seal_gate", "trial_gate":
+		"shrine", "chest", "echo", "diary", "chime", "memory_core", "seal_gate", "trial_gate", "relic":
 			var item: Interactable = Interactable.new()
 			item.name = String(data["id"])
 			add_child(item)
@@ -188,33 +188,26 @@ func reset_navzones() -> void:
 	navzones.clear()
 
 func _bake_navzone(data: Dictionary) -> void:
-	## Parses the colliders already streamed in around the encounter and bakes off-thread.
+	## The shipped navmesh when it matches this world (NavBake); else parses the colliders already
+	## streamed in around the encounter and bakes off-thread.
+	var shipped: NavigationMesh = NavBake.prebaked(String(data["id"]), world.settings.world_seed)
 	var size: float = float(data.get("size", 40.0))
 	var center: Vector2 = Vector2(float(data["pos"][0]), float(data["pos"][1]))
-	for offset: Vector2 in [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(-0.5, 0.5), Vector2(0.5, 0.5)]:
-		var corner: Vector2 = center + offset * size * 0.8
-		if not world.is_position_ready(Vector3(corner.x, 0, corner.y)):
-			return
-	var mesh: NavigationMesh = NavigationMesh.new()
-	mesh.agent_radius = 0.5
-	mesh.agent_height = 2.0
-	mesh.agent_max_climb = 0.5
-	mesh.agent_max_slope = 42.0
-	mesh.cell_size = 0.25
-	mesh.cell_height = 0.25
-	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
-	mesh.geometry_collision_mask = Combat.LAYER_WORLD
-	# Only terrain and props are walked, not characters, UI or the arena wind wall.
-	mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
-	mesh.geometry_source_group_name = NAV_SOURCE
-	var low: float = world.height_at(center.x, center.y) - 20.0
-	mesh.filter_baking_aabb = AABB(Vector3(center.x - size * 0.5, low, center.y - size * 0.5), Vector3(size, 60.0, size))
-	var source: NavigationMeshSourceGeometryData3D = NavigationMeshSourceGeometryData3D.new()
-	NavigationServer3D.parse_source_geometry_data(mesh, source, main)
+	if shipped == null:
+		for offset: Vector2 in [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(-0.5, 0.5), Vector2(0.5, 0.5)]:
+			var corner: Vector2 = center + offset * size * 0.8
+			if not world.is_position_ready(Vector3(corner.x, 0, corner.y)):
+				return
 	var region: NavigationRegion3D = NavigationRegion3D.new()
 	region.name = "Nav_" + String(data["id"])
 	add_child(region)
 	navzones[data["id"]] = region
+	if shipped:
+		region.navigation_mesh = shipped
+		return
+	var mesh: NavigationMesh = NavBake.make_mesh(data, world.height_at(center.x, center.y))
+	var source: NavigationMeshSourceGeometryData3D = NavigationMeshSourceGeometryData3D.new()
+	NavigationServer3D.parse_source_geometry_data(mesh, source, main)
 	NavigationServer3D.bake_from_source_geometry_data_async(mesh, source, func() -> void:
 		if is_instance_valid(region):
 			region.navigation_mesh = mesh)

@@ -118,7 +118,20 @@ func _run() -> void:
 
 	# ---- data integrity
 	var styles: Array = StyleBook.styles()
-	check(styles.size() == 5, "Five sword styles are defined")
+	check(styles.size() == 6, "Six sword styles are defined")
+	var unlocks_ok: bool = true
+	var elements_ok: bool = true
+	for style: String in styles:
+		var quest: String = StyleBook.unlock_quest(style)
+		var story: bool = bool((ContentDB.style(style).get("unlock", {}) as Dictionary).get("story", false))
+		if ContentDB.quest(quest).is_empty() or (not story and not ((ContentDB.quest(quest).get("rewards", {}) as Dictionary).get("styles", []) as Array).has(style)):
+			unlocks_ok = false
+			push_error("Style %s names quest %s that does not teach it" % [style, quest])
+		var element: String = String(ContentDB.style(style).get("element", ""))
+		if ContentDB.element(element).is_empty() or ContentDB.status(String(ContentDB.element(element).get("status", ""))).is_empty():
+			elements_ok = false
+	check(unlocks_ok, "Every Kiếm Quyết names the quest that teaches it, and that quest rewards it (Phong through the story)")
+	check(elements_ok, "Every Kiếm Quyết has an element with a status")
 	var forms_ok: bool = true
 	for style: String in styles:
 		for slot: String in StyleBook.SLOTS:
@@ -310,14 +323,11 @@ func _run() -> void:
 
 	# ---- every form of every style lands and applies its status
 	for style: String in styles:
-		var sword: String = ""
-		for candidate: String in ContentDB.get_data("weapons"):
-			if String(ContentDB.weapon(candidate).get("style", "")) == style and String(ContentDB.weapon(candidate).get("element", "")) != "":
-				sword = candidate
-				break
-		state.sword = sword
+		# Forms follow the loadout, not the sword: a plain story sword casts every style.
+		state.sword = "sword_old"
 		for slot: String in StyleBook.SLOTS:
 			state.skills[String(StyleBook.form(style, slot)["skill"])] = 1
+		state.equip_style(style)
 		for slot: String in StyleBook.SLOTS:
 			await reset_player()
 			var targets: Array[Enemy] = [spawn("tan_binh", Vector3(0, 0, -3.5)), spawn("tan_binh", Vector3(1.6, 0, -5)), spawn("tan_binh", Vector3(-1.6, 0, -5))]
@@ -340,6 +350,82 @@ func _run() -> void:
 			if float((data.get("status", {}) as Dictionary).get("chance", 0.0)) >= 1.0:
 				check(with_status > 0, "%s %s applies %s" % [style, form["name"], status])
 			await clear_dummies()
+
+	# ---- Nham Sơn: overlapping spikes strike each foe once; Thạch Giáp Trận's stone skin
+	await reset_player()
+	state.stats = {}
+	player.counter_bonus = 0.0
+	player.swap_window = 0.0
+	player.statuses.clear()
+	state.sword = "sword_old"
+	state.equip_style("tho")
+	# Each foe stands between two spikes of the line, within reach of both.
+	var spiked: Array[Enemy] = [spawn("tan_binh", Vector3(0, 0, -3.85)), spawn("tan_binh", Vector3(0.4, 0, -7.25))]
+	var reference: Enemy = spawn("tan_binh", Vector3(8, 0, 6))
+	await frames(3)
+	var reference_before: float = reference.health
+	player.strike(reference, Combat.attack("player", "tho_e"), 1.0, Vector3.FORWARD, true)
+	var one_spike: float = reference_before - reference.health
+	await cast("e")
+	await frames(60)
+	var struck_once: bool = one_spike > 0.0
+	for enemy: Enemy in spiked:
+		struck_once = struck_once and is_equal_approx(enemy.max_health - enemy.health, one_spike)
+	check(struck_once, "Địa Liệt Trảm strikes each foe on its line once, though two spikes reach it (%.1f each)" % one_spike)
+	await clear_dummies()
+	await reset_player()
+	player.statuses.clear()
+	await cast("q")
+	check(player.statuses.has("buff_stone") and is_equal_approx(state.stat("damage_taken"), -0.3) and is_equal_approx(state.stat("status_resist"), 0.3),
+		"Thạch Giáp Trận wraps Lâm An in stone: −30% damage taken, +30% status resistance")
+	player.statuses.clear()
+	await clear_dummies()
+
+	state.loadout = {}
+
+	# ---- Kiếm Quyết: forms follow the loadout; a form of the sword's element is attuned
+	await reset_player()
+	state.stats = {}
+	player.counter_bonus = 0.0
+	player.swap_window = 0.0
+	state.sword = "sword_water"
+	var water_power: float = state.attack_power()
+	state.sword = "sword_flame"
+	var flame_power: float = state.attack_power()
+	state.equip_style("viem")
+	var attuned_target: Enemy = spawn("tan_binh", Vector3(0, 0, -2.5))
+	var plain_target: Enemy = spawn("tan_binh", Vector3(2.5, 0, -2.5))
+	var viem_data: Dictionary = Combat.attack("player", "viem_e").duplicate()
+	viem_data["slot"] = "e"
+	viem_data.erase("status")
+	var attuned_before: float = attuned_target.health
+	player.strike(attuned_target, viem_data, 1.0)
+	var attuned_hit: float = attuned_before - attuned_target.health
+	state.sword = "sword_water"
+	var plain_before: float = plain_target.health
+	player.strike(plain_target, viem_data, 1.0)
+	var plain_hit: float = plain_before - plain_target.health
+	check(plain_hit > 0.0 and absf(attuned_hit - plain_hit * (1.0 + StyleBook.ATTUNE_BONUS) * flame_power / water_power) < 0.01,
+		"A Viêm form with the Xích Viêm sword in hand deals +%d%% (%.1f vs %.1f)" % [roundi(StyleBook.ATTUNE_BONUS * 100.0), attuned_hit, plain_hit])
+	await clear_dummies()
+	state.sword = "sword_old"
+	var unlearned: Dictionary = state.skills.duplicate()
+	state.skills["tho_e"] = 0
+	state.skills["tho_q"] = 0
+	state.skills["tho_x"] = 0
+	check(not state.set_slot_style("e", "tho") and not state.equip_style("tho") and state.slot_style("e") == "viem", "An unlearned Kiếm Quyết cannot be bound to a key")
+	state.skills = unlearned
+	check(state.set_slot_style("e", "tho") and state.set_slot_style("q", "bang") and state.slot_style("e") == "tho" and state.slot_style("q") == "bang" and state.slot_style("x") == "viem",
+		"Each key takes its own learned Kiếm Quyết")
+	var restored: GameState = GameState.new()
+	restored.from_dict(state.to_dict())
+	check(restored.loadout == state.loadout, "The loadout survives a save round trip")
+	var unbound: Dictionary = state.to_dict()
+	unbound.erase("loadout")
+	unbound["sword"] = "sword_frost"
+	restored.from_dict(unbound)
+	check(restored.slot_style("e") == "bang" and restored.slot_style("x") == "bang", "An older save without a loadout starts from the learned style of the sword it held")
+	state.loadout = {}
 
 	# ---- statuses on Lâm An: data, damage and healing over time, dodge shedding, stun
 	var hud_ok: bool = true
@@ -408,7 +494,7 @@ func _run() -> void:
 	player.cleanse(["weaken"])
 	player.apply_status("forget")
 	player._try_skill("e")
-	var gust_form: Dictionary = StyleBook.form(player.style_id(), "e")
+	var gust_form: Dictionary = StyleBook.form(player.slot_style("e"), "e")
 	var forgotten: float = float(gust_form["cooldown"]) * maxf(0.4, 1.0 - float(state.stats.get("skill_cd", 0.0)) - float(ContentDB.status("forget")["stats"]["skill_cd"]))
 	check(player.current_action() == String(gust_form["attack"]) and is_equal_approx(float(player.cooldown_max.get("gust", 0.0)), forgotten), "Lãng quên lengthens the cooldown to %.1f s" % forgotten)
 	await cast("")
@@ -617,8 +703,48 @@ func _run() -> void:
 		if String(reaction.get("name", "")) == "" or not reaction.has("color") or (reaction.get("needs", []) as Array).is_empty() or not trigger_ok:
 			reactions_ok = false
 			push_error("Reaction %s lacks a name, a colour, known statuses or a trigger" % reaction.get("id", "?"))
-	check(reactions_ok and Reactions.list().size() == 6 and bool(Combat.attack("player", "heavy").get("heavy", false)) and Combat.make_damage(player, Combat.attack("player", "heavy"), 1.0, player.global_position).heavy,
-		"Six reactions name known statuses and a trigger; the heavy attack carries the heavy tag")
+	check(reactions_ok and Reactions.list().size() == 9 and bool(Combat.attack("player", "heavy").get("heavy", false)) and Combat.make_damage(player, Combat.attack("player", "heavy"), 1.0, player.global_position).heavy,
+		"Nine reactions name known statuses and a trigger; the heavy attack carries the heavy tag")
+	# Thổ: Nứt giáp strips armour; Sa Lầy, Nham Hỏa and Cát Lốc fire on their combinations.
+	var earth_hit: Dictionary = {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": "earth"}
+	var armored: Enemy = spawn("tan_binh", Vector3(0, 0, -2.5))
+	armored.data = armored.data.duplicate()
+	armored.data["defense"] = 60.0
+	var plate_before: float = armored.health
+	armored.take_damage(Combat.make_damage(player, {"poise": 0, "knockback": 0.0, "hitstop": 0.0}, 100.0, armored.global_position))
+	var plated: float = plate_before - armored.health
+	armored.apply_status("sunder", 3)
+	var cracked_before: float = armored.health
+	armored.take_damage(Combat.make_damage(player, {"poise": 0, "knockback": 0.0, "hitstop": 0.0}, 100.0, armored.global_position))
+	var cracked: float = cracked_before - armored.health
+	check(is_equal_approx(armored.defense(), 60.0 - 3.0 * 18.0) and cracked > plated * 1.4, "Three layers of Nứt giáp strip 54 defence (%.1f → %.1f per blow)" % [plated, cracked])
+	await clear_dummies()
+	var mired: Enemy = spawn("tan_binh", Vector3(0, 0, -2.5))
+	var wet_neighbour: Enemy = spawn("tan_binh", Vector3(2.0, 0, -2.5))
+	await frames(2)
+	mired.apply_status("soak", 1)
+	wet_neighbour.apply_status("soak", 1)
+	var mire_result: Dictionary = player.strike(mired, earth_hit, 1.0)
+	check(String(mire_result.get("reaction", "")) == "quagmire" and mired.statuses.has("mire") and not mired.statuses.has("soak") and wet_neighbour.statuses.has("mire"),
+		"Sa Lầy: Thổ on a soaked foe bogs it and every soaked foe near it down")
+	await clear_dummies()
+	var molten: Enemy = spawn("tan_binh", Vector3(0, 0, -2.5))
+	var splashed: Enemy = spawn("tan_binh", Vector3(1.8, 0, -2.5))
+	await frames(2)
+	molten.apply_status("burn", 1, 10.0)
+	var splashed_before: float = splashed.health
+	var magma_result: Dictionary = player.strike(molten, earth_hit, 1.0)
+	check(String(magma_result.get("reaction", "")) == "magma" and not molten.statuses.has("burn") and splashed.health < splashed_before and splashed.statuses.has("sunder"),
+		"Nham Hỏa: Thổ on a burning foe erupts, splashing and cracking the armour of foes around it")
+	await clear_dummies()
+	var dusty: Enemy = spawn("tan_binh", Vector3(0, 0, -2.5))
+	var nearby: Enemy = spawn("tan_binh", Vector3(2.2, 0, -2.5))
+	await frames(2)
+	dusty.apply_status("sunder", 1)
+	var sand_result: Dictionary = player.strike(dusty, {"mult": 1.0, "poise": 0, "knockback": 0.0, "hitstop": 0.0, "element": "wind"}, 1.0)
+	check(String(sand_result.get("reaction", "")) == "sandstorm" and not dusty.statuses.has("sunder") and nearby.statuses.has("sunder"),
+		"Cát Lốc: Phong on a cracked foe whips the grit onto its neighbours")
+	await clear_dummies()
 	var soak_thunder: float = float(ContentDB.status("soak")["taken"]["thunder"])
 
 	# Điện Giật: +40% on the soaked target, shock and a jolt for soaked foes within 5 m only.
@@ -1041,11 +1167,12 @@ func _run() -> void:
 	state.equip_sword("sword_water")
 	game._equip_visuals()
 	var set_ok: bool = game.set_alt_sword("sword_thunder") and not state.set_alt("sword_water")
-	var water_style: String = player.style_id()
+	state.equip_style("phong")
+	var loadout_before: Dictionary = state.loadout.duplicate()
 	var swapped: bool = player.try_swap()
 	await frames(1)
-	check(refused and set_ok and swapped and state.sword == "sword_thunder" and state.sword_alt == "sword_water" and water_style == "thuy" and player.style_id() == "loi",
-		"The swap key trades the Thủy sword for the Lôi one at the hip (style %s → %s); no secondary sword, no swap" % [water_style, player.style_id()])
+	check(refused and set_ok and swapped and state.sword == "sword_thunder" and state.sword_alt == "sword_water" and state.loadout == loadout_before and player.slot_style("e") == "phong",
+		"The swap key trades the Thủy sword for the Lôi one at the hip and keeps the Kiếm Quyết on E/Q/X; no secondary sword, no swap")
 	var swap_blocked: bool = not player.try_swap()
 	var swap_data: Dictionary = player.swap_rule()
 	var soaked: Enemy = spawn("tan_binh", Vector3(0, 0, -2.2))

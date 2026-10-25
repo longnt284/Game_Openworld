@@ -177,14 +177,48 @@ def glaive():
     return b
 
 
+def spear():
+    """Shield guard's spear: dark shaft, leaf blade with a red horsehair tassel."""
+    b = vk.MeshBuilder("Sword")
+    b.cylinder(0.022, 2.0, (0, 0, 0.3), mat="wood_dark", segments=8)
+    for z in (-0.5, 0.0, 0.5):
+        b.torus(0.024, 0.005, (0, 0, z), mat="metal_dark", segments=8, ring=4)
+    b.cone(0.028, 0.1, (0, 0, -0.74), (180, 0, 0), mat="metal_dark", segments=8)
+    b.cylinder(0.03, 0.06, (0, 0, 1.3), mat="gold", segments=8)
+    blade(b, 1.33, 0.38, 0.09, 0.014, "metal", tip=0.2, fuller="metal_dark")
+    b.cone(0.05, 0.16, (0, 0, 1.22), (180, 0, 0), mat="vermilion", segments=8)
+    return b
+
+
+def staff():
+    """Storm mage's staff: knotted dark wood with a caged thunder orb and paper charms."""
+    b = vk.MeshBuilder("Sword")
+    b.cylinder(0.02, 1.7, (0, 0, 0.35), mat="wood_dark", segments=8)
+    for z in (-0.3, 0.2, 0.7):
+        b.sphere(0.028, (0, 0, z), mat="wood", segments=8, rings=4)
+    b.cone(0.024, 0.08, (0, 0, -0.52), (180, 0, 0), mat="bronze", segments=8)
+    for index in range(4):
+        angle = index * math.tau / 4
+        b.segment((math.cos(angle) * 0.02, math.sin(angle) * 0.02, 1.18), (math.cos(angle) * 0.075, math.sin(angle) * 0.075, 1.3), 0.008, mat="bronze", segments=4)
+        b.segment((math.cos(angle) * 0.075, math.sin(angle) * 0.075, 1.3), (math.cos(angle) * 0.02, math.sin(angle) * 0.02, 1.42), 0.008, mat="bronze", segments=4)
+    b.sphere(0.06, (0, 0, 1.3), mat="thunder_glow", segments=10, rings=8)
+    for side in (1, -1):
+        b.box((0.035, 0.006, 0.12), (side * 0.03, 0.0, 1.08), (0, 0, side * 10), mat="paper")
+    return b
+
+
 WEAPONS = {"sword_old": sword_old, "sword_bamboo": sword_bamboo, "sword_wind": sword_wind, "sabre": sabre, "glaive": glaive,
-           "sword_water": sword_water, "sword_thunder": sword_thunder, "sword_flame": sword_flame, "sword_frost": sword_frost}
+           "sword_water": sword_water, "sword_thunder": sword_thunder, "sword_flame": sword_flame, "sword_frost": sword_frost,
+           "spear": spear, "staff": staff}
 
 
 def main(preview):
     out_dir = vk.MODELS / "weapons"
     out_dir.mkdir(parents=True, exist_ok=True)
+    only = [arg for arg in sys.argv[sys.argv.index("--") + 1:] if not arg.startswith("--")] if "--" in sys.argv else []
     for name, factory in WEAPONS.items():
+        if only and name not in only:
+            continue
         vk.reset()
         factory().build()
         original = vk.MODELS
@@ -196,8 +230,9 @@ def main(preview):
         vk.ART = original_art
         vk.write_manifest_entry(info, "weapons")
         if preview:
-            size = 2.4 if name == "glaive" else 1.1
-            vk.render_preview(name, {"side": (90, 0, size), "front": (0, 0, size)}, size=(320, 480), target=(0, 0, 0.6 if name == "glaive" else 0.35))
+            long = name in ("glaive", "spear", "staff")
+            size = 2.4 if long else 1.1
+            vk.render_preview(name, {"side": (90, 0, size), "front": (0, 0, size)}, size=(320, 480), target=(0, 0, 0.6 if long else 0.35))
 
 
 if __name__ == "__main__":

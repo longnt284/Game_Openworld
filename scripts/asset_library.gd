@@ -3,8 +3,10 @@ extends RefCounted
 ## Loads every runtime GLB once (threaded when rendering, synchronous in headless),
 ## converts materials to the toon look and exposes mesh parts for MultiMesh flora.
 
-const CHARACTERS: PackedStringArray = ["lam_an", "tieu_mac", "ba_luc", "chu_bay", "ba_hanh", "tich_phong", "tan_binh", "truc_tuong", "heo_gio"]
-const WEAPONS: PackedStringArray = ["sword_old", "sword_bamboo", "sword_wind", "sabre", "glaive", "sword_water", "sword_thunder", "sword_flame", "sword_frost"]
+const CHARACTERS: PackedStringArray = ["lam_an", "tieu_mac", "ba_luc", "chu_bay", "ba_hanh", "tich_phong", "tan_binh", "truc_tuong", "heo_gio",
+	"cung_thu", "ho_ve", "phap_su", "hon_anh", "khoi_loi", "soi_suong", "soi_chua"]
+const WEAPONS: PackedStringArray = ["sword_old", "sword_bamboo", "sword_wind", "sabre", "glaive", "sword_water", "sword_thunder", "sword_flame", "sword_frost",
+	"spear", "staff"]
 const PROPS: PackedStringArray = [
 	"house_small", "house_long", "house_teal", "smithy", "gate_village", "shrine_wind", "bridge_wood", "dock", "boat", "lantern_stone",
 	"lantern_post", "signboard", "table", "bench", "chest", "stele", "ruins_pillar", "ruins_wall", "well", "barrel", "crate", "fence_bamboo",

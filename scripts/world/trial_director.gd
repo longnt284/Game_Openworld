@@ -138,10 +138,10 @@ func _spawn(kind: String) -> Enemy:
 	alive.append(enemy)
 	if enemy.boss:
 		boss = enemy
-		main.hud.show_boss(enemy.display_name(), "Thủ lĩnh đợt %d" % wave, 1.0)
+		main.hud.show_boss(enemy.display_name(), "Thủ lĩnh đợt %d" % wave, 1.0, enemy.max_health, enemy.max_health)
 		enemy.health_changed.connect(func(target: Enemy, current: float, maximum: float) -> void:
 			if active and target == boss:
-				main.hud.show_boss(target.display_name(), "Thủ lĩnh đợt %d" % wave, current / maximum))
+				main.hud.show_boss(target.display_name(), "Thủ lĩnh đợt %d" % wave, current / maximum, current, maximum))
 	return enemy
 
 func _on_defeated(enemy: Enemy) -> void:

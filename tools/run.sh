@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Linux/macOS helper. GODOT points to a Godot 4.7.2 binary (default: the one tools/setup.sh installs,
 # then godot on PATH).
-# Usage: tools/run.sh [game|editor|test|preview [scene ...]|export|web|serve|websmoke]
+# Usage: tools/run.sh [game|editor|test|preview [scene ...]|export|web|serve|websmoke|navbake [--check]]
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 if [ -z "${GODOT:-}" ]; then
@@ -13,7 +13,7 @@ MODE=${1:-game}
 case "$MODE" in
   test)
     "$GODOT" --headless --path "$ROOT" --editor --import
-    for suite in smoke_test gameplay_test combat_test progression_test world_test; do
+    for suite in smoke_test gameplay_test combat_test progression_test world_test monster_test; do
       [ -f "$ROOT/tests/$suite.gd" ] || continue
       "$GODOT" --headless --render-thread safe --path "$ROOT" --script "res://tests/$suite.gd"
     done
@@ -33,6 +33,9 @@ case "$MODE" in
     ;;
   websmoke)
     node "$ROOT/tools/web_smoke.cjs" "$@"
+    ;;
+  navbake)
+    "$GODOT" --headless --render-thread safe --path "$ROOT" --script res://tools/bake_navzones.gd -- "$@"
     ;;
   editor)
     "$GODOT" --path "$ROOT" --editor

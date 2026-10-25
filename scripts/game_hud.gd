@@ -31,21 +31,37 @@ var prompt: Label
 var toast: Label
 var banner: Label
 var banner_sub: Label
-var health_bar: ProgressBar
-var stamina_bar: ProgressBar
+var health_bar: HudBar
+var stamina_bar: HudBar
 var level_label: Label
+## Bottom-left vitals frame: badge, health and stamina gauges with a thin experience bar.
+var avatar: AvatarBadge
+var xp_bar: HudBar
+var vitals_frame: Control
 var heal_label: Label
 var quick_label: Label
+## Top-right corner map (Minimap); main hands it to the HUD and it reads main for markers.
+var minimap: Minimap
+## Vòng Kiếm Quyết, held on the style wheel key.
+var wheel: StyleWheel
+var tracker_panel: PanelContainer
+var prompt_panel: PanelContainer
+var prompt_key: Label
+var toast_panel: PanelContainer
+var banner_ribbon: Panel
+## Name labels under the skill buttons and the hint chip above them.
+var skill_names: Dictionary = {}
+var styles_hint: Label
 ## Secondary sword above the skill boxes: swap key, its name, dim while cooling down or absent.
 var alt_label: Label
 var status_row: HBoxContainer
 ## Reused status icons, one per active status: {"root", "style", "glyph", "stacks", "time"}
 var status_icons: Array[Dictionary] = []
-## slot (e, q, x) -> {"panel", "key", "name", "bar", "action"}
+## slot (e, q, x) -> {"panel": SkillSlot, "name": Label, "action"}
 var skill_boxes: Dictionary = {}
 var boss_box: VBoxContainer
 var boss_name: Label
-var boss_bar: ProgressBar
+var boss_bar: HudBar
 ## Thin poise gauge under the boss bar; pulses gold while the boss can be finished.
 var boss_poise: ProgressBar
 var boss_poise_fill: StyleBoxFlat
@@ -56,6 +72,8 @@ var prompt_tint: Color = UiTheme.CREAM
 var marker: Label
 var reticle: Label
 var dialogue_panel: PanelContainer
+## Bottom HUD blocks hidden while the dialogue box is open, shown again when it closes.
+var dialogue_hidden: Array[Control] = []
 var dialogue_name: Label
 var dialogue_text: RichTextLabel
 var dialogue_hint: Label
@@ -105,9 +123,10 @@ func _ready() -> void:
 	_build_center()
 	_build_boss()
 	_build_dialogue()
+	_build_wheel()
 	_build_vision()
 	_build_fade()
-	status = _anchored(UiTheme.label("", 14, UiTheme.CREAM), Control.PRESET_TOP_RIGHT, Vector2(-380, 16), Vector2(-16, 140))
+	status = _anchored(UiTheme.hud_label("", 13, UiTheme.CREAM, false), Control.PRESET_TOP_RIGHT, Vector2(-560, 196), Vector2(-16, 330))
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status.visible = false
 
@@ -146,15 +165,20 @@ func _build_focus() -> void:
 		label.visible = false
 
 func _build_tracker() -> void:
+	tracker_panel = PanelContainer.new()
+	tracker_panel.add_theme_stylebox_override("panel", UiTheme.hud_panel(0.62))
+	tracker_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Text wraps inside a fixed width so the panel never reaches the boss bar at top centre.
+	_anchored(tracker_panel, Control.PRESET_TOP_LEFT, Vector2(20, 16), Vector2(440, 40))
 	var box: VBoxContainer = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
-	_anchored(box, Control.PRESET_TOP_LEFT, Vector2(28, 20), Vector2(560, 160))
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tracker_panel.add_child(box)
 	var heading: HBoxContainer = HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 10)
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(heading)
-	region_label = UiTheme.title("", 22, UiTheme.CREAM)
+	region_label = UiTheme.outlined(UiTheme.title("", 22, UiTheme.CREAM), 5)
 	heading.add_child(region_label)
 	clock_icon = Control.new()
 	clock_icon.custom_minimum_size = Vector2(24, 24)
@@ -162,53 +186,82 @@ func _build_tracker() -> void:
 	clock_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clock_icon.draw.connect(_draw_clock_icon)
 	heading.add_child(clock_icon)
-	clock_label = UiTheme.label("", 15, UiTheme.CREAM, true)
+	clock_label = UiTheme.hud_label("", 14, UiTheme.CREAM)
 	clock_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	heading.add_child(clock_label)
-	quest_title = UiTheme.label("", 15, UiTheme.GOLD, true)
+	quest_title = UiTheme.hud_label("", 15, UiTheme.GOLD)
+	quest_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quest_title.custom_minimum_size.x = 380
 	box.add_child(quest_title)
-	objective = UiTheme.label("", 16, UiTheme.CREAM)
+	objective = UiTheme.hud_label("", 15, UiTheme.CREAM, false)
 	objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective.custom_minimum_size.x = 470
+	objective.custom_minimum_size.x = 380
 	box.add_child(objective)
-	marker = UiTheme.label("◆", 18, UiTheme.GOLD, true)
+	marker = UiTheme.hud_label("◆", 18, UiTheme.GOLD)
 	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	marker.size = Vector2(120, 44)
 	root.add_child(marker)
 	marker.visible = false
-	reticle = UiTheme.label("◇", 30, Color(1.0, 0.85, 0.6), true)
+	reticle = UiTheme.hud_label("◇", 30, Color(1.0, 0.85, 0.6))
 	reticle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	reticle.size = Vector2(40, 40)
 	root.add_child(reticle)
 	reticle.visible = false
+	minimap = Minimap.new()
+	_anchored(minimap, Control.PRESET_TOP_RIGHT, Vector2(-196, 16), Vector2(-20, 192))
 
 func _build_vitals() -> void:
+	var frame: HBoxContainer = HBoxContainer.new()
+	frame.add_theme_constant_override("separation", 10)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchored(frame, Control.PRESET_BOTTOM_LEFT, Vector2(20, -128), Vector2(440, -16))
+	vitals_frame = frame
+	avatar = AvatarBadge.new()
+	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	frame.add_child(avatar)
 	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 5)
-	_anchored(box, Control.PRESET_BOTTOM_LEFT, Vector2(28, -104), Vector2(400, -20))
+	box.add_theme_constant_override("separation", 4)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	level_label = UiTheme.label("Lâm An  •  Cấp 1", 15, UiTheme.CREAM, true)
+	frame.add_child(box)
+	level_label = UiTheme.hud_label("Lâm An", 16, UiTheme.CREAM)
 	box.add_child(level_label)
-	health_bar = UiTheme.bar(UiTheme.VERMILION, Vector2(320, 14))
+	health_bar = HudBar.new().setup(Color("e0503c"), Vector2(300, 20), true)
 	health_bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(health_bar)
-	stamina_bar = UiTheme.bar(Color("4fbfa8"), Vector2(250, 8))
+	stamina_bar = HudBar.new().setup(Color("4fc7ad"), Vector2(236, 10))
+	stamina_bar.trail_color = Color(0.85, 1.0, 0.95)
 	stamina_bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(stamina_bar)
-	# Healing counter (R) with the quick-use slot (C) beside it.
+	xp_bar = HudBar.new().setup(UiTheme.GOLD, Vector2(300, 6))
+	xp_bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	box.add_child(xp_bar)
+	# Healing counter (R) with the quick-use slot (C) beside it, each on a small pill.
 	var items: HBoxContainer = HBoxContainer.new()
-	items.add_theme_constant_override("separation", 18)
+	items.add_theme_constant_override("separation", 8)
 	items.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(items)
-	heal_label = UiTheme.label("", 14, UiTheme.MUTED)
-	items.add_child(heal_label)
-	quick_label = UiTheme.label("", 14, UiTheme.JADE_LIGHT)
-	items.add_child(quick_label)
+	heal_label = UiTheme.hud_label("", 13, UiTheme.CREAM, false)
+	items.add_child(_pill(heal_label))
+	quick_label = UiTheme.hud_label("", 13, UiTheme.JADE_LIGHT, false)
+	items.add_child(_pill(quick_label))
 	# Buff and debuff icons sit on their own row above the vitals, so the bars never shift.
 	status_row = HBoxContainer.new()
 	status_row.add_theme_constant_override("separation", 6)
 	status_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_anchored(status_row, Control.PRESET_BOTTOM_LEFT, Vector2(28, -158), Vector2(420, -110))
+	_anchored(status_row, Control.PRESET_BOTTOM_LEFT, Vector2(24, -186), Vector2(420, -136))
+
+func _pill(content: Control) -> PanelContainer:
+	var pill: PanelContainer = PanelContainer.new()
+	var style: StyleBoxFlat = UiTheme.hud_panel(0.6)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
+	style.set_corner_radius_all(10)
+	pill.add_theme_stylebox_override("panel", style)
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.add_child(content)
+	return pill
 
 func _status_icon() -> Dictionary:
 	## Rounded square tinted by the status, glyph in the middle, stacks as a corner badge and
@@ -248,42 +301,77 @@ func _build_skills() -> void:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	row.alignment = BoxContainer.ALIGNMENT_END
-	_anchored(row, Control.PRESET_BOTTOM_RIGHT, Vector2(-330, -112), Vector2(-28, -24))
+	_anchored(row, Control.PRESET_BOTTOM_RIGHT, Vector2(-420, -132), Vector2(-24, -14))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.offset_left = -560
 	for slot: String in StyleBook.SLOTS:
-		var panel: PanelContainer = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(140, 80)
-		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var inner: VBoxContainer = VBoxContainer.new()
-		inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(inner)
-		var key: Label = UiTheme.label("", 22, UiTheme.GOLD, true)
-		key.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		inner.add_child(key)
-		var name_label: Label = UiTheme.label("", 13, UiTheme.CREAM)
+		var column: VBoxContainer = VBoxContainer.new()
+		column.add_theme_constant_override("separation", 0)
+		column.alignment = BoxContainer.ALIGNMENT_END
+		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var button: SkillSlot = SkillSlot.new()
+		button.ultimate = slot == "x"
+		button.custom_minimum_size = Vector2(98, 102) if slot == "x" else Vector2(82, 88)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		column.add_child(button)
+		var name_label: Label = UiTheme.hud_label("", 12, UiTheme.CREAM)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		inner.add_child(name_label)
-		var cooldown: ProgressBar = UiTheme.bar(UiTheme.GOLD if slot == "x" else UiTheme.JADE_LIGHT, Vector2(108, 5))
-		cooldown.max_value = 1.0
-		inner.add_child(cooldown)
-		row.add_child(panel)
-		skill_boxes[slot] = {"panel": panel, "key": key, "name": name_label, "bar": cooldown, "action": StyleBook.SLOT_ACTIONS[slot]}
-	alt_label = _anchored(UiTheme.label("", 14, UiTheme.JADE_LIGHT), Control.PRESET_BOTTOM_RIGHT, Vector2(-560, -142), Vector2(-28, -116))
+		name_label.custom_minimum_size.x = 104
+		column.add_child(name_label)
+		row.add_child(column)
+		skill_boxes[slot] = {"panel": column, "slot": button, "name": name_label, "action": StyleBook.SLOT_ACTIONS[slot]}
+	alt_label = _anchored(UiTheme.hud_label("", 13, UiTheme.JADE_LIGHT), Control.PRESET_BOTTOM_RIGHT, Vector2(-560, -160), Vector2(-28, -138))
 	alt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	styles_hint = _anchored(UiTheme.hud_label("", 12, UiTheme.MUTED, false), Control.PRESET_BOTTOM_RIGHT, Vector2(-560, -180), Vector2(-28, -160))
+	styles_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 func _build_center() -> void:
-	prompt = _anchored(UiTheme.label("", 20, UiTheme.CREAM, true), Control.PRESET_CENTER_BOTTOM, Vector2(-320, -170), Vector2(320, -136))
+	prompt_panel = PanelContainer.new()
+	prompt_panel.add_theme_stylebox_override("panel", UiTheme.hud_panel(0.7))
+	prompt_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchored(prompt_panel, Control.PRESET_CENTER_BOTTOM, Vector2(-300, -200), Vector2(300, -158))
+	prompt_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	var prompt_row: HBoxContainer = HBoxContainer.new()
+	prompt_row.add_theme_constant_override("separation", 10)
+	prompt_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	prompt_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	prompt_panel.add_child(prompt_row)
+	var key_chip: PanelContainer = UiTheme.chip("F", UiTheme.CREAM, UiTheme.INK, 16)
+	prompt_key = key_chip.get_child(0) as Label
+	prompt_row.add_child(key_chip)
+	prompt = UiTheme.hud_label("", 19, UiTheme.CREAM)
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	toast = _anchored(UiTheme.label("", 17, UiTheme.CREAM), Control.PRESET_CENTER_BOTTOM, Vector2(-360, -214), Vector2(360, -178))
+	prompt_row.add_child(prompt)
+	prompt_panel.visible = false
+	toast_panel = PanelContainer.new()
+	var toast_style: StyleBoxFlat = UiTheme.hud_panel(0.78)
+	toast_style.set_corner_radius_all(20)
+	toast_style.content_margin_left = 22
+	toast_style.content_margin_right = 22
+	toast_panel.add_theme_stylebox_override("panel", toast_style)
+	toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchored(toast_panel, Control.PRESET_CENTER_BOTTOM, Vector2(-380, -252), Vector2(380, -210))
+	toast_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	toast = UiTheme.hud_label("", 16, UiTheme.CREAM, false)
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner = _anchored(UiTheme.title("", 40, UiTheme.CREAM), Control.PRESET_CENTER_TOP, Vector2(-420, 112), Vector2(420, 168))
+	toast_panel.add_child(toast)
+	toast_panel.visible = false
+	banner_ribbon = Panel.new()
+	var ribbon: StyleBoxFlat = UiTheme.box(Color(0.05, 0.1, 0.11, 0.7), Color(UiTheme.GOLD, 0.8), 0, 4)
+	ribbon.border_width_top = 2
+	ribbon.border_width_bottom = 2
+	ribbon.skew = Vector2(0.18, 0)
+	banner_ribbon.add_theme_stylebox_override("panel", ribbon)
+	banner_ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_anchored(banner_ribbon, Control.PRESET_CENTER_TOP, Vector2(-400, 104), Vector2(400, 202))
+	banner = _anchored(UiTheme.outlined(UiTheme.title("", 40, UiTheme.CREAM), 7), Control.PRESET_CENTER_TOP, Vector2(-420, 110), Vector2(420, 166))
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner_sub = _anchored(UiTheme.label("", 17, UiTheme.GOLD, true), Control.PRESET_CENTER_TOP, Vector2(-420, 168), Vector2(420, 196))
+	banner_sub = _anchored(UiTheme.hud_label("", 17, UiTheme.GOLD), Control.PRESET_CENTER_TOP, Vector2(-420, 166), Vector2(420, 196))
 	banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_ribbon.modulate.a = 0.0
 	hint_panel = PanelContainer.new()
+	hint_panel.add_theme_stylebox_override("panel", UiTheme.hud_panel(0.82))
 	hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_anchored(hint_panel, Control.PRESET_CENTER_LEFT, Vector2(28, -70), Vector2(360, 70))
+	_anchored(hint_panel, Control.PRESET_CENTER_LEFT, Vector2(20, -70), Vector2(380, 70))
 	hint_label = UiTheme.label("", 15, UiTheme.CREAM)
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint_panel.add_child(hint_label)
@@ -292,13 +380,17 @@ func _build_center() -> void:
 func _build_boss() -> void:
 	boss_box = VBoxContainer.new()
 	boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_anchored(boss_box, Control.PRESET_CENTER_TOP, Vector2(-300, 24), Vector2(300, 80))
-	boss_name = UiTheme.title("", 22, UiTheme.CREAM)
+	# Top centre, between the tracker and the minimap and above the banner ribbon, so nothing at
+	# the bottom (vitals, item pills, prompt, skills) ever runs into it.
+	_anchored(boss_box, Control.PRESET_CENTER_TOP, Vector2(-190, 18), Vector2(190, 76))
+	boss_box.add_theme_constant_override("separation", 3)
+	boss_name = UiTheme.outlined(UiTheme.title("", 20, UiTheme.CREAM), 6)
 	boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	boss_box.add_child(boss_name)
-	boss_bar = UiTheme.bar(Color("c8402e"), Vector2(600, 12))
+	boss_bar = HudBar.new().setup(Color("c8402e"), Vector2(380, 20), true)
+	boss_bar.segments = 10
 	boss_box.add_child(boss_bar)
-	boss_poise = UiTheme.bar(UiTheme.CREAM, Vector2(600, 5))
+	boss_poise = UiTheme.bar(UiTheme.CREAM, Vector2(380, 6))
 	boss_poise.max_value = 1.0
 	boss_poise.step = 0.0
 	boss_poise.value = 1.0
@@ -333,6 +425,10 @@ func _build_dialogue() -> void:
 	dialogue_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	box.add_child(dialogue_hint)
 	dialogue_panel.visible = false
+
+func _build_wheel() -> void:
+	wheel = StyleWheel.new()
+	root.add_child(wheel)
 
 func _build_vision() -> void:
 	vision = Control.new()
@@ -379,14 +475,17 @@ func _build_fade() -> void:
 # ------------------------------------------------------------------ updates
 
 func set_vitals(health: float, max_health: float, stamina: float, max_stamina: float) -> void:
-	health_bar.max_value = max_health
-	health_bar.value = health
-	stamina_bar.max_value = max_stamina
-	stamina_bar.value = stamina
+	health_bar.set_values(health, max_health)
+	stamina_bar.set_values(stamina, max_stamina)
 	stamina_bar.modulate = Color(1, 1, 1, 1.0 if stamina < max_stamina - 0.5 else 0.55)
+	avatar.show_state(avatar.icon, avatar.tint, avatar.level, health / maxf(max_health, 1.0), avatar.points)
 
 func set_level(level: int, xp: int, next_xp: int, skill_points: int) -> void:
-	level_label.text = "Lâm An  •  Cấp %d  •  %d/%d KN%s" % [level, xp, next_xp, ("  •  +%d điểm tu luyện" % skill_points) if skill_points > 0 else ""]
+	var text: String = "Lâm An  •  Cấp %d  •  %d/%d KN%s" % [level, xp, next_xp, ("  •  +%d điểm" % skill_points) if skill_points > 0 else ""]
+	if level_label.text != text:
+		level_label.text = text
+	xp_bar.set_values(float(xp), float(maxi(next_xp, 1)))
+	avatar.show_state(avatar.icon, avatar.tint, level, avatar.health_share, skill_points)
 
 func set_heal_count(text: String) -> void:
 	heal_label.text = text
@@ -432,20 +531,34 @@ func status_icon_count() -> int:
 			count += 1
 	return count
 
-func set_skill(slot: String, title: String, unlocked: bool, fill: float, level: int, tint: Color) -> void:
-	## fill: 1 when ready (cooldown done, or a full charge meter on the ultimate slot).
+func set_skill(slot: String, title: String, unlocked: bool, fill: float, level: int, tint: Color, style: String = "", seconds: float = 0.0) -> void:
+	## fill: 1 when ready (cooldown done, or a full charge meter on the ultimate slot); seconds:
+	## cooldown left. The button shows the bound Kiếm Quyết's element in its colour.
 	var box: Dictionary = skill_boxes[slot]
-	var ready: bool = unlocked and fill >= 0.999
-	(box["panel"] as Control).modulate = Color(1, 1, 1, 1.0 if unlocked else 0.35)
-	(box["bar"] as ProgressBar).value = fill
-	(box["key"] as Label).text = UserSettings.event_label(box["action"]) if unlocked else "—"
-	(box["key"] as Label).modulate = tint.lightened(0.25) if ready else Color(1, 1, 1)
-	(box["name"] as Label).text = title + ((" %s" % ["I", "II", "III"][clampi(level - 1, 0, 2)]) if unlocked and slot != "x" else "")
+	var icon: String = String(ContentDB.style(style).get("icon", "wind")) if style != "" else "wind"
+	(box["slot"] as SkillSlot).show_form(UserSettings.event_label(box["action"]), icon, tint, unlocked, fill, seconds, level)
+	var name_text: String = title + ((" %s" % ["I", "II", "III"][clampi(level - 1, 0, 2)]) if unlocked and slot != "x" else "")
+	var name_label: Label = box["name"]
+	if name_label.text != name_text:
+		name_label.text = name_text
+	name_label.add_theme_color_override("font_color", tint.lightened(0.35) if unlocked else UiTheme.MUTED)
+	if slot == "e":
+		avatar.show_state(icon, tint, avatar.level, avatar.health_share, avatar.points)
+
+func set_styles_hint(text: String) -> void:
+	if styles_hint.text != text:
+		styles_hint.text = text
 
 func set_tracker(region: String, title: String, text: String) -> void:
+	if region_label.text == region and quest_title.text == title and objective.text == text:
+		return
 	region_label.text = region
 	quest_title.text = title
 	objective.text = text
+	quest_title.visible = title != ""
+	objective.visible = text != ""
+	# Shrink the backing to the text it holds (the container keeps its largest size otherwise).
+	tracker_panel.reset_size()
 
 func set_clock(hour: String, weather: String, icon: String, night: bool) -> void:
 	## From main's 10 Hz refresh: "Giờ Thìn  •  Mưa" and its icon, redrawn only when they change.
@@ -557,8 +670,27 @@ func update_reticle(camera: Camera3D, target: Node3D) -> void:
 	reticle.visible = true
 
 func show_prompt(text: String, tint: Color = UiTheme.CREAM) -> void:
-	## Called every frame by main._update_focus; gold marks a finisher.
-	prompt.text = text
+	## Called every frame by main._update_focus ("F  •  Nói chuyện"); the key goes on its own
+	## key cap, the rest beside it; gold marks a finisher.
+	var key: String = ""
+	var body: String = text
+	var split: int = text.find("  •  ")
+	if split > 0 and split <= 12:
+		key = text.left(split)
+		body = text.substr(split + 5)
+	var resized: bool = false
+	if prompt.text != body:
+		prompt.text = body
+		resized = true
+	if prompt_key.text != key:
+		prompt_key.text = key
+		(prompt_key.get_parent() as Control).visible = key != ""
+		resized = true
+	prompt_panel.visible = body != "" and prompt.visible
+	if resized and prompt_panel.visible:
+		# The pill hugs its text, centred.
+		prompt_panel.reset_size()
+		prompt_panel.position.x = (root.size.x - prompt_panel.size.x) * 0.5
 	if tint != prompt_tint:
 		prompt_tint = tint
 		prompt.add_theme_color_override("font_color", tint)
@@ -576,6 +708,9 @@ func _show_toast(message: String, duration: float) -> void:
 	toast.add_theme_color_override("font_color", toast_tints.get(message, UiTheme.CREAM))
 	toast_tints.erase(message)
 	toast_remaining = duration
+	# The pill hugs its text, centred under the screen middle.
+	toast_panel.reset_size()
+	toast_panel.position.x = (root.size.x - toast_panel.size.x) * 0.5
 
 func show_banner(title: String, subtitle: String = "", duration: float = 3.5) -> void:
 	banner.text = title
@@ -587,11 +722,15 @@ func show_hint(text: String, duration: float = 9.0) -> void:
 	hint_panel.visible = true
 	hint_remaining = duration
 
-func show_boss(name: String, title: String, ratio: float) -> void:
+func show_boss(name: String, title: String, ratio: float, health: float = -1.0, max_health: float = -1.0) -> void:
 	boss_box.visible = true
 	boss_name.text = "%s — %s" % [name, title] if title != "" else name
-	boss_bar.max_value = 1.0
-	boss_bar.value = ratio
+	if max_health > 0.0:
+		boss_bar.show_text = true
+		boss_bar.set_values(health, max_health)
+	else:
+		boss_bar.show_text = false
+		boss_bar.set_values(ratio, 1.0)
 
 func set_boss_poise(ratio: float, broken: bool, finishable: bool) -> void:
 	## ratio: Enemy.poise_ratio() (empty while broken). While a finisher can still land the
@@ -626,6 +765,13 @@ func hide_boss() -> void:
 	boss_finishable = false
 
 func open_dialogue(speaker: String, text: String, choices: Array = []) -> void:
+	if not dialogue_panel.visible:
+		# The dialogue box covers the bottom of the screen: the vitals and skills step aside.
+		dialogue_hidden.clear()
+		for node: Control in _bottom_hud():
+			if node.visible:
+				node.visible = false
+				dialogue_hidden.append(node)
 	dialogue_panel.visible = true
 	dialogue_name.text = speaker
 	dialogue_text.text = text
@@ -644,6 +790,17 @@ func open_dialogue(speaker: String, text: String, choices: Array = []) -> void:
 
 func close_dialogue() -> void:
 	dialogue_panel.visible = false
+	# Back only while gameplay shows (leaving for the title hides the HUD before closing this).
+	for node: Control in dialogue_hidden:
+		if is_instance_valid(node) and tracker_panel.visible:
+			node.visible = true
+	dialogue_hidden.clear()
+
+func _bottom_hud() -> Array[Control]:
+	var nodes: Array[Control] = [vitals_frame, status_row, alt_label, styles_hint]
+	for skill: String in skill_boxes:
+		nodes.append(skill_boxes[skill]["panel"] as Control)
+	return nodes
 
 func dialogue_open() -> bool:
 	return dialogue_panel.visible
@@ -675,13 +832,43 @@ func set_debug(enabled: bool) -> void:
 	status.visible = enabled
 
 func set_gameplay_visible(value: bool) -> void:
-	for node: Control in [region_label, clock_icon, clock_label, quest_title, objective, health_bar, stamina_bar, level_label, heal_label, quick_label, prompt, status_row]:
+	for node: Control in [tracker_panel, region_label, clock_icon, clock_label, vitals_frame, health_bar, stamina_bar, level_label, heal_label, quick_label, prompt, status_row, minimap, alt_label, styles_hint]:
 		node.visible = value
+	if not value:
+		prompt_panel.visible = false
 	for skill: String in skill_boxes:
 		(skill_boxes[skill]["panel"] as Control).visible = value
 	if not value:
 		marker.visible = false
 		reticle.visible = false
+		close_wheel(false)
+
+# ------------------------------------------------------------------ Kiếm Quyết wheel
+
+func open_wheel(learned: Array[String], equipped: String) -> void:
+	wheel.open(learned, equipped)
+
+func close_wheel(apply: bool) -> void:
+	wheel.close(apply)
+
+func wheel_open() -> bool:
+	return wheel.is_open()
+
+func _input(event: InputEvent) -> void:
+	## While the wheel is up it owns the mouse (the camera stays still) and the number keys.
+	if not wheel.is_open():
+		return
+	if event is InputEventMouseMotion:
+		wheel.steer((event as InputEventMouseMotion).relative)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var code: int = (event as InputEventKey).keycode
+		if code >= KEY_1 and code <= KEY_6:
+			wheel.pick(code - KEY_1)
+			get_viewport().set_input_as_handled()
+	if event.is_action_released("style_wheel"):
+		get_viewport().set_input_as_handled()
+		close_wheel(true)
 
 func _unhandled_input(event: InputEvent) -> void:
 	var advance: bool = event.is_action_pressed("interact") or event.is_action_pressed("jump") or event.is_action_pressed("attack") or (event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ENTER)
@@ -729,11 +916,15 @@ func _process(delta: float) -> void:
 		if toast_remaining <= 0.0 and not toast_queue.is_empty():
 			_show_toast(toast_queue.pop_front(), 3.0)
 	toast.visible = toast_remaining > 0.0 and not dialogue_panel.visible
-	toast.modulate.a = clampf(toast_remaining * 3.0, 0.0, 1.0)
+	toast_panel.visible = toast.visible
+	toast_panel.modulate.a = clampf(toast_remaining * 3.0, 0.0, 1.0)
 	banner_remaining = maxf(0.0, banner_remaining - delta)
 	var banner_alpha: float = clampf(banner_remaining * 1.5, 0.0, 1.0)
 	banner.modulate.a = banner_alpha
 	banner_sub.modulate.a = banner_alpha
+	banner_ribbon.modulate.a = banner_alpha * (1.0 if banner.text != "" else 0.0)
+	if minimap.visible:
+		minimap.refresh(delta)
 	if hint_remaining > 0.0:
 		hint_remaining -= delta
 		hint_panel.modulate.a = clampf(hint_remaining, 0.0, 1.0)

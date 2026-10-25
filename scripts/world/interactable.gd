@@ -22,6 +22,9 @@ func setup(data: Dictionary, assets: AssetLibrary, owner_main: Node) -> void:
 	main = owner_main
 	var model_key: String = {"shrine": "shrine_wind", "chest": "chest", "chime": "wind_chime_post", "memory_core": "memory_stone", "seal_gate": "seal_gate",
 		"trial_gate": "stele", "reward_chest": "chest"}.get(kind, "")
+	if kind == "relic":
+		# A readable relic (stele, altar): its own model, or none when it marks a prop already placed.
+		model_key = String(data.get("model", "stele"))
 	if model_key != "":
 		model = assets.instantiate("env/" + model_key)
 		add_child(model)
@@ -30,6 +33,10 @@ func setup(data: Dictionary, assets: AssetLibrary, owner_main: Node) -> void:
 			body.set_meta("surface", "stone")
 		glow = model.find_child("Glow", true, false) as MeshInstance3D
 		lid = model.find_child("Lid", true, false) as Node3D
+	if kind == "relic":
+		wisps = Vfx.wisps(self, Color(1.0, 0.82, 0.45), 14, 0.6)
+		wisps.position.y = 1.2
+		radius = 2.6
 	if kind in ["echo", "diary"]:
 		wisps = Vfx.wisps(self, Vfx.WIND if kind == "echo" else Color(1.0, 0.9, 0.6), 16, 0.5)
 		wisps.position.y = 1.2 if kind == "echo" else 1.0
@@ -99,9 +106,11 @@ func refresh() -> void:
 		visible = not is_used()
 	if kind == "memory_core" and glow:
 		glow.visible = not is_used()
+	if kind == "relic" and wisps:
+		wisps.emitting = not is_used()
 
 func can_interact() -> bool:
-	if kind in ["echo", "diary", "chest", "memory_core", "reward_chest"] and is_used():
+	if kind in ["echo", "diary", "chest", "memory_core", "reward_chest", "relic"] and is_used():
 		return false
 	return true
 
@@ -125,6 +134,8 @@ func prompt() -> String:
 			return "Bước vào Ải Vô Tận"
 		"reward_chest":
 			return "Mở " + String(entity.get("title", "rương thưởng"))
+		"relic":
+			return String(entity.get("prompt", "Xem bia đá"))
 	return "Tương tác"
 
 func interact() -> void:

@@ -40,6 +40,13 @@ static func step(rows: int) -> void:
 		_paint_row(source, image, next_row)
 		next_row += 1
 
+static func poll() -> void:
+	## Turns a finished background painting into the texture (the minimap asks every refresh,
+	## so the corner map appears without the full map ever being opened).
+	if texture == null and task != -1 and WorkerThreadPool.is_task_completed(task):
+		WorkerThreadPool.wait_for_task_completion(task)
+		texture = ImageTexture.create_from_image(image)
+
 static func shutdown() -> void:
 	## Worker tasks must finish before the engine tears down.
 	if task != -1 and texture == null:
@@ -75,9 +82,7 @@ static func _paint_row(layout: WorldLayout, result: Image, py: int) -> void:
 		result.set_pixel(px, py, color)
 
 func _process(_delta: float) -> void:
-	if texture == null and task != -1 and WorkerThreadPool.is_task_completed(task):
-		WorkerThreadPool.wait_for_task_completion(task)
-		texture = ImageTexture.create_from_image(image)
+	MapView.poll()
 	queue_redraw()
 
 func _map_rect() -> Rect2:

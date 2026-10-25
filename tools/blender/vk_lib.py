@@ -50,8 +50,12 @@ PALETTE = {
     # Elemental sword accents (glowing) and fittings.
     "water_glow": "5fb8ff", "thunder_glow": "ffe066", "flame_glow": "ff7a3a", "frost_glow": "bfefff",
     "steel_blue": "9fb8d0", "steel_frost": "d8ecf4", "violet": "6b4fa0", "ember": "8a2418", "navy": "203a5c",
+    # Chapter-one monsters: frost wolves, the stone golem's rock and runes, the memory wraith.
+    "fur_frost": "cbd9e3", "fur_frost_dark": "7a90a4", "fur_alpha": "45566a", "fur_alpha_light": "9fb3c4",
+    "rock": "8d8473", "rock_dark": "5e574c", "rock_light": "b3aa95", "rune": "ffb347",
+    "ghost": "d6eef2", "ghost_dark": "8fb2c4", "storm_robe": "34305a", "storm_trim": "e2c45a",
 }
-EMISSIVE = {"lantern": 2.2, "spirit": 1.6, "seal": 1.4, "water_glow": 1.8, "thunder_glow": 2.0, "flame_glow": 2.0, "frost_glow": 1.6}
+EMISSIVE = {"lantern": 2.2, "spirit": 1.6, "seal": 1.4, "water_glow": 1.8, "thunder_glow": 2.0, "flame_glow": 2.0, "frost_glow": 1.6, "rune": 2.0}
 # Generators that set this to True build every MeshBuilder vertex-coloured unless told otherwise.
 DEFAULT_VCOL = False
 

@@ -62,9 +62,11 @@ func _saves() -> void:
 	broken["state"]["world_tier"] = -1
 	check(not SaveStore.validate(broken), "A negative world tier is rejected")
 	var state: GameState = GameState.new()
-	check(state.grant_sword("sword_flame") and state.skill_level("viem_e") == 1 and state.skill_level("viem_q") == 1 and state.skill_level("viem_x") == 0,
-		"The first elemental sword teaches its style's E and Q forms")
+	check(state.grant_sword("sword_flame") and state.skill_level("viem_e") == 0 and not state.style_learned("viem"),
+		"An elemental sword brings its element, not its Kiếm Quyết (those come from quests)")
 	check(not state.grant_sword("sword_flame"), "A sword is only granted once")
+	check(state.learn_style("viem") and state.skill_level("viem_e") == 1 and state.skill_level("viem_q") == 1 and state.skill_level("viem_x") == 0 and not state.learn_style("viem"),
+		"A quest teaches a style's E and Q forms once")
 	state.skill_points = 2
 	check(state.learn_ultimate("viem_x", "viem_q") and state.skill_level("viem_x") == 1 and state.skill_points == 0, "Ultimates cost two cultivation points")
 

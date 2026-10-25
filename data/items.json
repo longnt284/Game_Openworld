@@ -21,6 +21,11 @@
 	"chuong_gio": {"name": "Chuông gió của bé Tý", "kind": "quest", "description": "Chuông gió tre treo tua đỏ. Khắc chữ \"Tý\" nguệch ngoạc.", "icon": "bamboo"},
 	"nhat_ky": {"name": "Nhật ký người giữ đền", "kind": "quest", "description": "Những trang chữ nhòe của Tịch Phong, người giữ đền trên núi.", "icon": "paper"},
 	"long_vu_gio": {"name": "Lông vũ gió", "kind": "key", "description": "Lông chim trắng không bao giờ rơi xuống đất. Giúp lĩnh hội khinh công.", "icon": "white"},
+	"nanh_soi": {"name": "Nanh sói sương", "kind": "material", "description": "Chiếc nanh lạnh buốt, trong như băng. Thợ săn đổi lấy tiền hay làm bùa giữ ấm.", "icon": "white"},
+	"tinh_suong": {"name": "Tinh sương Bạch Sương", "kind": "quest", "description": "Viên băng kết trong lồng ngực sói chúa. Lạnh đến mức sương đọng quanh ngón tay.", "icon": "frost"},
+	"hach_nham": {"name": "Hạch nham thạch", "kind": "quest", "description": "Lõi đá còn ấm lấy từ khôi lỗi giữ phế tích, khắc văn phù màu hổ phách.", "icon": "stone"},
+	"loi_phu": {"name": "Lôi phù", "kind": "quest", "description": "Lá bùa vàng của Lôi sư, mực chu sa còn rung tiếng sấm.", "icon": "seal"},
+	"giot_ky_uc": {"name": "Giọt ký ức", "kind": "quest", "description": "Giọt nước sáng mờ hồn ảnh để lại khi tan, trong đó thấp thoáng một gương mặt.", "icon": "spirit"},
 	"to_ky_uc": {"name": "Tơ ký ức", "kind": "key", "description": "Sợi tơ sáng kết từ ký ức người làng nhớ lại. Có thể dùng để hóa giải phong ấn.", "icon": "spirit"},
 	"ngoc_phong_an": {"name": "Ngọc phong ấn", "kind": "key", "description": "Viên ngọc nứt rơi ra từ Trúc Tướng. Bên trong vọng tiếng chuông xa.", "icon": "seal"}
 }
